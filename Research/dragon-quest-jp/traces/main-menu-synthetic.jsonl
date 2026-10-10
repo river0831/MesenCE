@@ -1,0 +1,6 @@
+{"type":"rom-read","frame":100,"cpuAddress":33881,"prgOffset":1113,"value":60,"cpuPc":49152}
+{"type":"rom-read","frame":100,"cpuAddress":33882,"prgOffset":1114,"value":95,"cpuPc":49155}
+{"type":"rom-read","frame":100,"cpuAddress":33883,"prgOffset":1115,"value":35,"cpuPc":49155}
+{"type":"rom-read","frame":101,"cpuAddress":33890,"prgOffset":1122,"value":248,"cpuPc":49155}
+{"type":"hide","frame":180}
+{"type":"rom-read","frame":240,"cpuAddress":33881,"prgOffset":1113,"value":60,"cpuPc":49152}

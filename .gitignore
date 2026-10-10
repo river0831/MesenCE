@@ -172,6 +172,12 @@ $RECYCLE.BIN/
 *.pce
 PGOHelper/PGOGames/*
 
+# Local NES translation inputs and reproducible generated artifacts
+nointro_set/
+test_roms/
+Research/**/generated/
+Tools/**/__pycache__/
+
 *.VC.opendb
 *.VC.db
 *.VC.db-wal
