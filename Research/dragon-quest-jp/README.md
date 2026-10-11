@@ -36,6 +36,21 @@ resolver deduplicates the reads, switches between the database records, and
 restores the main-menu translation when the detail window is cancelled. PPU
 monitoring is not used.
 
+## Strength-menu visual overlay prototype
+
+`runtime/strength-overlay.lua` covers only the ten static labels in the
+runtime-confirmed strength window. The original numeric and equipment values
+remain visible. It uses Mesen's console-screen drawing surface and does not
+modify ROM, emulated RAM, or the emulator core. The initial label positions are
+visual-provisional until checked at native 256x240 coordinates.
+
+```sh
+bin/osx-arm64/Release/osx-arm64/publish/Mesen.app/Contents/MacOS/Mesen \
+  --enableStdout --doNotSaveSettings \
+  Research/dragon-quest-jp/runtime/strength-overlay.lua \
+  "test_roms/Dragon Quest (Japan).nes"
+```
+
 ## Capture menu lifecycle evidence
 
 The lifecycle capture is a bounded diagnostic run. It starts at the first

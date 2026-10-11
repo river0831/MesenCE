@@ -14,6 +14,11 @@
   1740, and parent-menu `replace` at frame 1968 after cancel. The final event
   intentionally has no PRG offset because it is a database-declared parent
   restoration rather than a new ROM read.
+- The first console-screen overlay now replaces all ten static Japanese labels
+  while preserving the original dynamic numbers and equipment values. Its
+  native-coordinate layout has passed one visual check.
+- Repeated open/cancel cycles confirmed that the overlay activates again on
+  each strength-record read and disappears on the verified cancel input.
 
 ## Completed
 

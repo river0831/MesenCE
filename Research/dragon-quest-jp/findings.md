@@ -89,3 +89,18 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Confidence: `runtime-confirmed` for `$02D3-$030E` as the summary window and
   `$030F-$03F5` as the strength-detail record. Field meanings are
   `cross-validated` by byte decoding and the screenshot.
+
+## Strength-detail visual overlay
+
+- A read-only Lua overlay activates from the runtime-confirmed
+  `dq.menu.strength` range and redraws only the ten static label areas.
+- A visual check confirmed that the original Japanese labels are fully
+  covered, the translated labels align with their rows, and the game's
+  numeric and equipment values remain unobscured.
+- The current prototype uses traditional/Japanese glyph variants available in
+  Mesen's built-in debug font (`等級`, `攻撃力`, and `鎧甲`). Simplified Chinese
+  requires a separate bitmap font and remains future display work.
+- Multiple subsequent open/cancel cycles emitted stable `show` and `hide`
+  events, and the translated labels disappeared with the strength window.
+- Lifecycle confidence: `runtime-confirmed`. Layout confidence remains
+  `visual-provisional` pending tests at additional window scales.
