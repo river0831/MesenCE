@@ -26,6 +26,8 @@ class TextRecord:
     source_text: str
     translation: str
     confidence: str
+    dismiss_input_mask: int | None
+    deactivation_confidence: str | None
 
     def contains(self, prg_offset: int) -> bool:
         return self.prg_start <= prg_offset < self.prg_end_exclusive
@@ -88,6 +90,17 @@ def load_database(path: Path) -> GameDatabase:
         if len(record_bytes) != end - start:
             raise DatabaseError(f"rawHex length does not match PRG range for {record_id}")
 
+        dismiss_input_mask: int | None = None
+        deactivation_confidence: str | None = None
+        if "deactivation" in item:
+            deactivation = _require(item, "deactivation", dict)
+            dismiss_input_mask = _require(deactivation, "dismissInputMask", int)
+            if dismiss_input_mask < 1 or dismiss_input_mask > 0xFF:
+                raise DatabaseError(
+                    f"invalid dismissInputMask for {record_id}: {dismiss_input_mask}"
+                )
+            deactivation_confidence = _require(deactivation, "confidence", str)
+
         records.append(TextRecord(
             id=record_id,
             kind=_require(item, "kind", str),
@@ -97,6 +110,8 @@ def load_database(path: Path) -> GameDatabase:
             source_text=_require(item, "sourceText", str),
             translation=_require(item, "translation", str),
             confidence=_require(item, "confidence", str),
+            dismiss_input_mask=dismiss_input_mask,
+            deactivation_confidence=deactivation_confidence,
         ))
 
     return GameDatabase(version, sha256, prg_file_offset, tuple(records))

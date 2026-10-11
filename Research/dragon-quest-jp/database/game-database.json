@@ -16,7 +16,11 @@
       "rawHex": "3c 5f 23 1e 16 5f 5f 5f 15 f8 3a 2c 37 5f 5b ff 3c 5f 1b 2f 14 5f 5f 5f 1d f8 0c 11 f8 5f 5f 5b ff 3c 5f 0f 0b 19 f8 37 5f 5f 15 30 26 f8 32 5f 5b ff 3c 5f 1d 24 f8 30 5f 5f 5f 1d 32 5f 5f 5f 5b ff",
       "sourceText": "はなす　　じゅもん\nつよさ　　どうぐ\nかいだん　しらべる\nとびら　　とる",
       "translation": "交谈　　　咒文\n状态　　　道具\n楼梯　　　调查\n开门　　　拿取",
-      "confidence": "runtime-confirmed"
+      "confidence": "runtime-confirmed",
+      "deactivation": {
+        "dismissInputMask": 2,
+        "confidence": "runtime-confirmed"
+      }
     }
   ]
 }

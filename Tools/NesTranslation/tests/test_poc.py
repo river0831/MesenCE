@@ -7,8 +7,8 @@ from pathlib import Path
 
 from Tools.NesTranslation.database import DatabaseError, load_database, validate_rom
 from Tools.NesTranslation.display import DebugRenderer
-from Tools.NesTranslation.events import RomReadEvent
-from Tools.NesTranslation.live import parse_trace_line
+from Tools.NesTranslation.events import InputEvent, RomReadEvent
+from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
 from Tools.NesTranslation.replay import replay
 from Tools.NesTranslation.resolver import TextResolver
 
@@ -36,6 +36,11 @@ class DatabaseTests(unittest.TestCase):
         validate_rom(database, ROM)
         self.assertEqual(database.records[0].raw_bytes[0], 0x3C)
         self.assertEqual(database.records[0].raw_bytes[-1], 0xFF)
+        self.assertEqual(database.records[0].dismiss_input_mask, 0x02)
+        self.assertEqual(
+            database.records[0].deactivation_confidence,
+            "runtime-confirmed",
+        )
 
     def test_wrong_rom_hash_is_rejected(self) -> None:
         database = load_database(DATABASE)
@@ -78,6 +83,21 @@ class ResolverTests(unittest.TestCase):
         self.assertEqual(hidden.type, "text-hide")
         self.assertNotEqual(first.instance_id, second.instance_id)
 
+    def test_record_declared_dismiss_input_hides_active_text(self) -> None:
+        self.resolver.consume(read_event(0x0459, 10))
+        ignored = self.resolver.consume(InputEvent("input", 20, 0x01))
+        hidden = self.resolver.consume(InputEvent("input", 30, 0x02))
+        self.assertEqual(ignored, [])
+        self.assertEqual(len(hidden), 1)
+        self.assertEqual(hidden[0].type, "text-hide")
+        self.assertEqual(hidden[0].frame, 30)
+
+    def test_dismiss_input_without_active_text_is_ignored(self) -> None:
+        self.assertEqual(
+            self.resolver.consume(InputEvent("input", 20, 0x02)),
+            [],
+        )
+
     def test_renderer_only_consumes_text_event(self) -> None:
         event = self.resolver.consume(read_event(0x0459))[0]
         command = DebugRenderer(self.database).consume(event)
@@ -100,6 +120,36 @@ class ResolverTests(unittest.TestCase):
         self.assertEqual(event.prg_offset, 0x0459)
         self.assertEqual(event.frame, 42)
         self.assertIsNone(parse_trace_line("ordinary Mesen log"))
+
+        input_event = parse_trace_line(
+            'DQTRACE {"type":"input","frame":43,"buttons":2}'
+        )
+        self.assertEqual(input_event, InputEvent("input", 43, 2))
+
+    def test_diagnostic_trace_payload_contract(self) -> None:
+        item = parse_trace_payload(
+            'DQTRACE {"type":"ram-write","frame":43,"address":17,'
+            '"value":2,"cpuPc":49154}'
+        )
+        self.assertEqual(item, {
+            "type": "ram-write",
+            "frame": 43,
+            "address": 17,
+            "value": 2,
+            "cpuPc": 49154,
+        })
+        self.assertIsNone(parse_trace_line(
+            'DQTRACE {"type":"ram-write","frame":43,"address":17,'
+            '"value":2,"cpuPc":49154}'
+        ))
+
+        state = parse_trace_payload(
+            'DQTRACE {"type":"state","frame":44,"menuMode":3,'
+            '"input":1,"textLo":89,"textHi":132,"values":[3,1,89,132]}'
+        )
+        assert state is not None
+        self.assertEqual(state["type"], "state")
+        self.assertEqual(state["input"], 1)
 
 
 if __name__ == "__main__":

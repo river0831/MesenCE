@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .database import GameDatabase, TextRecord
-from .events import RomReadEvent, TextEvent
+from .events import InputEvent, RomReadEvent, TextEvent
 
 
 class TextResolver:
@@ -13,7 +13,16 @@ class TextResolver:
         self.active_instance_id: int | None = None
         self._next_instance_id = 1
 
-    def consume(self, event: RomReadEvent) -> list[TextEvent]:
+    def consume(self, event: RomReadEvent | InputEvent) -> list[TextEvent]:
+        if isinstance(event, InputEvent):
+            if (
+                self.active_record is not None
+                and self.active_record.dismiss_input_mask is not None
+                and event.buttons & self.active_record.dismiss_input_mask
+            ):
+                return self.hide(event.frame)
+            return []
+
         matches = self.database.records_at(event.prg_offset)
         if not matches:
             return []

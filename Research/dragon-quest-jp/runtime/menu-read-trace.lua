@@ -3,9 +3,18 @@
 -- corresponds to physical PRG $0459-$049A (the complete eight-entry menu).
 
 local frame = 0
+local previousInput = 0
 
 emu.addEventCallback(function()
   frame = frame + 1
+  local input = emu.read(0x47, emu.memType.nesDebug)
+  if input ~= 0 and input ~= previousInput then
+    print(string.format(
+      "DQTRACE {\"type\":\"input\",\"frame\":%d,\"buttons\":%d}",
+      frame, input
+    ))
+  end
+  previousInput = input
 end, emu.eventType.endFrame)
 
 emu.addMemoryCallback(function(address, value)

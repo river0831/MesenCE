@@ -10,30 +10,45 @@ from pathlib import Path
 
 from .database import load_database, validate_rom
 from .display import DebugRenderer
-from .events import RomReadEvent
+from .events import InputEvent, RomReadEvent
 from .resolver import TextResolver
 
 
 TRACE_PREFIX = "DQTRACE "
 
 
-def parse_trace_line(line: str) -> RomReadEvent | None:
+def parse_trace_payload(line: str) -> dict | None:
     if not line.startswith(TRACE_PREFIX):
         return None
     payload = line[len(TRACE_PREFIX):].strip()
     if not payload.startswith("{"):
         return None
     value = json.loads(payload)
-    if value.get("type") != "rom-read":
+    if not isinstance(value, dict) or not isinstance(value.get("type"), str):
         return None
-    return RomReadEvent(
-        type="rom-read",
-        frame=int(value["frame"]),
-        cpu_address=int(value["cpuAddress"]),
-        prg_offset=int(value["prgOffset"]),
-        value=int(value["value"]),
-        cpu_pc=int(value["cpuPc"]),
-    )
+    return value
+
+
+def parse_trace_line(line: str) -> RomReadEvent | InputEvent | None:
+    value = parse_trace_payload(line)
+    if value is None:
+        return None
+    if value.get("type") == "rom-read":
+        return RomReadEvent(
+            type="rom-read",
+            frame=int(value["frame"]),
+            cpu_address=int(value["cpuAddress"]),
+            prg_offset=int(value["prgOffset"]),
+            value=int(value["value"]),
+            cpu_pc=int(value["cpuPc"]),
+        )
+    if value.get("type") == "input":
+        return InputEvent(
+            type="input",
+            frame=int(value["frame"]),
+            buttons=int(value["buttons"]),
+        )
+    return None
 
 
 def run_live(mesen: Path, script: Path, rom: Path, database_path: Path) -> int:

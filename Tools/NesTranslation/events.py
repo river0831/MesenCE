@@ -17,6 +17,13 @@ class RomReadEvent:
 
 
 @dataclass(frozen=True)
+class InputEvent:
+    type: Literal["input"]
+    frame: int
+    buttons: int
+
+
+@dataclass(frozen=True)
 class TextEvent:
     type: Literal["text-show", "text-replace", "text-hide"]
     frame: int
@@ -25,7 +32,7 @@ class TextEvent:
     evidence_prg_offset: int | None
 
 
-def event_dict(event: RomReadEvent | TextEvent) -> dict:
+def event_dict(event: RomReadEvent | InputEvent | TextEvent) -> dict:
     result = asdict(event)
     result["cpuAddress"] = result.pop("cpu_address", None)
     result["prgOffset"] = result.pop("prg_offset", None)

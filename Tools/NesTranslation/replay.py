@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .database import load_database
 from .display import DebugRenderer
-from .events import RomReadEvent
+from .events import InputEvent, RomReadEvent
 from .resolver import TextResolver
 
 
@@ -24,6 +24,12 @@ def replay(database_path: Path, trace_path: Path) -> list[dict]:
         item = json.loads(line)
         if item.get("type") == "hide":
             text_events = resolver.hide(int(item["frame"]))
+        elif item.get("type") == "input":
+            text_events = resolver.consume(InputEvent(
+                type="input",
+                frame=int(item["frame"]),
+                buttons=int(item["buttons"]),
+            ))
         elif item.get("type") == "rom-read":
             text_events = resolver.consume(RomReadEvent(
                 type="rom-read",
