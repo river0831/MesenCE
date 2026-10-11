@@ -103,3 +103,19 @@ python3 -m Tools.NesTranslation.provenance \
 how many physical Nametable cells currently carry that tag and their bounds.
 The frame TTL is only a lightweight correlation heuristic; this prototype does
 not yet propagate tags through the intermediate RAM PPU-update buffer.
+
+Trace the intermediate RAM buffer with the same launcher and the buffer
+diagnostic template:
+
+```sh
+python3 -m Tools.NesTranslation.provenance \
+  --mesen bin/osx-arm64/Release/osx-arm64/publish/Mesen.app/Contents/MacOS/Mesen \
+  --template Research/dragon-quest-jp/runtime/ppu-buffer-provenance.lua \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --database Research/dragon-quest-jp/database/game-database.json
+```
+
+This correlates tagged RAM writes with same-value RAM reads immediately before
+a physical Nametable write. It emits one `DQBUFFER buffer-summary` per record
+when the script exits. It is a discovery tool; confirmed buffer structure must
+still be checked against the 6502 code before becoming runtime configuration.

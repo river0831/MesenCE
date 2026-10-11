@@ -146,3 +146,29 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   overwrite sequence, and close-to-zero lifecycle in this exact ROM;
   `semantic-probable` for treating the temporal tag as true byte-level source
   provenance until the intermediate RAM PPU-update buffer is traced.
+
+## PPU update buffer provenance
+
+- A second diagnostic propagated the temporary record tag into CPU RAM and
+  correlated tagged RAM reads with same-value physical Nametable writes.
+- All successful correlations used RAM `$0302-$036E`. Addresses advance by
+  three bytes, identifying the third byte of repeated buffer entries.
+- The producer routine at CPU `$ABA4-$ABBA` stores three bytes per entry at
+  `$0300,X`: high PPU address, low PPU address, then tile value. The tile-value
+  store is at `$ABB8`; zero-page `$04` is the buffer cursor and `$C0` is the
+  checked capacity.
+- The NMI uploader loop at `$AB30-$AB4D` reads the high address at `$AB36` and
+  writes it to `$2006` at `$AB39`; it reads/writes the low address at
+  `$AB3D/$AB40`, then reads the tile value at `$AB44` and writes it to `$2007`
+  at `$AB47`.
+- Mesen callbacks reported producer PC `$ABBB`, consumer PC `$AB47`, and PPU
+  writer PC `$AB4B`. Callback PC values point just after or within the observed
+  instruction, consistent with the decoded loop above.
+- Every successful RAM-read-to-Nametable-write correlation had the same clock
+  delta of 5. The main menu produced four uploads per detected data slot;
+  the strength window produced eleven, matching their multi-frame drawing
+  sequences.
+- This establishes a concrete path for this ROM:
+  known text record -> `$0300` triple buffer -> NMI upload loop -> Nametable.
+- Confidence: `code-confirmed` for the buffer format, producer, and uploader;
+  `runtime-confirmed` for record-tagged data slots `$0302-$036E` in this run.

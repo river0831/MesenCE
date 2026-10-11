@@ -113,6 +113,17 @@ class DatabaseTests(unittest.TestCase):
                 database, "-- __NES_TRANSLATION_PROVENANCE_CONFIG__", -1
             )
 
+    def test_buffer_provenance_template_uses_same_database_contract(self) -> None:
+        database = load_database(DATABASE)
+        template = (
+            ROOT / "Research/dragon-quest-jp/runtime/ppu-buffer-provenance.lua"
+        ).read_text(encoding="utf-8")
+        script = build_provenance_script(database, template)
+        self.assertNotIn("__NES_TRANSLATION_PROVENANCE_CONFIG__", script)
+        self.assertIn('id = "dq.menu.main"', script)
+        self.assertIn('id = "dq.menu.strength"', script)
+        self.assertIn("emu.memType.nesNametableRam", script)
+
 
 class ReadAnalysisTests(unittest.TestCase):
     def test_clusters_contiguous_prg_reads_and_excludes_known_range(self) -> None:
