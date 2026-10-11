@@ -82,6 +82,10 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   remained drawn and its ROM range was not read again, `dq.menu.strength`
   declares `returnToRecordId: dq.menu.main`; the generic resolver restores the
   parent translation without game-specific code.
+- A subsequent production-adapter run (not the diagnostic replay) emitted the
+  expected live sequence: `dq.menu.main` show at frame 1676,
+  `dq.menu.strength` replace at frame 1740, and `dq.menu.main` replace at frame
+  1968 after cancel.
 - Confidence: `runtime-confirmed` for `$02D3-$030E` as the summary window and
   `$030F-$03F5` as the strength-detail record. Field meanings are
   `cross-validated` by byte decoding and the screenshot.

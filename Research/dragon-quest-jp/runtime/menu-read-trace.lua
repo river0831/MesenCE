@@ -1,6 +1,7 @@
 -- Read-only Mesen debugger adapter for the Dragon Quest menu PoC.
--- The exact 32 KiB PRG is mapped at CPU $8000-$FFFF, so CPU $8459-$849A
--- corresponds to physical PRG $0459-$049A (the complete eight-entry menu).
+-- The exact 32 KiB PRG is mapped at CPU $8000-$FFFF. The watched ranges are
+-- database-backed records; the Python resolver decides which translation is
+-- active and how it transitions.
 
 local frame = 0
 local previousInput = 0
@@ -17,7 +18,7 @@ emu.addEventCallback(function()
   previousInput = input
 end, emu.eventType.endFrame)
 
-emu.addMemoryCallback(function(address, value)
+local function onRecordRead(address, value)
   local state = emu.getCpuState(emu.cpuType.nes)
   local pc = state.pc or state.PC or 0
   print(string.format(
@@ -25,6 +26,26 @@ emu.addMemoryCallback(function(address, value)
     "\"prgOffset\":%d,\"value\":%d,\"cpuPc\":%d}",
     frame, address, address - 0x8000, value, pc
   ))
-end, emu.callbackType.read, 0x8459, 0x849A, emu.cpuType.nes, emu.memType.nesMemory)
+end
 
-print("DQTRACE_READY menu=dq.menu.main cpuStart=33881 cpuEnd=33946")
+-- dq.menu.strength: physical PRG $030F-$03F5
+emu.addMemoryCallback(
+  onRecordRead,
+  emu.callbackType.read,
+  0x830F,
+  0x83F5,
+  emu.cpuType.nes,
+  emu.memType.nesMemory
+)
+
+-- dq.menu.main: physical PRG $0459-$049A
+emu.addMemoryCallback(
+  onRecordRead,
+  emu.callbackType.read,
+  0x8459,
+  0x849A,
+  emu.cpuType.nes,
+  emu.memType.nesMemory
+)
+
+print("DQTRACE_READY records=dq.menu.main,dq.menu.strength")

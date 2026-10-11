@@ -30,9 +30,11 @@ python3 -m Tools.NesTranslation.live \
   --database Research/dragon-quest-jp/database/game-database.json
 ```
 
-When the main command menu reads CPU `$8459-$849A`, Mesen emits a `DQTRACE`
-event. The Python resolver deduplicates the reads and prints one translated
-display command. PPU monitoring is not used.
+When the main command menu reads CPU `$8459-$849A` or the strength-detail
+window reads CPU `$830F-$83F5`, Mesen emits `DQTRACE` events. The Python
+resolver deduplicates the reads, switches between the database records, and
+restores the main-menu translation when the detail window is cancelled. PPU
+monitoring is not used.
 
 ## Capture menu lifecycle evidence
 
