@@ -83,3 +83,23 @@ deduplicating reads per frame and CPU PC. Summarize the result with:
 python3 -m Tools.NesTranslation.analyze_reads \
   Research/dragon-quest-jp/generated/item-menu.jsonl
 ```
+
+## Lightweight Nametable provenance prototype
+
+This read-only diagnostic keeps a shadow copy of physical Nametable RAM. A
+database text read opens a short source context, and nearby Nametable writes
+inherit that record ID. Later untagged writes replace the metadata, so a record
+group naturally reaches zero cells when its tiles are cleared or overwritten.
+
+```sh
+python3 -m Tools.NesTranslation.provenance \
+  --mesen bin/osx-arm64/Release/osx-arm64/publish/Mesen.app/Contents/MacOS/Mesen \
+  --template Research/dragon-quest-jp/runtime/nametable-provenance.lua \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --database Research/dragon-quest-jp/database/game-database.json
+```
+
+`DQPROV source` identifies the active database record. `DQPROV group` reports
+how many physical Nametable cells currently carry that tag and their bounds.
+The frame TTL is only a lightweight correlation heuristic; this prototype does
+not yet propagate tags through the intermediate RAM PPU-update buffer.

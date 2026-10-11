@@ -11,6 +11,7 @@ from Tools.NesTranslation.display import DebugRenderer
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
 from Tools.NesTranslation.overlay import build_overlay_script
+from Tools.NesTranslation.provenance import build_provenance_script
 from Tools.NesTranslation.replay import replay
 from Tools.NesTranslation.resolver import TextResolver
 
@@ -92,6 +93,25 @@ class DatabaseTests(unittest.TestCase):
         self.assertIn('text = "等級:"', script)
         self.assertIn("startAddress = 33881", script)
         self.assertIn("local inputAddress = 71", script)
+
+    def test_provenance_script_is_generated_from_database(self) -> None:
+        database = load_database(DATABASE)
+        template = (
+            ROOT / "Research/dragon-quest-jp/runtime/nametable-provenance.lua"
+        ).read_text(encoding="utf-8")
+        script = build_provenance_script(database, template, source_ttl_frames=4)
+        self.assertNotIn("__NES_TRANSLATION_PROVENANCE_CONFIG__", script)
+        self.assertIn("local sourceTtlFrames = 4", script)
+        self.assertIn('id = "dq.menu.main"', script)
+        self.assertIn("startAddress = 33881", script)
+        self.assertIn("endAddress = 33946", script)
+
+    def test_provenance_rejects_negative_ttl(self) -> None:
+        database = load_database(DATABASE)
+        with self.assertRaisesRegex(ValueError, "non-negative"):
+            build_provenance_script(
+                database, "-- __NES_TRANSLATION_PROVENANCE_CONFIG__", -1
+            )
 
 
 class ReadAnalysisTests(unittest.TestCase):

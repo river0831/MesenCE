@@ -117,3 +117,32 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   strength replacement, strength cancel-to-hide, and direct main-menu hide.
 - Main-menu layout confidence: `visual-provisional`; both overlay lifecycles
   are `runtime-confirmed` for the bound ROM.
+
+## Lightweight Nametable provenance
+
+- A read-only prototype now attaches the active database record ID to a shadow
+  copy of physical Nametable RAM. It uses Mesen's `nesNametableRam` write
+  callback, so cartridge mirroring is already resolved to the 2 KiB CIRAM
+  address written by the game.
+- In the validation run, `dq.menu.main` was first read at frame 2970. Tagged
+  writes grew over frames 2971-2974 into 113 cells with bounds table 0,
+  rows 3-11, columns 14-27. This is a 14-by-9 rectangular window region,
+  including its background/border writes rather than glyph cells alone.
+- `dq.menu.strength` was first read at frame 3069. Its tagged writes grew over
+  frames 3070-3083 into 308 cells with bounds table 0, rows 6-27,
+  columns 12-25: a 14-by-22 rectangle.
+- As the strength window was drawn, the main-menu tagged cell count fell from
+  111 to 88, 64, and then 40. This directly observes higher-layer Nametable
+  writes replacing the overlapping lower-layer provenance.
+- On cancel, the strength group shrank by 28 cells per frame from frame 3385
+  until it reached zero at frame 3395. The remaining main-menu group then
+  shrank to zero by frame 3401. This independently confirms that this action
+  closes both windows; the lower menu was not restored in this scenario.
+- The three-frame context remained active because continuing source reads
+  refreshed it while the window was rendered over multiple frames. The result
+  validates lightweight temporal source propagation for these two records,
+  but does not prove it will separate unrelated writes in other games.
+- Confidence: `runtime-confirmed` for the observed Nametable bounds,
+  overwrite sequence, and close-to-zero lifecycle in this exact ROM;
+  `semantic-probable` for treating the temporal tag as true byte-level source
+  provenance until the intermediate RAM PPU-update buffer is traced.
