@@ -5,6 +5,10 @@
     "sha256": "f3973016ecc113ec89b8b20f49072a2ff677d6b581920683d9c72acc4b667a3e",
     "prgFileOffset": 16
   },
+  "runtime": {
+    "cpuAddressBase": 32768,
+    "inputAddress": 71
+  },
   "records": [
     {
       "id": "dq.menu.main",
@@ -17,6 +21,19 @@
       "sourceText": "はなす　　じゅもん\nつよさ　　どうぐ\nかいだん　しらべる\nとびら　　とる",
       "translation": "交谈　　　咒文\n状态　　　道具\n楼梯　　　调查\n开门　　　拿取",
       "confidence": "runtime-confirmed",
+      "presentation": {
+        "mode": "label-overlay",
+        "labels": [
+          { "text": "交談", "x": 128, "y": 34, "clear": { "x": 128, "y": 32, "width": 32, "height": 12 } },
+          { "text": "咒文", "x": 182, "y": 34, "clear": { "x": 174, "y": 32, "width": 40, "height": 12 } },
+          { "text": "状態", "x": 128, "y": 50, "clear": { "x": 128, "y": 48, "width": 32, "height": 12 } },
+          { "text": "道具", "x": 182, "y": 50, "clear": { "x": 174, "y": 48, "width": 40, "height": 12 } },
+          { "text": "樓梯", "x": 128, "y": 66, "clear": { "x": 128, "y": 64, "width": 32, "height": 12 } },
+          { "text": "調査", "x": 182, "y": 66, "clear": { "x": 174, "y": 64, "width": 40, "height": 12 } },
+          { "text": "開門", "x": 128, "y": 82, "clear": { "x": 128, "y": 80, "width": 32, "height": 12 } },
+          { "text": "拿取", "x": 182, "y": 82, "clear": { "x": 174, "y": 80, "width": 40, "height": 12 } }
+        ]
+      },
       "deactivation": {
         "dismissInputMask": 2,
         "confidence": "runtime-confirmed"
@@ -33,9 +50,23 @@
       "sourceText": "レベル\nちから\nすばやさ\nさいだいHP\nさいだいMP\nこうげき力\nしゅび力\nぶき\nよろい\nたて",
       "translation": "等级\n力量\n敏捷\n最大生命值\n最大魔法值\n攻击力\n防御力\n武器\n铠甲\n盾牌",
       "confidence": "runtime-confirmed",
+      "presentation": {
+        "mode": "label-overlay",
+        "labels": [
+          { "text": "等級:", "x": 132, "y": 66, "clear": { "x": 100, "y": 64, "width": 78, "height": 12 } },
+          { "text": "力量:", "x": 132, "y": 82, "clear": { "x": 100, "y": 80, "width": 78, "height": 12 } },
+          { "text": "敏捷:", "x": 132, "y": 98, "clear": { "x": 100, "y": 96, "width": 78, "height": 12 } },
+          { "text": "最大HP:", "x": 123, "y": 114, "clear": { "x": 100, "y": 112, "width": 78, "height": 12 } },
+          { "text": "最大MP:", "x": 123, "y": 130, "clear": { "x": 100, "y": 128, "width": 78, "height": 12 } },
+          { "text": "攻撃力:", "x": 126, "y": 146, "clear": { "x": 100, "y": 144, "width": 78, "height": 12 } },
+          { "text": "防御力:", "x": 126, "y": 162, "clear": { "x": 100, "y": 160, "width": 78, "height": 12 } },
+          { "text": "武器:", "x": 132, "y": 178, "clear": { "x": 100, "y": 176, "width": 78, "height": 12 } },
+          { "text": "鎧甲:", "x": 132, "y": 194, "clear": { "x": 100, "y": 192, "width": 78, "height": 12 } },
+          { "text": "盾牌:", "x": 132, "y": 210, "clear": { "x": 100, "y": 208, "width": 78, "height": 12 } }
+        ]
+      },
       "deactivation": {
         "dismissInputMask": 2,
-        "returnToRecordId": "dq.menu.main",
         "confidence": "runtime-confirmed"
       }
     }

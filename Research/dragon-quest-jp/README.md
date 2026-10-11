@@ -33,23 +33,29 @@ python3 -m Tools.NesTranslation.live \
 When the main command menu reads CPU `$8459-$849A` or the strength-detail
 window reads CPU `$830F-$83F5`, Mesen emits `DQTRACE` events. The Python
 resolver deduplicates the reads, switches between the database records, and
-restores the main-menu translation when the detail window is cancelled. PPU
-monitoring is not used.
+hides the active translation when the verified cancel input closes the menu
+stack. PPU monitoring is not used.
 
-## Strength-menu visual overlay prototype
+## Database-driven visual overlay
 
-`runtime/strength-overlay.lua` covers only the ten static labels in the
-runtime-confirmed strength window. The original numeric and equipment values
-remain visible. It uses Mesen's console-screen drawing surface and does not
-modify ROM, emulated RAM, or the emulator core. The initial label positions are
-visual-provisional until checked at native 256x240 coordinates.
+The overlay launcher validates the exact ROM, loads every database record with
+`presentation` metadata, injects that data into the generic Lua template, and
+starts Mesen. The generated script exists only in a temporary directory. The
+template contains no Dragon Quest record IDs, addresses, translations, or
+coordinates.
 
 ```sh
-bin/osx-arm64/Release/osx-arm64/publish/Mesen.app/Contents/MacOS/Mesen \
-  --enableStdout --doNotSaveSettings \
-  Research/dragon-quest-jp/runtime/strength-overlay.lua \
-  "test_roms/Dragon Quest (Japan).nes"
+python3 -m Tools.NesTranslation.overlay \
+  --mesen bin/osx-arm64/Release/osx-arm64/publish/Mesen.app/Contents/MacOS/Mesen \
+  --template Research/dragon-quest-jp/runtime/database-overlay.lua \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --database Research/dragon-quest-jp/database/game-database.json
 ```
+
+The main command menu and strength-detail window both use this path. Static
+labels are covered and redrawn while the game's dynamic numbers and equipment
+values remain visible. No ROM, emulated RAM, or emulator-core modification is
+used.
 
 ## Capture menu lifecycle evidence
 

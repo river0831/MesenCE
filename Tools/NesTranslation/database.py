@@ -17,6 +17,28 @@ class DatabaseError(ValueError):
 
 
 @dataclass(frozen=True)
+class ClearRect:
+    x: int
+    y: int
+    width: int
+    height: int
+
+
+@dataclass(frozen=True)
+class OverlayLabel:
+    text: str
+    x: int
+    y: int
+    clear: ClearRect
+
+
+@dataclass(frozen=True)
+class Presentation:
+    mode: str
+    labels: tuple[OverlayLabel, ...]
+
+
+@dataclass(frozen=True)
 class TextRecord:
     id: str
     kind: str
@@ -26,6 +48,7 @@ class TextRecord:
     source_text: str
     translation: str
     confidence: str
+    presentation: Presentation | None
     dismiss_input_mask: int | None
     return_to_record_id: str | None
     deactivation_confidence: str | None
@@ -39,6 +62,8 @@ class GameDatabase:
     database_version: int
     rom_sha256: str
     prg_file_offset: int
+    cpu_address_base: int
+    input_address: int
     records: tuple[TextRecord, ...]
 
     def records_at(self, prg_offset: int) -> tuple[TextRecord, ...]:
@@ -49,6 +74,51 @@ def _require(value: dict[str, Any], key: str, expected_type: type) -> Any:
     if key not in value or not isinstance(value[key], expected_type):
         raise DatabaseError(f"{key!r} must be {expected_type.__name__}")
     return value[key]
+
+
+def _non_negative_int(value: dict[str, Any], key: str, context: str) -> int:
+    result = _require(value, key, int)
+    if result < 0:
+        raise DatabaseError(f"{context}.{key} must be non-negative")
+    return result
+
+
+def _load_presentation(item: dict[str, Any], record_id: str) -> Presentation | None:
+    if "presentation" not in item:
+        return None
+    value = _require(item, "presentation", dict)
+    mode = _require(value, "mode", str)
+    if mode != "label-overlay":
+        raise DatabaseError(f"unsupported presentation mode for {record_id}: {mode}")
+    raw_labels = _require(value, "labels", list)
+    if not raw_labels:
+        raise DatabaseError(f"presentation labels must not be empty for {record_id}")
+
+    labels: list[OverlayLabel] = []
+    for index, raw_label in enumerate(raw_labels):
+        context = f"presentation.labels[{index}]"
+        if not isinstance(raw_label, dict):
+            raise DatabaseError(f"{context} must be an object")
+        text = _require(raw_label, "text", str)
+        if not text:
+            raise DatabaseError(f"{context}.text must not be empty")
+        clear = _require(raw_label, "clear", dict)
+        width = _non_negative_int(clear, "width", f"{context}.clear")
+        height = _non_negative_int(clear, "height", f"{context}.clear")
+        if width == 0 or height == 0:
+            raise DatabaseError(f"{context}.clear dimensions must be positive")
+        labels.append(OverlayLabel(
+            text=text,
+            x=_non_negative_int(raw_label, "x", context),
+            y=_non_negative_int(raw_label, "y", context),
+            clear=ClearRect(
+                x=_non_negative_int(clear, "x", f"{context}.clear"),
+                y=_non_negative_int(clear, "y", f"{context}.clear"),
+                width=width,
+                height=height,
+            ),
+        ))
+    return Presentation(mode=mode, labels=tuple(labels))
 
 
 def load_database(path: Path) -> GameDatabase:
@@ -65,6 +135,11 @@ def load_database(path: Path) -> GameDatabase:
     if len(sha256) != 64 or any(char not in "0123456789abcdef" for char in sha256):
         raise DatabaseError("rom.sha256 must be a lowercase SHA-256 hex digest")
     prg_file_offset = _require(rom, "prgFileOffset", int)
+    runtime = _require(raw, "runtime", dict)
+    cpu_address_base = _non_negative_int(runtime, "cpuAddressBase", "runtime")
+    input_address = _non_negative_int(runtime, "inputAddress", "runtime")
+    if cpu_address_base > 0xFFFF or input_address > 0xFFFF:
+        raise DatabaseError("runtime addresses must fit in 16 bits")
 
     record_values = _require(raw, "records", list)
     records: list[TextRecord] = []
@@ -116,6 +191,7 @@ def load_database(path: Path) -> GameDatabase:
             source_text=_require(item, "sourceText", str),
             translation=_require(item, "translation", str),
             confidence=_require(item, "confidence", str),
+            presentation=_load_presentation(item, record_id),
             dismiss_input_mask=dismiss_input_mask,
             return_to_record_id=return_to_record_id,
             deactivation_confidence=deactivation_confidence,
@@ -132,7 +208,14 @@ def load_database(path: Path) -> GameDatabase:
                 f"{record.return_to_record_id}"
             )
 
-    return GameDatabase(version, sha256, prg_file_offset, tuple(records))
+    return GameDatabase(
+        version,
+        sha256,
+        prg_file_offset,
+        cpu_address_base,
+        input_address,
+        tuple(records),
+    )
 
 
 def validate_rom(database: GameDatabase, rom_path: Path) -> None:

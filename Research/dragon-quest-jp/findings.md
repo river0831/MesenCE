@@ -78,14 +78,18 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   frame 1278 and confirmation mask `$01` occurred at frame 1318. The first
   `$030F` read occurred in that same frame. All 231 consecutive bytes through
   `$03F5` were read by frame 1331.
-- Cancel mask `$02` occurred at frame 1610. Because the underlying main menu
-  remained drawn and its ROM range was not read again, `dq.menu.strength`
-  declares `returnToRecordId: dq.menu.main`; the generic resolver restores the
-  parent translation without game-specific code.
+- Cancel mask `$02` occurred at frame 1610. An initial event-only
+  interpretation treated the lack of a new main-menu read as a parent-menu
+  restoration.
 - A subsequent production-adapter run (not the diagnostic replay) emitted the
   expected live sequence: `dq.menu.main` show at frame 1676,
   `dq.menu.strength` replace at frame 1740, and `dq.menu.main` replace at frame
   1968 after cancel.
+- A later visual overlay run disproved that interpretation: the same cancel
+  closes both visible menus. Restoring `dq.menu.main` left an overlay over the
+  game scene. The database relationship was removed, so strength-menu cancel
+  now produces a complete hide. This visual result supersedes the earlier
+  event-only conclusion.
 - Confidence: `runtime-confirmed` for `$02D3-$030E` as the summary window and
   `$030F-$03F5` as the strength-detail record. Field meanings are
   `cross-validated` by byte decoding and the screenshot.
@@ -104,3 +108,12 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   events, and the translated labels disappeared with the strength window.
 - Lifecycle confidence: `runtime-confirmed`. Layout confidence remains
   `visual-provisional` pending tests at additional window scales.
+- The original game-specific overlay was subsequently replaced by a generic
+  template. Record ranges, deactivation relationships, display text, and
+  native-screen layout now come from the validated game database.
+- The database-driven main-menu overlay was visually calibrated so its clear
+  rectangles preserve the game's full cursor tile and remove all Japanese
+  glyphs in both columns. The final run confirmed cursor movement, main-to-
+  strength replacement, strength cancel-to-hide, and direct main-menu hide.
+- Main-menu layout confidence: `visual-provisional`; both overlay lifecycles
+  are `runtime-confirmed` for the bound ROM.

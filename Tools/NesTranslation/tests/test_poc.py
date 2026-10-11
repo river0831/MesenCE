@@ -10,6 +10,7 @@ from Tools.NesTranslation.analyze_reads import cluster_reads
 from Tools.NesTranslation.display import DebugRenderer
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
+from Tools.NesTranslation.overlay import build_overlay_script
 from Tools.NesTranslation.replay import replay
 from Tools.NesTranslation.resolver import TextResolver
 
@@ -46,7 +47,9 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(strength.id, "dq.menu.strength")
         self.assertEqual(strength.prg_start, 0x030F)
         self.assertEqual(strength.prg_end_exclusive, 0x03F6)
-        self.assertEqual(strength.return_to_record_id, "dq.menu.main")
+        self.assertIsNone(strength.return_to_record_id)
+        self.assertEqual(len(database.records[0].presentation.labels), 8)
+        self.assertEqual(len(strength.presentation.labels), 10)
 
     def test_wrong_rom_hash_is_rejected(self) -> None:
         database = load_database(DATABASE)
@@ -64,6 +67,31 @@ class DatabaseTests(unittest.TestCase):
             path.write_text(json.dumps(value), encoding="utf-8")
             with self.assertRaisesRegex(DatabaseError, "duplicate record id"):
                 load_database(path)
+
+    def test_invalid_presentation_dimensions_are_rejected(self) -> None:
+        value = json.loads(DATABASE.read_text(encoding="utf-8"))
+        value["records"][0]["presentation"]["labels"][0]["clear"]["width"] = 0
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "database.json"
+            path.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(DatabaseError, "dimensions must be positive"):
+                load_database(path)
+
+    def test_overlay_script_is_generated_from_database(self) -> None:
+        database = load_database(DATABASE)
+        template_path = (
+            ROOT / "Research/dragon-quest-jp/runtime/database-overlay.lua"
+        )
+        script = build_overlay_script(
+            database,
+            template_path.read_text(encoding="utf-8"),
+        )
+        self.assertNotIn("__NES_TRANSLATION_CONFIG__", script)
+        self.assertIn('id = "dq.menu.main"', script)
+        self.assertIn('id = "dq.menu.strength"', script)
+        self.assertIn('text = "等級:"', script)
+        self.assertIn("startAddress = 33881", script)
+        self.assertIn("local inputAddress = 71", script)
 
 
 class ReadAnalysisTests(unittest.TestCase):
@@ -135,13 +163,26 @@ class ResolverTests(unittest.TestCase):
         self.assertEqual(hidden[0].type, "text-hide")
         self.assertEqual(hidden[0].frame, 30)
 
-    def test_child_record_dismiss_restores_declared_parent(self) -> None:
+    def test_strength_dismiss_hides_when_game_closes_all_menus(self) -> None:
         main = self.resolver.consume(read_event(0x0459, 10))[0]
         strength = self.resolver.consume(read_event(0x030F, 20))[0]
-        restored = self.resolver.consume(InputEvent("input", 30, 0x02))[0]
+        hidden = self.resolver.consume(InputEvent("input", 30, 0x02))[0]
         self.assertEqual(main.type, "text-show")
         self.assertEqual(strength.type, "text-replace")
         self.assertEqual(strength.record_id, "dq.menu.strength")
+        self.assertEqual(hidden.type, "text-hide")
+        self.assertEqual(hidden.record_id, "dq.menu.strength")
+
+    def test_child_record_can_restore_declared_parent(self) -> None:
+        value = json.loads(DATABASE.read_text(encoding="utf-8"))
+        value["records"][1]["deactivation"]["returnToRecordId"] = "dq.menu.main"
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "database.json"
+            path.write_text(json.dumps(value), encoding="utf-8")
+            resolver = TextResolver(load_database(path))
+        resolver.consume(read_event(0x0459, 10))
+        resolver.consume(read_event(0x030F, 20))
+        restored = resolver.consume(InputEvent("input", 30, 0x02))[0]
         self.assertEqual(restored.type, "text-replace")
         self.assertEqual(restored.record_id, "dq.menu.main")
         self.assertIsNone(restored.evidence_prg_offset)
