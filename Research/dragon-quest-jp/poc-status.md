@@ -1,5 +1,15 @@
 # Translation PoC status
 
+## Strength menu path
+
+- Database record `dq.menu.strength` covers physical PRG `$030F-$03F5`.
+- A corrected runtime capture hit the record on the same frame as the confirm
+  input and read the full range while the detail window was drawn.
+- Replay of the real diagnostic trace produces main-menu show, strength-menu
+  replace, then main-menu restore on cancel.
+- Both activation and cancel-to-parent behavior are runtime-confirmed for the
+  bound ROM.
+
 ## Completed
 
 - The database is bound to the exact Dragon Quest ROM SHA-256.

@@ -21,6 +21,23 @@
         "dismissInputMask": 2,
         "confidence": "runtime-confirmed"
       }
+    },
+    {
+      "id": "dq.menu.strength",
+      "kind": "status-menu",
+      "prgRange": {
+        "start": 783,
+        "endExclusive": 1014
+      },
+      "rawHex": "3c f7 0c 5f 5b ff 5c f7 0c 5d 5e ff 59 3d 3d 3e 1b 2f 14 f7 06 3d 5a ff 3c 5f 5f 5f 8a 58 5f f0 c7 00 5f 5b ff 3c 5f 5f 5f 1a 0f 30 58 5f f0 c8 00 5f 5b ff 3c 5f 5f 16 e6 2d 14 58 5f f0 c9 00 5f 5b ff 3c 14 0b e1 0b 63 65 58 5f f0 ca 00 5f 5b ff 3c 14 0b e1 0b 64 65 58 5f f0 cb 00 5f 5b ff 3c 5f 13 0c da 10 4c 58 5f f0 cc 00 5f 5b ff 3c 5f 5f 15 3a e7 4c 58 5f f0 cd 00 5f 5b ff 9c f7 04 5f 1e 15 5f 5b ff 9c 5f 5f 8b 5f 5b ff 9c 5f 5f 8c 5f 5b ff 9c 8d 5f 5b ff 9c 5f 8e 5f 5b ff 9c 8f 5b ff 9c 90 5b ff 9c 91 5f 5b ff 9d f7 04 5f 1e 15 5f 5b ff 9d 5f 92 5f 5b ff 9d 5f 93 5f 5b ff 9d 94 5b ff 9d 95 5f 5b ff 9d 96 5b ff 9d 97 5b ff 9d 98 5f 5b ff 3c 5f 5f 19 1c 58 f7 04 5f 1e 15 5f 5b ff",
+      "sourceText": "レベル\nちから\nすばやさ\nさいだいHP\nさいだいMP\nこうげき力\nしゅび力\nぶき\nよろい\nたて",
+      "translation": "等级\n力量\n敏捷\n最大生命值\n最大魔法值\n攻击力\n防御力\n武器\n铠甲\n盾牌",
+      "confidence": "runtime-confirmed",
+      "deactivation": {
+        "dismissInputMask": 2,
+        "returnToRecordId": "dq.menu.main",
+        "confidence": "runtime-confirmed"
+      }
     }
   ]
 }

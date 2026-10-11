@@ -27,6 +27,7 @@ class TextRecord:
     translation: str
     confidence: str
     dismiss_input_mask: int | None
+    return_to_record_id: str | None
     deactivation_confidence: str | None
 
     def contains(self, prg_offset: int) -> bool:
@@ -91,6 +92,7 @@ def load_database(path: Path) -> GameDatabase:
             raise DatabaseError(f"rawHex length does not match PRG range for {record_id}")
 
         dismiss_input_mask: int | None = None
+        return_to_record_id: str | None = None
         deactivation_confidence: str | None = None
         if "deactivation" in item:
             deactivation = _require(item, "deactivation", dict)
@@ -98,6 +100,10 @@ def load_database(path: Path) -> GameDatabase:
             if dismiss_input_mask < 1 or dismiss_input_mask > 0xFF:
                 raise DatabaseError(
                     f"invalid dismissInputMask for {record_id}: {dismiss_input_mask}"
+                )
+            if "returnToRecordId" in deactivation:
+                return_to_record_id = _require(
+                    deactivation, "returnToRecordId", str
                 )
             deactivation_confidence = _require(deactivation, "confidence", str)
 
@@ -111,8 +117,20 @@ def load_database(path: Path) -> GameDatabase:
             translation=_require(item, "translation", str),
             confidence=_require(item, "confidence", str),
             dismiss_input_mask=dismiss_input_mask,
+            return_to_record_id=return_to_record_id,
             deactivation_confidence=deactivation_confidence,
         ))
+
+    record_ids = {record.id for record in records}
+    for record in records:
+        if (
+            record.return_to_record_id is not None
+            and record.return_to_record_id not in record_ids
+        ):
+            raise DatabaseError(
+                f"unknown returnToRecordId for {record.id}: "
+                f"{record.return_to_record_id}"
+            )
 
     return GameDatabase(version, sha256, prg_file_offset, tuple(records))
 

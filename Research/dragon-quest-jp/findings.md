@@ -41,3 +41,47 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   generated from dynamic data or lie outside that window.
 - No child-menu translation is in the database yet.
 - Dialogue page boundaries and dialogue close behavior remain untested.
+
+## Shared compressed-text dictionary
+
+- Entering the empty item path caused a sequential read of physical PRG
+  `$0858-$0A1E` at frame 5206, followed by a few reads near the selected entry.
+- Code at CPU `$BE7A` checks whether a script byte is at least `$6D`, subtracts
+  `$6D`, and uses the result as a dictionary index.
+- It initializes the dictionary pointer to CPU `$8858` (physical PRG `$0858`)
+  and advances through entries delimited by `$FA`.
+- Therefore the large Japanese-looking region is a shared token dictionary,
+  not one child-menu text record. Runtime identity must remain attached to the
+  originating script record, not to the dictionary entry alone.
+- Confidence: `code-confirmed` for the token threshold, dictionary base, and
+  `$FA` entry delimiter; the semantic purpose of individual entries remains
+  unconfirmed.
+
+## Status summary and strength-detail windows
+
+- In the attempted `つよさ` trace, the main-menu capture began at frame 54970
+  and the next recorded input edge occurred at frame 55017.
+- Physical PRG `$02D3-$030E` began being read at frame 55071 and continued to
+  participate in drawing through frame 55863.
+- The 60-byte region consists of window records terminated by `$FF`. Its five
+  content rows contain fixed glyph bytes followed by dynamic-value operations
+  (`$F0 $C5-$C7` and `$F1 $BA/$BC`). A later screenshot identifies this as
+  the separate left-hand summary window: player name, レベル, HP, MP, G, and
+  E. It is not the large `つよさ` detail window.
+- A larger, adjacent group beginning at physical PRG `$030F` matches the
+  right-hand detail window in the screenshot. Its rows are レベル, ちから,
+  すばやさ, さいだいHP, さいだいMP, こうげき力, しゅび力, ぶき, よろい,
+  and たて, each with a dynamic value or equipment-name field.
+- No reads from `$030F` occurred in the first attempted trace, showing that the
+  summary and detail windows must not be inferred from one another.
+- In the corrected capture, input mask `$20` selected the second command at
+  frame 1278 and confirmation mask `$01` occurred at frame 1318. The first
+  `$030F` read occurred in that same frame. All 231 consecutive bytes through
+  `$03F5` were read by frame 1331.
+- Cancel mask `$02` occurred at frame 1610. Because the underlying main menu
+  remained drawn and its ROM range was not read again, `dq.menu.strength`
+  declares `returnToRecordId: dq.menu.main`; the generic resolver restores the
+  parent translation without game-specific code.
+- Confidence: `runtime-confirmed` for `$02D3-$030E` as the summary window and
+  `$030F-$03F5` as the strength-detail record. Field meanings are
+  `cross-validated` by byte decoding and the screenshot.

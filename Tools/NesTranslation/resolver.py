@@ -20,6 +20,10 @@ class TextResolver:
                 and self.active_record.dismiss_input_mask is not None
                 and event.buttons & self.active_record.dismiss_input_mask
             ):
+                if self.active_record.return_to_record_id is not None:
+                    return self._return_to_record(
+                        self.active_record.return_to_record_id, event.frame
+                    )
                 return self.hide(event.frame)
             return []
 
@@ -49,6 +53,22 @@ class TextResolver:
             record_id=record.id,
             instance_id=instance_id,
             evidence_prg_offset=event.prg_offset,
+        )]
+
+    def _return_to_record(self, record_id: str, frame: int) -> list[TextEvent]:
+        record = next(
+            record for record in self.database.records if record.id == record_id
+        )
+        instance_id = self._next_instance_id
+        self._next_instance_id += 1
+        self.active_record = record
+        self.active_instance_id = instance_id
+        return [TextEvent(
+            type="text-replace",
+            frame=frame,
+            record_id=record.id,
+            instance_id=instance_id,
+            evidence_prg_offset=None,
         )]
 
     def hide(self, frame: int) -> list[TextEvent]:

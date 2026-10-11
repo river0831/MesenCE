@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from Tools.NesTranslation.database import DatabaseError, load_database, validate_rom
+from Tools.NesTranslation.analyze_reads import cluster_reads
 from Tools.NesTranslation.display import DebugRenderer
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
@@ -41,6 +42,11 @@ class DatabaseTests(unittest.TestCase):
             database.records[0].deactivation_confidence,
             "runtime-confirmed",
         )
+        strength = database.records[1]
+        self.assertEqual(strength.id, "dq.menu.strength")
+        self.assertEqual(strength.prg_start, 0x030F)
+        self.assertEqual(strength.prg_end_exclusive, 0x03F6)
+        self.assertEqual(strength.return_to_record_id, "dq.menu.main")
 
     def test_wrong_rom_hash_is_rejected(self) -> None:
         database = load_database(DATABASE)
@@ -58,6 +64,43 @@ class DatabaseTests(unittest.TestCase):
             path.write_text(json.dumps(value), encoding="utf-8")
             with self.assertRaisesRegex(DatabaseError, "duplicate record id"):
                 load_database(path)
+
+
+class ReadAnalysisTests(unittest.TestCase):
+    def test_clusters_contiguous_prg_reads_and_excludes_known_range(self) -> None:
+        items = [
+            {"type": "rom-read", "frame": 10, "cpuAddress": 0x8459,
+             "prgOffset": 0x0459, "cpuPc": 1},
+            {"type": "rom-read", "frame": 20, "cpuAddress": 0x9000,
+             "prgOffset": 0x1000, "cpuPc": 2},
+            {"type": "rom-read", "frame": 20, "cpuAddress": 0x9001,
+             "prgOffset": 0x1001, "cpuPc": 2},
+            {"type": "rom-read", "frame": 21, "cpuAddress": 0x9001,
+             "prgOffset": 0x1001, "cpuPc": 3},
+            {"type": "input", "frame": 22, "buttons": 1},
+        ]
+        clusters = cluster_reads(items, excluded=((0x0459, 0x049B),))
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(clusters[0].start, 0x1000)
+        self.assertEqual(clusters[0].end_exclusive, 0x1002)
+        self.assertEqual(clusters[0].read_count, 3)
+        self.assertEqual(clusters[0].frames, (20, 21))
+        self.assertEqual(clusters[0].cpu_pcs, (2, 3))
+
+        narrowed = cluster_reads(items, frame_from=21, frame_to=21)
+        self.assertEqual(len(narrowed), 1)
+        self.assertEqual(narrowed[0].start, 0x1001)
+        self.assertEqual(narrowed[0].read_count, 1)
+
+    def test_instruction_operand_reads_are_not_text_candidates(self) -> None:
+        items = [{
+            "type": "rom-read",
+            "frame": 1,
+            "cpuAddress": 0xB001,
+            "prgOffset": 0x3001,
+            "cpuPc": 0xB000,
+        }]
+        self.assertEqual(cluster_reads(items), [])
 
 
 class ResolverTests(unittest.TestCase):
@@ -92,6 +135,17 @@ class ResolverTests(unittest.TestCase):
         self.assertEqual(hidden[0].type, "text-hide")
         self.assertEqual(hidden[0].frame, 30)
 
+    def test_child_record_dismiss_restores_declared_parent(self) -> None:
+        main = self.resolver.consume(read_event(0x0459, 10))[0]
+        strength = self.resolver.consume(read_event(0x030F, 20))[0]
+        restored = self.resolver.consume(InputEvent("input", 30, 0x02))[0]
+        self.assertEqual(main.type, "text-show")
+        self.assertEqual(strength.type, "text-replace")
+        self.assertEqual(strength.record_id, "dq.menu.strength")
+        self.assertEqual(restored.type, "text-replace")
+        self.assertEqual(restored.record_id, "dq.menu.main")
+        self.assertIsNone(restored.evidence_prg_offset)
+
     def test_dismiss_input_without_active_text_is_ignored(self) -> None:
         self.assertEqual(
             self.resolver.consume(InputEvent("input", 20, 0x02)),
@@ -109,6 +163,25 @@ class ResolverTests(unittest.TestCase):
         second = replay(DATABASE, TRACE)
         self.assertEqual(first, second)
         self.assertEqual([item["type"] for item in first], ["show", "hide", "show"])
+
+    def test_replay_ignores_diagnostic_capture_events(self) -> None:
+        lines = [
+            {"type": "capture-start", "frame": 1},
+            {"type": "record-hit", "frame": 2, "recordId": "candidate"},
+            {"type": "rom-read", "frame": 3, "cpuAddress": 0x8459,
+             "prgOffset": 0x0459, "value": 0x3C, "cpuPc": 0xC000},
+            {"type": "capture-stop", "frame": 4},
+        ]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "diagnostic.jsonl"
+            path.write_text(
+                "\n".join(json.dumps(item) for item in lines),
+                encoding="utf-8",
+            )
+            result = replay(DATABASE, path)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["type"], "show")
+        self.assertEqual(result[0]["record_id"], "dq.menu.main")
 
     def test_mesen_trace_line_contract(self) -> None:
         event = parse_trace_line(

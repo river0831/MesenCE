@@ -13,6 +13,15 @@ from .events import InputEvent, RomReadEvent
 from .resolver import TextResolver
 
 
+DIAGNOSTIC_EVENT_TYPES = {
+    "capture-start",
+    "capture-stop",
+    "ram-write",
+    "record-hit",
+    "state",
+}
+
+
 def replay(database_path: Path, trace_path: Path) -> list[dict]:
     database = load_database(database_path)
     resolver = TextResolver(database)
@@ -39,6 +48,8 @@ def replay(database_path: Path, trace_path: Path) -> list[dict]:
                 value=int(item["value"]),
                 cpu_pc=int(item["cpuPc"]),
             ))
+        elif item.get("type") in DIAGNOSTIC_EVENT_TYPES:
+            continue
         else:
             raise ValueError(f"unsupported trace event on line {line_number}")
         commands.extend(asdict(renderer.consume(event)) for event in text_events)

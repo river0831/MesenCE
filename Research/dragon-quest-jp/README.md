@@ -51,3 +51,12 @@ python3 -m Tools.NesTranslation.capture \
 During the bounded capture, open the main menu, enter the item menu, return to
 the main menu, and close it. This trace is discovery evidence only; RAM writes
 must not be promoted to runtime locators until repeated runs are consistent.
+
+For child-menu discovery, use `runtime/child-menu-trace.lua` with the same
+capture command. It observes data reads across the complete PRG mapping while
+deduplicating reads per frame and CPU PC. Summarize the result with:
+
+```sh
+python3 -m Tools.NesTranslation.analyze_reads \
+  Research/dragon-quest-jp/generated/item-menu.jsonl
+```
