@@ -31,9 +31,21 @@ def build_lua_config(database: GameDatabase, source_ttl_frames: int = 3) -> str:
         if start_address > 0xFFFF or end_address > 0xFFFF:
             raise DatabaseError(f"record range does not fit CPU space: {record.id}")
         lines.append(
-            "  { id = %s, startAddress = %d, endAddress = %d },"
+            "  { id = %s, startAddress = %d, endAddress = %d, labels = {"
             % (_lua_string(record.id), start_address, end_address)
         )
+        if record.presentation is not None:
+            for label in record.presentation.labels:
+                lines.append(
+                    "    { text = %s, x = %d, y = %d, "
+                    "clearX = %d, clearY = %d, clearWidth = %d, clearHeight = %d },"
+                    % (
+                        _lua_string(label.text), label.x, label.y,
+                        label.clear.x, label.clear.y,
+                        label.clear.width, label.clear.height,
+                    )
+                )
+        lines.append("  } },")
     lines.append("}")
     buffer = database.ppu_update_buffer
     if buffer is None:

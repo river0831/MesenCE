@@ -121,3 +121,21 @@ This correlates tagged RAM writes with same-value RAM reads immediately before
 a physical Nametable write. It emits one `DQBUFFER buffer-summary` per record
 when the script exits. It is a discovery tool; confirmed buffer structure must
 still be checked against the 6502 code before becoming runtime configuration.
+
+## Provenance-driven visual overlay
+
+The next adapter uses sourced Nametable groups, not controller input, to drive
+the existing translated labels:
+
+```sh
+python3 -m Tools.NesTranslation.provenance \
+  --mesen bin/osx-arm64/Release/osx-arm64/publish/Mesen.app/Contents/MacOS/Mesen \
+  --template Research/dragon-quest-jp/runtime/provenance-overlay.lua \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --database Research/dragon-quest-jp/database/game-database.json
+```
+
+A newly sourced record takes focus immediately, and labels are drawn after its
+group remains stable for two frames. Bulk untagged writes clear a group and
+hide its overlay. Small per-frame changes are treated as cursor or dynamic-
+field updates so moving the menu cursor does not flicker the translation.

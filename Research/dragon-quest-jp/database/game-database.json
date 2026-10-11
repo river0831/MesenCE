@@ -69,9 +69,9 @@
           { "text": "最大MP:", "x": 123, "y": 130, "clear": { "x": 100, "y": 128, "width": 78, "height": 12 } },
           { "text": "攻撃力:", "x": 126, "y": 146, "clear": { "x": 100, "y": 144, "width": 78, "height": 12 } },
           { "text": "防御力:", "x": 126, "y": 162, "clear": { "x": 100, "y": 160, "width": 78, "height": 12 } },
-          { "text": "武器:", "x": 132, "y": 178, "clear": { "x": 100, "y": 176, "width": 78, "height": 12 } },
-          { "text": "鎧甲:", "x": 132, "y": 194, "clear": { "x": 100, "y": 192, "width": 78, "height": 12 } },
-          { "text": "盾牌:", "x": 132, "y": 210, "clear": { "x": 100, "y": 208, "width": 78, "height": 12 } }
+          { "text": "武器:", "x": 132, "y": 178, "clear": { "x": 108, "y": 176, "width": 58, "height": 12 } },
+          { "text": "鎧甲:", "x": 132, "y": 194, "clear": { "x": 108, "y": 192, "width": 58, "height": 12 } },
+          { "text": "盾牌:", "x": 132, "y": 210, "clear": { "x": 108, "y": 208, "width": 58, "height": 12 } }
         ]
       },
       "deactivation": {

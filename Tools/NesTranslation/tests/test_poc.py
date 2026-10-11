@@ -141,6 +141,19 @@ class DatabaseTests(unittest.TestCase):
         self.assertIn('id = "dq.menu.strength"', script)
         self.assertIn("emu.memType.nesNametableRam", script)
 
+    def test_provenance_overlay_contains_database_labels(self) -> None:
+        database = load_database(DATABASE)
+        template = (
+            ROOT / "Research/dragon-quest-jp/runtime/provenance-overlay.lua"
+        ).read_text(encoding="utf-8")
+        script = build_provenance_script(database, template)
+        self.assertNotIn("__NES_TRANSLATION_PROVENANCE_CONFIG__", script)
+        self.assertIn('text = "等級:"', script)
+        self.assertIn("clearWidth = 78", script)
+        self.assertIn("restoreRatio = 0.80", script)
+        self.assertIn("bulkClearThreshold = 8", script)
+        self.assertIn("clearWidth = 58", script)
+
 
 class ReadAnalysisTests(unittest.TestCase):
     def test_clusters_contiguous_prg_reads_and_excludes_known_range(self) -> None:

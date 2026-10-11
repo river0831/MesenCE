@@ -195,3 +195,27 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   confirmed producer routine with an explicit render context.
 - Confidence: `runtime-confirmed` for exact buffer-to-Nametable propagation;
   `semantic-probable` for the remaining ROM-read-to-buffer association.
+
+## Provenance-driven overlay lifecycle
+
+- A visual adapter now selects the newest sourced Nametable group, waits for
+  two stable frames, and draws its database labels without reading controller
+  input or using `deactivation.dismissInputMask`.
+- The first visual run exposed that cursor movement replaces one background
+  cell at a time without a text source tag. Treating every such write as group
+  invalidation caused a two-frame translation flicker and gradually reduced
+  the main group from 113 to 105 cells.
+- The adapter now batches untagged overwrites per frame. Fewer than eight are
+  treated as cursor/dynamic-field changes and preserve the region identity;
+  eight or more are a bulk clear. Actual window open/close operations update
+  roughly 28 cells per frame, so they remain unambiguously detected.
+- A repeat visual run confirmed that repeated cursor movement no longer
+  flickers. Opening strength suppresses the lower menu immediately, its group
+  grows to 308 cells, and cancel drives it to zero and hides the overlay.
+- The strength window's three equipment-label clear rectangles were reduced
+  from 78 to 58 pixels and shifted right. Visual review confirmed that 武器,
+  鎧甲, and 盾牌 no longer cover their dynamic right-hand equipment values.
+- Confidence: `runtime-confirmed` for cursor-stable display, main-to-strength
+  focus replacement, and strength hide in the tested flow. The threshold is a
+  generic adapter policy but still needs validation on dialogue animation and
+  other games before it can be considered a universal default.
