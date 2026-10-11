@@ -35,6 +35,20 @@ def build_lua_config(database: GameDatabase, source_ttl_frames: int = 3) -> str:
             % (_lua_string(record.id), start_address, end_address)
         )
     lines.append("}")
+    buffer = database.ppu_update_buffer
+    if buffer is None:
+        lines.append("local ppuUpdateBuffer = nil")
+    else:
+        lines.extend([
+            "local ppuUpdateBuffer = {",
+            f"  ramStart = {buffer.ram_start},",
+            f"  ramEndExclusive = {buffer.ram_end_exclusive},",
+            f"  entrySize = {buffer.entry_size},",
+            f"  addressHighOffset = {buffer.address_high_offset},",
+            f"  addressLowOffset = {buffer.address_low_offset},",
+            f"  valueOffset = {buffer.value_offset},",
+            "}",
+        ])
     return "\n".join(lines)
 
 

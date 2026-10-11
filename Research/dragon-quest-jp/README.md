@@ -101,8 +101,10 @@ python3 -m Tools.NesTranslation.provenance \
 
 `DQPROV source` identifies the active database record. `DQPROV group` reports
 how many physical Nametable cells currently carry that tag and their bounds.
-The frame TTL is only a lightweight correlation heuristic; this prototype does
-not yet propagate tags through the intermediate RAM PPU-update buffer.
+When the database declares `runtime.ppuUpdateBuffer`, tags are attached only to
+the configured tile-value slots and follow their NMI reads into physical
+Nametable writes. The frame TTL remains only on the earlier ROM-read-to-buffer-
+production step; it is no longer used to claim arbitrary Nametable writes.
 
 Trace the intermediate RAM buffer with the same launcher and the buffer
 diagnostic template:

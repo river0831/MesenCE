@@ -7,6 +7,8 @@
 local frame = 0
 local activeSource = nil
 local sourceExpiresAfterFrame = -1
+local bufferTags = {}
+local pendingByValue = {}
 local shadow = {}
 local dirtyRecords = {}
 
@@ -53,6 +55,59 @@ end
 
 for _, record in ipairs(records) do registerRecord(record) end
 
+local function isBufferValueAddress(address)
+  return ppuUpdateBuffer
+      and address >= ppuUpdateBuffer.ramStart
+      and address < ppuUpdateBuffer.ramEndExclusive
+      and (address - ppuUpdateBuffer.ramStart) % ppuUpdateBuffer.entrySize
+          == ppuUpdateBuffer.valueOffset
+end
+
+local function onBufferWrite(address, value)
+  if not isBufferValueAddress(address) then return end
+  if activeSource and frame <= sourceExpiresAfterFrame then
+    bufferTags[address] = {
+      recordId = activeSource.recordId,
+      sourceCpuAddress = activeSource.cpuAddress,
+      readerPc = activeSource.readerPc,
+      value = value,
+    }
+  else
+    bufferTags[address] = nil
+  end
+end
+
+local function onBufferRead(address, value)
+  local tag = bufferTags[address]
+  if tag and tag.value == value then
+    pendingByValue[value] = {
+      recordId = tag.recordId,
+      sourceCpuAddress = tag.sourceCpuAddress,
+      readerPc = tag.readerPc,
+      frame = frame,
+    }
+  end
+end
+
+if ppuUpdateBuffer then
+  emu.addMemoryCallback(
+    onBufferWrite,
+    emu.callbackType.write,
+    ppuUpdateBuffer.ramStart,
+    ppuUpdateBuffer.ramEndExclusive - 1,
+    emu.cpuType.nes,
+    emu.memType.nesMemory
+  )
+  emu.addMemoryCallback(
+    onBufferRead,
+    emu.callbackType.read,
+    ppuUpdateBuffer.ramStart,
+    ppuUpdateBuffer.ramEndExclusive - 1,
+    emu.cpuType.nes,
+    emu.memType.nesMemory
+  )
+end
+
 local function tilePosition(address)
   local tableIndex = math.floor(address / 0x400)
   local tableOffset = address % 0x400
@@ -65,8 +120,9 @@ local function onNametableWrite(address, value)
   if not tableIndex then return end
 
   local old = shadow[address]
-  local source = nil
-  if activeSource and frame <= sourceExpiresAfterFrame then source = activeSource end
+  local source = pendingByValue[value]
+  if source and source.frame ~= frame then source = nil end
+  if source then pendingByValue[value] = nil end
   if old then markDirty(old.recordId) end
   if source then markDirty(source.recordId) end
 
@@ -125,8 +181,12 @@ end
 local function onEndFrame()
   emitGroups()
   frame = frame + 1
+  pendingByValue = {}
   if activeSource and frame > sourceExpiresAfterFrame then activeSource = nil end
 end
 
 emu.addEventCallback(onEndFrame, emu.eventType.endFrame)
-print(string.format("DQPROV_READY records=%d sourceTtlFrames=%d", #records, sourceTtlFrames))
+print(string.format(
+  "DQPROV_READY records=%d sourceTtlFrames=%d exactBuffer=%s",
+  #records, sourceTtlFrames, ppuUpdateBuffer and "true" or "false"
+))

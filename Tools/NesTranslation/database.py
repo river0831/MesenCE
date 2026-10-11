@@ -39,6 +39,17 @@ class Presentation:
 
 
 @dataclass(frozen=True)
+class PpuUpdateBuffer:
+    ram_start: int
+    ram_end_exclusive: int
+    entry_size: int
+    address_high_offset: int
+    address_low_offset: int
+    value_offset: int
+    confidence: str
+
+
+@dataclass(frozen=True)
 class TextRecord:
     id: str
     kind: str
@@ -64,6 +75,7 @@ class GameDatabase:
     prg_file_offset: int
     cpu_address_base: int
     input_address: int
+    ppu_update_buffer: PpuUpdateBuffer | None
     records: tuple[TextRecord, ...]
 
     def records_at(self, prg_offset: int) -> tuple[TextRecord, ...]:
@@ -141,6 +153,43 @@ def load_database(path: Path) -> GameDatabase:
     if cpu_address_base > 0xFFFF or input_address > 0xFFFF:
         raise DatabaseError("runtime addresses must fit in 16 bits")
 
+    ppu_update_buffer: PpuUpdateBuffer | None = None
+    if "ppuUpdateBuffer" in runtime:
+        buffer = _require(runtime, "ppuUpdateBuffer", dict)
+        ram_start = _non_negative_int(buffer, "ramStart", "runtime.ppuUpdateBuffer")
+        ram_end = _non_negative_int(
+            buffer, "ramEndExclusive", "runtime.ppuUpdateBuffer"
+        )
+        entry_size = _non_negative_int(
+            buffer, "entrySize", "runtime.ppuUpdateBuffer"
+        )
+        offsets = {
+            "addressHighOffset": _non_negative_int(
+                buffer, "addressHighOffset", "runtime.ppuUpdateBuffer"
+            ),
+            "addressLowOffset": _non_negative_int(
+                buffer, "addressLowOffset", "runtime.ppuUpdateBuffer"
+            ),
+            "valueOffset": _non_negative_int(
+                buffer, "valueOffset", "runtime.ppuUpdateBuffer"
+            ),
+        }
+        if ram_start >= ram_end or ram_end > 0x800:
+            raise DatabaseError("runtime.ppuUpdateBuffer must fit NES internal RAM")
+        if entry_size == 0 or any(offset >= entry_size for offset in offsets.values()):
+            raise DatabaseError("runtime.ppuUpdateBuffer offsets must fit entrySize")
+        if len(set(offsets.values())) != len(offsets):
+            raise DatabaseError("runtime.ppuUpdateBuffer offsets must be distinct")
+        ppu_update_buffer = PpuUpdateBuffer(
+            ram_start=ram_start,
+            ram_end_exclusive=ram_end,
+            entry_size=entry_size,
+            address_high_offset=offsets["addressHighOffset"],
+            address_low_offset=offsets["addressLowOffset"],
+            value_offset=offsets["valueOffset"],
+            confidence=_require(buffer, "confidence", str),
+        )
+
     record_values = _require(raw, "records", list)
     records: list[TextRecord] = []
     seen_ids: set[str] = set()
@@ -214,6 +263,7 @@ def load_database(path: Path) -> GameDatabase:
         prg_file_offset,
         cpu_address_base,
         input_address,
+        ppu_update_buffer,
         tuple(records),
     )
 

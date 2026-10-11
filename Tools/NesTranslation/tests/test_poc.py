@@ -51,6 +51,12 @@ class DatabaseTests(unittest.TestCase):
         self.assertIsNone(strength.return_to_record_id)
         self.assertEqual(len(database.records[0].presentation.labels), 8)
         self.assertEqual(len(strength.presentation.labels), 10)
+        assert database.ppu_update_buffer is not None
+        self.assertEqual(database.ppu_update_buffer.ram_start, 0x0300)
+        self.assertEqual(database.ppu_update_buffer.ram_end_exclusive, 0x03C0)
+        self.assertEqual(database.ppu_update_buffer.entry_size, 3)
+        self.assertEqual(database.ppu_update_buffer.value_offset, 2)
+        self.assertEqual(database.ppu_update_buffer.confidence, "code-confirmed")
 
     def test_wrong_rom_hash_is_rejected(self) -> None:
         database = load_database(DATABASE)
@@ -76,6 +82,15 @@ class DatabaseTests(unittest.TestCase):
             path = Path(folder) / "database.json"
             path.write_text(json.dumps(value), encoding="utf-8")
             with self.assertRaisesRegex(DatabaseError, "dimensions must be positive"):
+                load_database(path)
+
+    def test_invalid_ppu_buffer_offset_is_rejected(self) -> None:
+        value = json.loads(DATABASE.read_text(encoding="utf-8"))
+        value["runtime"]["ppuUpdateBuffer"]["valueOffset"] = 3
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "database.json"
+            path.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(DatabaseError, "offsets must fit"):
                 load_database(path)
 
     def test_overlay_script_is_generated_from_database(self) -> None:
@@ -105,6 +120,8 @@ class DatabaseTests(unittest.TestCase):
         self.assertIn('id = "dq.menu.main"', script)
         self.assertIn("startAddress = 33881", script)
         self.assertIn("endAddress = 33946", script)
+        self.assertIn("ramStart = 768", script)
+        self.assertIn("valueOffset = 2", script)
 
     def test_provenance_rejects_negative_ttl(self) -> None:
         database = load_database(DATABASE)

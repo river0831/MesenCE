@@ -172,3 +172,26 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   known text record -> `$0300` triple buffer -> NMI upload loop -> Nametable.
 - Confidence: `code-confirmed` for the buffer format, producer, and uploader;
   `runtime-confirmed` for record-tagged data slots `$0302-$036E` in this run.
+
+## Exact buffer-to-Nametable propagation
+
+- The confirmed buffer description is now database data rather than Lua code:
+  RAM `$0300-$03BF`, three-byte entries, with PPU high address at offset 0,
+  low address at offset 1, and tile value at offset 2.
+- The shadow Nametable adapter tags only value slots `$0302 + 3n`. A tagged
+  slot must subsequently be read by the uploader before the matching
+  Nametable write inherits its record ID. Other Nametable writes clear prior
+  source metadata normally.
+- A validation run using this exact path reproduced the earlier results:
+  `dq.menu.main` reached 113 cells at rows 3-11, columns 14-27;
+  `dq.menu.strength` reached 308 cells at rows 6-27, columns 12-25.
+- Strength drawing again reduced the main group from 111 to 88, 64, and 40
+  cells. Cancel reduced strength to zero and then main to zero. The exact
+  buffer path therefore preserves show, overwrite, and clear lifecycle events
+  without assigning source from a broad Nametable-write time window.
+- A short TTL is still used between a known ROM record read and production of
+  its buffer entry. Replacing that remaining correlation would require tracing
+  the text decoder's register/table transformations or instrumenting the
+  confirmed producer routine with an explicit render context.
+- Confidence: `runtime-confirmed` for exact buffer-to-Nametable propagation;
+  `semantic-probable` for the remaining ROM-read-to-buffer association.

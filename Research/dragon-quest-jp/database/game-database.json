@@ -7,7 +7,16 @@
   },
   "runtime": {
     "cpuAddressBase": 32768,
-    "inputAddress": 71
+    "inputAddress": 71,
+    "ppuUpdateBuffer": {
+      "ramStart": 768,
+      "ramEndExclusive": 960,
+      "entrySize": 3,
+      "addressHighOffset": 0,
+      "addressLowOffset": 1,
+      "valueOffset": 2,
+      "confidence": "code-confirmed"
+    }
   },
   "records": [
     {
