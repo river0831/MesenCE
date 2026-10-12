@@ -14,6 +14,8 @@ local nextGlyph = 1
 local pendingBeforeMatch = {}
 local pendingUploads = {}
 local cells = {}
+local previousCells = {}
+local untaggedWrites = {}
 local changed = false
 local selectedSegment = nil
 local emptySinceFrame = nil
@@ -54,6 +56,18 @@ local function prefixMatches(prefix)
   return true
 end
 
+local function assignCell(address, tag)
+  -- One logical source glyph has one current screen location. Moving it during
+  -- a scroll must retire its previous location instead of duplicating it.
+  for otherAddress, other in pairs(cells) do
+    if otherAddress ~= address and other.recordId == tag.recordId
+        and other.glyphIndex == tag.glyphIndex then
+      cells[otherAddress] = nil
+    end
+  end
+  cells[address] = tag
+end
+
 local function alignCandidate(candidate, alreadyUploaded)
   if not activeRecord then return end
   local glyph = activeRecord.glyphs[nextGlyph]
@@ -68,7 +82,7 @@ local function alignCandidate(candidate, alreadyUploaded)
     value = candidate.value,
   }
   if alreadyUploaded then
-    cells[address] = tag
+    assignCell(address, tag)
     changed = true
   else
     pendingUploads[address] = tag
@@ -122,8 +136,20 @@ local function onBufferWrite(address, value)
     table.insert(pendingBeforeMatch, candidate)
   end
   if layoutSource and frame <= layoutSourceExpires then
+    local physical = candidate.ppuAddress % 0x400
+    local x = physical % 32
+    local y = math.floor(physical / 32)
+    local labelIndex = nil
+    for _, label in ipairs(layoutSource.labels) do
+      if x >= label.startX and x < label.endX
+          and y >= label.startY and y < label.endY then
+        labelIndex = label.index
+        break
+      end
+    end
     layoutPending[candidate.ppuAddress % 0x400] = {
       recordId = layoutSource.id,
+      labelIndex = labelIndex,
       value = value,
     }
   end
@@ -148,9 +174,10 @@ local function onNametableWrite(address, value)
   layoutPending[address] = nil
   -- A later game write owns the cell. Only the exact queued destination/value
   -- inherits a tag; every unrelated write clears old provenance.
+  untaggedWrites[address] = nil
   local pending = pendingUploads[address]
   if pending and pending.value == value then
-    cells[address] = pending
+    assignCell(address, pending)
     pendingUploads[address] = nil
     changed = true
   elseif cells[address] and cells[address].value == value then
@@ -159,19 +186,82 @@ local function onNametableWrite(address, value)
   elseif cells[address] then
     cells[address] = nil
     changed = true
+    untaggedWrites[address] = value
+  elseif address >= visibilityStart and address < visibilityEndExclusive then
+    untaggedWrites[address] = value
   end
   pendingUploads[address] = nil
+end
+
+local function propagateCopiedCells()
+  if next(untaggedWrites) == nil or next(previousCells) == nil then return end
+  local votes = {}
+  for destination, value in pairs(untaggedWrites) do
+    for source, cell in pairs(previousCells) do
+      local delta = destination - source
+      if delta ~= 0 and delta % 32 == 0 and math.abs(delta) <= 128
+          and cell.value == value then
+        votes[delta] = (votes[delta] or 0) + 1
+      end
+    end
+  end
+  local bestDelta = nil
+  local bestVotes = 0
+  for delta, count in pairs(votes) do
+    if count > bestVotes then
+      bestDelta = delta
+      bestVotes = count
+    end
+  end
+  -- A repeated glyph can match by accident. Require a short sequence of
+  -- agreeing cells before treating a write batch as a Nametable copy/scroll.
+  if not bestDelta or bestVotes < 3 then return end
+  local copied = 0
+  for destination, value in pairs(untaggedWrites) do
+    local source = destination - bestDelta
+    local cell = previousCells[source]
+    if cell and cell.value == value then
+      assignCell(destination, cell)
+      copied = copied + 1
+      changed = true
+    end
+  end
+  if copied > 0 then
+    print(string.format(
+      "DQGLYPH {\"type\":\"copy\",\"frame\":%d," ..
+      "\"delta\":%d,\"cellCount\":%d}", frame, bestDelta, copied
+    ))
+  end
+end
+
+local function snapshotCells()
+  previousCells = {}
+  for address, cell in pairs(cells) do previousCells[address] = cell end
+  untaggedWrites = {}
 end
 
 local function emitLayoutGroups()
   for recordId, _ in pairs(layoutDirty) do
     local count = 0
+    local labelCounts = {}
     for _, owner in pairs(layoutCells) do
-      if owner.recordId == recordId then count = count + 1 end
+      if owner.recordId == recordId then
+        count = count + 1
+        if owner.labelIndex then
+          labelCounts[owner.labelIndex] = (labelCounts[owner.labelIndex] or 0) + 1
+        end
+      end
+    end
+    local labels = {}
+    for index, labelCount in pairs(labelCounts) do
+      table.insert(labels, string.format(
+        "{\"index\":%d,\"cellCount\":%d}", index, labelCount
+      ))
     end
     print(string.format(
       "DQMENU {\"type\":\"group\",\"frame\":%d,\"recordId\":%s," ..
-      "\"cellCount\":%d}", frame, jsonString(recordId), count
+      "\"cellCount\":%d,\"labels\":[%s]}", frame, jsonString(recordId),
+      count, table.concat(labels, ",")
     ))
   end
   layoutDirty = {}
@@ -262,6 +352,7 @@ local function drawSelectedSegment()
 end
 
 local function onEndFrame()
+  propagateCopiedCells()
   emitLayoutGroups()
   if changed then
     emitVisibleRanges()
@@ -299,6 +390,7 @@ local function onEndFrame()
     end
   end
   drawSelectedSegment()
+  snapshotCells()
   frame = frame + 1
   if layoutSource and frame > layoutSourceExpires then layoutSource = nil end
 end

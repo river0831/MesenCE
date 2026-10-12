@@ -144,7 +144,7 @@ class SubtitleEventRouter:
             for record in (database.records if database else ())
             if record.presentation is not None
         }
-        self._visible_layouts: set[str] = set()
+        self._visible_layouts: dict[str, set[int]] = {}
         self._visible_dialogue: dict[str, list[str]] = {}
 
     def _scene_state(self) -> dict[str, Any]:
@@ -152,6 +152,7 @@ class SubtitleEventRouter:
         for record_id in sorted(self._visible_layouts):
             record = self._layouts[record_id]
             assert record.presentation is not None
+            visible_labels = self._visible_layouts[record_id]
             labels.extend(
                 {
                     "recordId": record_id,
@@ -159,7 +160,8 @@ class SubtitleEventRouter:
                     "x": label.x / 256.0,
                     "y": label.y / 240.0,
                 }
-                for label in record.presentation.labels
+                for index, label in enumerate(record.presentation.labels, 1)
+                if index in visible_labels
             )
         subtitles = [
             line
@@ -191,10 +193,25 @@ class SubtitleEventRouter:
             if event.get("type") != "group" or event.get("recordId") not in self._layouts:
                 return None
             record_id = event["recordId"]
-            if event.get("cellCount", 0) > 0:
-                self._visible_layouts.add(record_id)
+            label_counts = event.get("labels")
+            if isinstance(label_counts, list):
+                visible = {
+                    int(item["index"])
+                    for item in label_counts
+                    if isinstance(item, dict)
+                    and isinstance(item.get("index"), int)
+                    and int(item.get("cellCount", 0)) > 0
+                }
+            elif event.get("cellCount", 0) > 0:
+                visible = set(range(1, len(
+                    self._layouts[record_id].presentation.labels  # type: ignore[union-attr]
+                ) + 1))
             else:
-                self._visible_layouts.discard(record_id)
+                visible = set()
+            if visible:
+                self._visible_layouts[record_id] = visible
+            else:
+                self._visible_layouts.pop(record_id, None)
             return self._scene_state()
         if event.get("type") == "reset":
             self._visible_dialogue.pop(str(event.get("recordId")), None)
@@ -268,14 +285,25 @@ def build_config(
         for record in database.records:
             if record.presentation is None:
                 continue
-            lines.append(
-                "  { id = %s, startAddress = %d, endAddress = %d },"
+            lines.extend([
+                "  { id = %s, startAddress = %d, endAddress = %d, labels = {"
                 % (
                     _lua_string(record.id),
                     database.cpu_address_base + record.prg_start,
                     database.cpu_address_base + record.prg_end_exclusive - 1,
+                ),
+            ])
+            for index, label in enumerate(record.presentation.labels, 1):
+                start_x = label.clear.x // 8
+                start_y = label.clear.y // 8
+                end_x = (label.clear.x + label.clear.width + 7) // 8
+                end_y = (label.clear.y + label.clear.height + 7) // 8
+                lines.append(
+                    "    { index = %d, startX = %d, endX = %d, "
+                    "startY = %d, endY = %d },"
+                    % (index, start_x, end_x, start_y, end_y)
                 )
-            )
+            lines.extend(["  } },"])
     lines.extend([
         "}",
         "local records = {",

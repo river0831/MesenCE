@@ -353,3 +353,10 @@ Multiple genuinely visible source sentences can produce multiple translated
 lines without exposing a later sentence merely because both previously shared
 one coarse record range. Rewriting the same tile value to the same cell keeps
 its provenance, since such a redraw does not change the visible state.
+
+Vertical dialogue scrolling is treated as provenance movement rather than new
+text. Unattributed write batches vote for a 32-tile row displacement; a match
+requires at least three agreeing tiles and one logical glyph may occupy only
+one current cell. Short UI labels are likewise tracked individually through
+their database `clear` rectangles, so a higher window hides only the labels it
+actually covers instead of keeping or removing an entire menu record.

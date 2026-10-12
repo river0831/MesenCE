@@ -493,9 +493,24 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Same-value rewrites at the same Nametable address now preserve both menu and
   dialogue provenance. This prevents ordinary window redraws from erasing the
   source identity even though the visible tile did not change.
+- Runtime validation showed that dialogue scrolling moves existing tile rows
+  without rereading their source bytes. The prototype now recognizes write
+  batches with at least three matching tiles at a 32-tile row displacement and
+  migrates their provenance. A `(recordId, glyphIndex)` pair is kept at only
+  one current cell, preventing old and new rows from both contributing.
 - Multiple active intervals are rendered in source order. This implements the
   proposed Nametable-visible-position -> original interval -> translated unit
   mapping without proportionally truncating Chinese characters.
 - Confidence: `code-confirmed` for interval validation, current-state coverage
   routing, and menu/dialogue composition; visual result remains
   `visual-provisional` pending another long-dialogue run.
+
+### Per-label menu visibility
+
+- Record-level menu visibility was too coarse: a partially covered main menu
+  caused all eight translated labels to remain beside a higher status window.
+- Each presentation label is now mapped from its database `clear` rectangle to
+  a Nametable tile region. Runtime group events report sourced-cell counts per
+  label, and the scene contains only labels whose own region remains present.
+- Confidence: `code-confirmed` through routing tests; the label-region behavior
+  remains `visual-provisional` until the combined-window run is reviewed.

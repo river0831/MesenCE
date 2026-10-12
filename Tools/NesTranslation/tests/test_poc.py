@@ -372,6 +372,21 @@ class ReadAnalysisTests(unittest.TestCase):
         assert hidden is not None
         self.assertFalse(hidden["visible"])
 
+    def test_subtitle_router_filters_individual_visible_menu_labels(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+        )
+        scene = router.consume(
+            'DQMENU {"type":"group","recordId":"dq.menu.main",'
+            '"cellCount":12,"labels":[{"index":1,"cellCount":6},'
+            '{"index":2,"cellCount":6}]}'
+        )
+        assert scene is not None
+        self.assertEqual(
+            [label["text"] for label in scene["labels"]], ["交談", "咒文"]
+        )
+
     def test_subtitle_router_composes_menu_and_dialogue_from_current_state(self) -> None:
         router = SubtitleEventRouter(
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
@@ -414,7 +429,8 @@ class ReadAnalysisTests(unittest.TestCase):
             ROOT / "Research/dragon-quest-jp/runtime/dialogue-glyph-provenance.lua"
         ).read_text(encoding="utf-8")
         script = build_glyph_provenance_script(
-            catalog, translations, load_character_map(CHARACTER_MAP), template
+            catalog, translations, load_character_map(CHARACTER_MAP), template,
+            database=load_database(DATABASE),
         )
         self.assertNotIn("__NES_TRANSLATION_GLYPH_PROVENANCE_CONFIG__", script)
         self.assertIn('id = "chr-fc-38a7"', script)
@@ -422,6 +438,12 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("sourceEndExclusive = 90", script)
         self.assertIn("emptyGraceFrames = 20", script)
         self.assertNotIn("stableFrames", script)
+        self.assertIn("propagateCopiedCells()", script)
+        self.assertIn('\\"type\\":\\"copy\\"', script)
+        self.assertIn("delta % 32 == 0", script)
+        self.assertIn("assignCell(destination, cell)", script)
+        self.assertIn("labelIndex = labelIndex", script)
+        self.assertIn("startX = 16, endX = 20", script)
 
     def test_character_map_renders_dialogue_and_combines_dakuten(self) -> None:
         character_map = load_character_map(CHARACTER_MAP)
