@@ -13,7 +13,10 @@ local stream = {}
 local maxRecordLength = 0
 local activeRecord = nil
 local visibleSinceFrame = -1
+local activeIsVisible = false
+local lastVisibilityWriteFrame = -1
 local writesInVisibilityRegion = 0
+local stableRegionFrames = 8
 
 for _, record in ipairs(records) do
   maxRecordLength = math.max(maxRecordLength, #record.raw)
@@ -42,6 +45,8 @@ local function consumeSourceByte(value)
     if suffixMatches(record.raw) then
       activeRecord = record
       visibleSinceFrame = frame
+      activeIsVisible = false
+      lastVisibilityWriteFrame = frame
       writesInVisibilityRegion = 0
       print(string.format(
         "DQDIALOGUE {\"type\":\"show\",\"frame\":%d,\"recordId\":%s}",
@@ -71,15 +76,15 @@ end
 
 local function onNametableWrite(address, value)
   if activeRecord
-      and frame > visibleSinceFrame + hideGraceFrames
       and address >= visibilityStart
       and address < visibilityEndExclusive then
     writesInVisibilityRegion = writesInVisibilityRegion + 1
+    lastVisibilityWriteFrame = frame
   end
 end
 
 local function drawDialogue()
-  if not activeRecord then return end
+  if not activeRecord or not activeIsVisible then return end
   emu.selectDrawSurface(emu.drawSurface.consoleScreen)
   emu.drawRectangle(
     activeRecord.x, activeRecord.y, activeRecord.width, activeRecord.height,
@@ -95,13 +100,26 @@ local function drawDialogue()
 end
 
 local function onEndFrame()
-  if activeRecord and writesInVisibilityRegion >= clearWriteThreshold then
+  if activeRecord
+      and not activeIsVisible
+      and frame - lastVisibilityWriteFrame >= stableRegionFrames then
+    activeIsVisible = true
+    visibleSinceFrame = frame
+    print(string.format(
+      "DQDIALOGUE {\"type\":\"visible\",\"frame\":%d,\"recordId\":%s}",
+      frame, jsonString(activeRecord.id)
+    ))
+  elseif activeRecord
+      and activeIsVisible
+      and frame > visibleSinceFrame + hideGraceFrames
+      and writesInVisibilityRegion >= clearWriteThreshold then
     print(string.format(
       "DQDIALOGUE {\"type\":\"hide\",\"frame\":%d,\"recordId\":%s," ..
       "\"regionWrites\":%d}",
       frame, jsonString(activeRecord.id), writesInVisibilityRegion
     ))
     activeRecord = nil
+    activeIsVisible = false
   end
   writesInVisibilityRegion = 0
   drawDialogue()

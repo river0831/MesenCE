@@ -189,9 +189,11 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   bytes. The exact-ROM bytes are injected from the ignored, locally generated
   validated catalog into a temporary Mesen script.
 - Dialogue visibility is independent of controller input. After a match, the
-  adapter draws while the dialogue Nametable region remains stable and hides
-  after a bulk rewrite of that region. This is provisional until visually
-  tested against opening and dismissing both selected records.
+  adapter waits until the dialogue Nametable region becomes stable, then draws
+  while it remains stable and hides after a later bulk rewrite. The initial
+  implementation treated the long dialogue's final rendering pass as a close;
+  the explicit pending/visible phases correct that lifecycle race. This remains
+  provisional until both records are visually retested.
 
 ## Shared compressed-text dictionary
 

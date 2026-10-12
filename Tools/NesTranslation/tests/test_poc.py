@@ -212,6 +212,8 @@ class DatabaseTests(unittest.TestCase):
         self.assertIn("raw = { 85, 98, 252 }", script)
         self.assertIn("这里什么也拿不到。", script)
         self.assertIn("local visibilityStart = 576", script)
+        self.assertIn("and not activeIsVisible", script)
+        self.assertIn("frame - lastVisibilityWriteFrame >= stableRegionFrames", script)
 
     def test_dialogue_overlay_rejects_unverified_catalog_record(self) -> None:
         spec = load_translation_spec(DIALOGUE_TRANSLATIONS)
