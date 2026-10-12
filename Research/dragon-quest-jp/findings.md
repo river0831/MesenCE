@@ -436,3 +436,17 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Confidence: `code-confirmed` for validation and deterministic selection;
   visual behavior remains `semantic-probable` until the segmented overlay is
   exercised through the full long dialogue.
+
+### First visual correction
+
+- The first visual run showed that clearing presentation on every provenance
+  change causes flicker during typewriter rendering. It also showed that
+  requiring four stable frames can skip a source interval during continuous
+  scroll and leave the final interval visible for only a single frame.
+- Segment presentation now persists while glyphs within that segment change
+  and switches atomically when the newest visible index crosses a reviewed
+  boundary. Empty provenance is tolerated for 20 frames to bridge the measured
+  11-frame scroll gap; sustained emptiness clears all session state.
+- Sustained emptiness resets the active record and logical cursor, allowing the
+  same record to be recognized on a later interaction. These corrections
+  remain `semantic-probable` pending a repeat visual run.

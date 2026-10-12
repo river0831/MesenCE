@@ -15,9 +15,9 @@ local pendingBeforeMatch = {}
 local pendingUploads = {}
 local cells = {}
 local changed = false
-local lastChangedFrame = -1
-local stableFrames = 4
 local selectedSegment = nil
+local emptySinceFrame = nil
+local emptyGraceFrames = 20
 local foreground = 0xFFFFFF
 local background = 0x000000
 
@@ -185,19 +185,36 @@ end
 local function onEndFrame()
   if changed then
     emitVisibleRanges()
-    selectedSegment = nil
-    lastChangedFrame = frame
     changed = false
-  elseif displaySegments and not selectedSegment
-      and frame - lastChangedFrame >= stableFrames then
-    selectedSegment = chooseSegment()
-    if selectedSegment then
+  end
+
+  local candidate = chooseSegment()
+  if candidate then
+    emptySinceFrame = nil
+    if candidate ~= selectedSegment then
+      selectedSegment = candidate
       print(string.format(
         "DQGLYPH {\"type\":\"segment\",\"frame\":%d," ..
         "\"recordId\":%s,\"sourceStart\":%d,\"sourceEndExclusive\":%d}",
         frame, jsonString(activeRecord.id), selectedSegment.sourceStart,
         selectedSegment.sourceEndExclusive
       ))
+    end
+  elseif activeRecord then
+    if not emptySinceFrame then emptySinceFrame = frame end
+    if frame - emptySinceFrame >= emptyGraceFrames then
+      print(string.format(
+        "DQGLYPH {\"type\":\"reset\",\"frame\":%d,\"recordId\":%s}",
+        frame, jsonString(activeRecord.id)
+      ))
+      activeRecord = nil
+      nextGlyph = 1
+      selectedSegment = nil
+      emptySinceFrame = nil
+      stream = {}
+      pendingBeforeMatch = {}
+      pendingUploads = {}
+      cells = {}
     end
   end
   drawSelectedSegment()

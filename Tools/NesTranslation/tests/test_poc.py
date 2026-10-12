@@ -319,6 +319,8 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn('id = "chr-fc-38a7"', script)
         self.assertIn("expandedIndex = 0", script)
         self.assertIn("sourceEndExclusive = 90", script)
+        self.assertIn("emptyGraceFrames = 20", script)
+        self.assertNotIn("stableFrames", script)
 
     def test_character_map_renders_dialogue_and_combines_dakuten(self) -> None:
         character_map = load_character_map(CHARACTER_MAP)

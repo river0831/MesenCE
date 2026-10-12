@@ -310,5 +310,8 @@ Add `--display-segments` and
 experimental range-driven presentation. Each reviewed `segments[]` entry maps
 an exact logical source interval to one or more translated lines. The adapter
 uses the newest visible logical glyph as its segment anchor, hides presentation
-while sourced cells are changing, and displays the selected segment after four
-stable frames. Controller input is not observed.
+until the first segment is identified, and atomically switches only when the
+newest glyph crosses a reviewed segment boundary. The current segment remains
+visible through ordinary glyph writes and short empty intervals during scroll;
+a sustained empty interval resets the record so it can be recognized again.
+Controller input is not observed.
