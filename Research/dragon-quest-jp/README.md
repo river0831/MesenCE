@@ -252,6 +252,22 @@ The 512-byte ceiling is required for the 277-byte opening speech at
 `chr-fc-3908`; the earlier 256-byte ceiling silently excluded that complete
 bounded record.
 
+Build a single prioritized worklist from the lossless catalog and the committed
+translation specification:
+
+```sh
+python3 -m Tools.NesTranslation.review_worklist \
+  --catalog Research/dragon-quest-jp/generated/dialogue-catalog-validated.json \
+  --translations Research/dragon-quest-jp/database/dialogue-translations.json \
+  --json-output Research/dragon-quest-jp/generated/text-review-worklist.json \
+  --markdown-output Research/dragon-quest-jp/generated/text-review-worklist.md
+```
+
+The JSON retains every catalog record, including low-likelihood data and all
+unknown bytes. The Markdown view omits low-priority bodies to keep the first
+review pass manageable. Suggested categories are only routing hints; neither a
+keyword match nor Japanese semantics promotes a candidate to confirmed text.
+
 Match captured overlapping CHR staging windows back to stable catalog IDs:
 
 ```sh

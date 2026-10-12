@@ -38,6 +38,10 @@ from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
 from Tools.NesTranslation.overlay import build_overlay_script
 from Tools.NesTranslation.provenance import build_provenance_script
 from Tools.NesTranslation.replay import replay
+from Tools.NesTranslation.review_worklist import (
+    build_worklist as build_review_worklist,
+    render_markdown as render_review_worklist,
+)
 from Tools.NesTranslation.resolver import TextResolver
 from Tools.NesTranslation.runtime_catalog_match import (
     extract_runtime_bytes,
@@ -293,11 +297,72 @@ class DatabaseTests(unittest.TestCase):
             "chr-fc-3847": 90,
             "chr-fc-3002": 14,
             "chr-fc-35e7": 7,
+            "chr-fc-3397": 39,
+            "chr-fc-215b": 16,
         }
         records = {record["id"]: record for record in spec["records"]}
         for record_id, glyph_count in expected_counts.items():
             with self.subTest(record_id=record_id):
                 validate_segments(records[record_id], glyph_count)
+
+
+class ReviewWorklistTests(unittest.TestCase):
+    def test_worklist_preserves_and_prioritizes_every_catalog_record(self) -> None:
+        catalog = {
+            "romSha256": "a" * 64,
+            "records": [
+                {
+                    "id": "translated", "decoded": "＊「こんにちは", "unknownBytes": [],
+                    "metrics": {"score": 0.9, "glyphCount": 6},
+                    "evidence": {"likelihood": "high"},
+                    "runtime": {"status": "runtime-confirmed"},
+                    "source": {"chrStart": 1, "chrEndExclusive": 8},
+                },
+                {
+                    "id": "item-result", "decoded": "かぎを みつけた", "unknownBytes": [0xFD],
+                    "metrics": {"score": 0.8, "glyphCount": 8},
+                    "evidence": {"likelihood": "medium"},
+                    "runtime": {"status": "runtime-confirmed"},
+                    "source": {"chrStart": 9, "chrEndExclusive": 18},
+                },
+                {
+                    "id": "low", "decoded": "<00>", "unknownBytes": [0],
+                    "metrics": {"score": 0.1, "glyphCount": 0},
+                    "evidence": {"likelihood": "low"},
+                    "runtime": {"status": "unverified"},
+                    "source": {"chrStart": 19, "chrEndExclusive": 20},
+                },
+            ],
+        }
+        worklist = build_review_worklist(
+            catalog, {"records": [{"id": "translated"}]}
+        )
+        self.assertEqual(len(worklist["records"]), 3)
+        self.assertEqual([item["id"] for item in worklist["records"]], [
+            "translated", "item-result", "low",
+        ])
+        self.assertEqual(worklist["records"][1]["suggestedCategory"], "system-or-template")
+        self.assertEqual(worklist["summary"]["runtimeConfirmedPending"], 1)
+        self.assertTrue(worklist["policy"]["preservesAllCatalogRecords"])
+
+    def test_markdown_omits_low_priority_body_but_reports_lossless_json(self) -> None:
+        worklist = {
+            "romSha256": "b" * 64,
+            "summary": {
+                "recordCount": 1, "translated": 0, "pending": 1,
+                "runtimeConfirmedPending": 0,
+                "bySuggestedCategory": {"unclassified": 1},
+            },
+            "records": [{
+                "id": "low", "priority": 4, "priorityReason": "low static likelihood",
+                "suggestedCategory": "unclassified", "runtimeStatus": "unverified",
+                "staticLikelihood": "low", "score": 0.1, "unknownBytes": [],
+                "source": {"chrStart": 0, "chrEndExclusive": 1}, "decoded": "noise",
+            }],
+        }
+        rendered = render_review_worklist(worklist)
+        self.assertIn("Catalog records preserved: 1", rendered)
+        self.assertNotIn("### low", rendered)
 
 
 class ReadAnalysisTests(unittest.TestCase):

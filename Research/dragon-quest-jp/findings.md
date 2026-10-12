@@ -668,3 +668,18 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   treated as static records. Confidence for the three catalog identities:
   `runtime-confirmed`; translation segmentation: `semantic-probable` pending
   the next visual run. The full suite contains 57 passing tests.
+
+### Prioritized text-review worklist
+
+- The validated 512-byte catalog now feeds a lossless review worklist. All 563
+  catalog records are retained in JSON with their decoded text, offsets,
+  unknown bytes, runtime status, static score, and empty human-review fields.
+- Category labels such as dialogue, system/template, and vocabulary-containing
+  are routing suggestions only. They do not promote a candidate or discard
+  records that resemble bitmap or non-text data.
+- The first pass found 6 previously translated records, 557 pending records,
+  and 2 runtime-confirmed pending records. Those two records (`chr-fc-3397`
+  and `chr-fc-215b`) now have reviewed Chinese segments, leaving no observed
+  static record without a translation. Dynamic player/item substitution still
+  requires a separate template matcher. Confidence: `code-confirmed`; the full
+  suite contains 59 passing tests.

@@ -135,6 +135,32 @@
         { "sourceStart": 0, "sourceEndExclusive": 7, "lines": ["發現了物品。"] }
       ],
       "box": { "x": 52, "y": 158, "width": 152, "height": 18, "lineHeight": 14 }
+    },
+    {
+      "id": "chr-fc-3397",
+      "sourceText": "旅の支度ができたなら、またわしに会いに来るがよい。待っておるぞ、勇者よ！",
+      "translation": "准备好旅行后，再来见我。我会等着你，勇者！",
+      "pages": [
+        { "lines": ["準備好旅行後，再來見我。", "我會等著勇者！"] }
+      ],
+      "segments": [
+        { "sourceStart": 0, "sourceEndExclusive": 15, "lines": ["準備好旅行後，"] },
+        { "sourceStart": 15, "sourceEndExclusive": 30, "lines": ["再來見我。"] },
+        { "sourceStart": 30, "sourceEndExclusive": 39, "lines": ["我會等著勇者！"] }
+      ],
+      "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
+    },
+    {
+      "id": "chr-fc-215b",
+      "sourceText": "その方向には誰もいない。",
+      "translation": "那个方向没有人。",
+      "pages": [
+        { "lines": ["那個方向沒有人。"] }
+      ],
+      "segments": [
+        { "sourceStart": 0, "sourceEndExclusive": 16, "lines": ["那個方向沒有人。"] }
+      ],
+      "box": { "x": 52, "y": 158, "width": 152, "height": 18, "lineHeight": 14 }
     }
   ]
 }
