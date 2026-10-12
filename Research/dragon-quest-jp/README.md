@@ -365,6 +365,13 @@ snapshot deltas. Spatial overlap, rapid reappearance, long-lived units, and a
 trace ending with visible translations are warnings for review. Continuous
 overlap is reported once when it begins instead of once per snapshot.
 
+A compact, ROM-free lifecycle fixture is kept at
+`Tools/NesTranslation/tests/fixtures/visible-snapshot-lifecycle.jsonl`. It
+covers a base menu, a replacing higher window, restoration, one and two
+dialogue units, and final clearing. The automated suite loads and audits this
+fixture so changes to snapshot routing cannot silently break the established
+lifecycle contract.
+
 The runtime event router is renderer-independent. The current companion is a
 small AppKit prototype which accepts ordinary JSON subtitle state over stdin;
 it neither embeds game-specific logic nor changes the emulator frame. This

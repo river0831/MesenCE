@@ -55,6 +55,9 @@ CHARACTER_MAP = ROOT / "Research/dragon-quest-jp/database/character-map.json"
 DIALOGUE_TRANSLATIONS = (
     ROOT / "Research/dragon-quest-jp/database/dialogue-translations.json"
 )
+SNAPSHOT_LIFECYCLE = (
+    ROOT / "Tools/NesTranslation/tests/fixtures/visible-snapshot-lifecycle.jsonl"
+)
 
 
 def prg_byte(cpu_address: int) -> int:
@@ -599,6 +602,17 @@ class ReadAnalysisTests(unittest.TestCase):
         codes = {finding["code"] for finding in report["findings"]}
         self.assertTrue({"out-of-bounds", "invalid-coverage", "overlap",
                          "delta-mismatch", "flicker", "visible-at-end"} <= codes)
+
+    def test_snapshot_lifecycle_regression_fixture_is_clean(self) -> None:
+        snapshots = load_snapshots(SNAPSHOT_LIFECYCLE)
+        self.assertEqual(len(snapshots), 6)
+        self.assertEqual(
+            [snapshot["frame"] for snapshot in snapshots],
+            [1, 10, 20, 30, 40, 50],
+        )
+        report = audit_snapshots(snapshots)
+        self.assertEqual(report["summary"], {"errors": 0, "warnings": 0})
+        self.assertEqual(report["recordIds"], ["dialogue", "menu", "status"])
 
     def test_glyph_provenance_script_contains_catalog_positions(self) -> None:
         catalog = json.loads((

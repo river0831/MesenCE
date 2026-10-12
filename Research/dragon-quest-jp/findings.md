@@ -588,3 +588,12 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Confidence: `code-confirmed`; 52 automated tests cover valid traces and the
   major error/warning classes. The real-trace result agrees with the earlier
   successful visual replay.
+
+### Snapshot lifecycle regression fixture
+
+- A six-snapshot, ROM-free JSONL fixture fixes the expected transition order:
+  menu, higher replacement window, restored menu, first dialogue unit, two
+  ordered dialogue units, then an empty scene.
+- The fixture is loaded through the production trace parser and must pass the
+  production auditor with zero errors and zero warnings. Confidence:
+  `code-confirmed`; the full suite now contains 53 tests.
