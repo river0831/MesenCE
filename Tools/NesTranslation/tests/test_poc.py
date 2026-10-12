@@ -9,6 +9,7 @@ from Tools.NesTranslation.database import DatabaseError, load_database, validate
 from Tools.NesTranslation.dialogue_catalog import build_catalog, render_catalog_review
 from Tools.NesTranslation.analyze_reads import cluster_reads
 from Tools.NesTranslation.chr_records import ines_chr_layout, split_chr_records
+from Tools.NesTranslation.catalog_validation import apply_runtime_matches
 from Tools.NesTranslation.dictionary_codec import (
     expand_tokens,
     ines_prg,
@@ -324,6 +325,38 @@ class ReadAnalysisTests(unittest.TestCase):
         broken = list(events)
         broken[6]["ppuAddress"] = 0x1400
         self.assertEqual(match_catalog(extract_runtime_bytes(broken), catalog), [])
+
+    def test_runtime_matches_promote_catalog_record_and_count_occurrences(self) -> None:
+        catalog = {
+            "records": [{
+                "id": "chr-fc-test",
+                "runtime": {
+                    "status": "unverified",
+                    "observedReadAddress": None,
+                    "notes": None,
+                },
+            }]
+        }
+        hit = {
+            "recordId": "chr-fc-test",
+            "frameStart": 10,
+            "frameEnd": 20,
+            "selector": 1,
+            "ppuStart": 0x1234,
+            "ppuEndExclusive": 0x1237,
+        }
+        validated = apply_runtime_matches(
+            catalog,
+            ({"trace": "one.jsonl", "hits": [hit, dict(hit)]},),
+        )
+        runtime = validated["records"][0]["runtime"]
+        self.assertEqual(runtime["status"], "runtime-confirmed")
+        self.assertEqual(runtime["occurrenceCount"], 2)
+        self.assertEqual(runtime["observedReadAddress"], 0x1234)
+        self.assertEqual(
+            validated["validationSummary"]["runtimeConfirmedRecordCount"], 1
+        )
+        self.assertEqual(catalog["records"][0]["runtime"]["status"], "unverified")
 
     def test_dialogue_decoder_instruction_addresses_match_rom(self) -> None:
         self.assertEqual(

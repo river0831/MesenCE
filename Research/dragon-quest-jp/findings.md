@@ -167,6 +167,15 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   text despite having ranked only `medium` statically. The duplicate means the
   player attempted to speak twice in a direction without an NPC; it is two
   occurrences but only one distinct record.
+- A second lightweight capture produced 166 runtime source bytes and all 166
+  were covered by exact catalog matches. It contains five occurrences across
+  three IDs: `chr-fc-215b` three times, `chr-fc-35c8` once, and
+  `chr-fc-38a7` once. The latter is a 97-byte, seven-line castle tutorial NPC
+  dialogue, demonstrating that the same identity mechanism handles both short
+  system messages and long multi-line dialogue without PPU screenshot matching.
+- Confidence: `runtime-confirmed` for these three record identities and zero
+  unmatched bytes in this capture. This validation does not yet assign meaning
+  to the remaining unknown controls in their decoded review text.
 
 ## Shared compressed-text dictionary
 

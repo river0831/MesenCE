@@ -248,3 +248,18 @@ For a focused multi-dialogue validation capture, use
 `runtime/dialogue-catalog-trace.lua`. It starts after the main command menu is
 read, runs for 3600 frames, and omits Nametable and PPU-buffer logging. Open the
 menu once, speak to two or more NPCs, finish their dialogue, then close Mesen.
+
+Merge one or more exact-match reports back into a generated validated catalog:
+
+```sh
+python3 -m Tools.NesTranslation.catalog_validation \
+  --catalog Research/dragon-quest-jp/generated/dialogue-catalog.json \
+  --matches Research/dragon-quest-jp/generated/dialogue-runtime-matches.json \
+  --matches Research/dragon-quest-jp/generated/dialogue-catalog-validation-matches.json \
+  --matches Research/dragon-quest-jp/generated/dialogue-catalog-validation-2-matches.json \
+  --output Research/dragon-quest-jp/generated/dialogue-catalog-validated.json
+```
+
+This preserves the static ranking while promoting exact runtime hits, recording
+each observation and keeping occurrence count separate from distinct record
+count.
