@@ -66,6 +66,9 @@ CHARACTER_MAP = ROOT / "Research/dragon-quest-jp/database/character-map.json"
 DIALOGUE_TRANSLATIONS = (
     ROOT / "Research/dragon-quest-jp/database/dialogue-translations.json"
 )
+VOCABULARY_TRANSLATIONS = (
+    ROOT / "Research/dragon-quest-jp/database/vocabulary-translations.json"
+)
 SNAPSHOT_LIFECYCLE = (
     ROOT / "Tools/NesTranslation/tests/fixtures/visible-snapshot-lifecycle.jsonl"
 )
@@ -556,6 +559,29 @@ class ReadAnalysisTests(unittest.TestCase):
                 "label:dq.menu.main", (("dq.menu.strength#label-1", 1),)
             ))
 
+    def test_vocabulary_visibility_uses_runtime_ppu_bounds(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE), vocabulary,
+        )
+        shown = router.consume(
+            'DQMENU {"type":"group","frame":9,"recordId":"dict-a1",'
+            '"cellCount":3,"labels":[{"index":1,"cellCount":3,'
+            '"x":168,"y":64,"width":24,"height":8}]}'
+        )
+        assert shown is not None
+        self.assertEqual(shown["items"][0]["text"], "鑰匙")
+        self.assertEqual(shown["items"][0]["ppuBounds"], {
+            "x": 168, "y": 64, "width": 24, "height": 8,
+        })
+        hidden = router.consume(
+            'DQMENU {"type":"group","frame":10,"recordId":"dict-a1",'
+            '"cellCount":0,"labels":[]}'
+        )
+        assert hidden is not None
+        self.assertFalse(hidden["visible"])
+
     def test_subtitle_router_maps_menu_groups_to_layout_labels(self) -> None:
         router = SubtitleEventRouter(
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
@@ -788,12 +814,18 @@ class ReadAnalysisTests(unittest.TestCase):
             ROOT / "Research/dragon-quest-jp/generated/dialogue-catalog-validated.json"
         ).read_text(encoding="utf-8"))
         translations = json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8"))
+        dictionary_catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
         template = (
             ROOT / "Research/dragon-quest-jp/runtime/dialogue-glyph-provenance.lua"
         ).read_text(encoding="utf-8")
         script = build_glyph_provenance_script(
             catalog, translations, load_character_map(CHARACTER_MAP), template,
             database=load_database(DATABASE),
+            dictionary_catalog=dictionary_catalog,
+            vocabulary=vocabulary,
         )
         self.assertNotIn("__NES_TRANSLATION_GLYPH_PROVENANCE_CONFIG__", script)
         self.assertIn('id = "chr-fc-38a7"', script)
@@ -809,6 +841,8 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("startX = 128, endX = 160", script)
         self.assertIn('state["ppu.tmpVideoRamAddr"]', script)
         self.assertIn('state["ppu.xScroll"]', script)
+        self.assertIn('id = "dict-a1"', script)
+        self.assertIn("dynamic = true", script)
 
     def test_character_map_renders_dialogue_and_combines_dakuten(self) -> None:
         character_map = load_character_map(CHARACTER_MAP)

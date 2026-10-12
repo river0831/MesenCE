@@ -698,3 +698,17 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   offsets are static facts, but actual inventory placement and dynamic-template
   substitution still require runtime validation. Confidence for catalog
   generation and cross-file validation: `code-confirmed`; 62 tests pass.
+
+### Dynamic vocabulary projection
+
+- Reviewed dictionary entries can now join the normalized state model as
+  `vocabulary` text units. They use the same scoped visibility replacement and
+  renderer-independent snapshots as fixed labels and dialogue segments.
+- The Lua adapter tags PPU-buffer writes from each exact dictionary PRG range,
+  derives the visible pixel rectangle from the resulting Nametable cells, and
+  emits that rectangle with the current cell count. No inventory row or window
+  coordinate is stored in the vocabulary database.
+- Static menu labels retain their reviewed rectangles; only dynamic vocabulary
+  entries override their output bounds. Confidence: `code-confirmed` for
+  configuration, routing, bounds, and clearing behavior in 63 tests;
+  runtime behavior remains pending a populated-inventory visual run.

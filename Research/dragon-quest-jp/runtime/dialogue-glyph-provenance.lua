@@ -159,18 +159,23 @@ local function onBufferWrite(address, value)
   end
   if layoutSource and frame <= layoutSourceExpires then
     local x, y = screenTilePixel(candidate.ppuAddress)
-    local labelIndex = nil
-    for _, label in ipairs(layoutSource.labels) do
-      if x and y and x < label.endX and x + 8 > label.startX
-          and y < label.endY and y + 8 > label.startY then
-        labelIndex = label.index
-        break
+    local labelIndex = layoutSource.dynamic and 1 or nil
+    if not layoutSource.dynamic then
+      for _, label in ipairs(layoutSource.labels) do
+        if x and y and x < label.endX and x + 8 > label.startX
+            and y < label.endY and y + 8 > label.startY then
+          labelIndex = label.index
+          break
+        end
       end
     end
     layoutPending[candidate.ppuAddress % 0x400] = {
       recordId = layoutSource.id,
       labelIndex = labelIndex,
       value = value,
+      x = x,
+      y = y,
+      dynamic = layoutSource.dynamic,
     }
   end
 end
@@ -264,19 +269,43 @@ local function emitLayoutGroups()
   for recordId, _ in pairs(layoutDirty) do
     local count = 0
     local labelCounts = {}
+    local labelBounds = {}
     for _, owner in pairs(layoutCells) do
       if owner.recordId == recordId then
         count = count + 1
         if owner.labelIndex then
           labelCounts[owner.labelIndex] = (labelCounts[owner.labelIndex] or 0) + 1
+          if owner.dynamic and owner.x and owner.y then
+            local bounds = labelBounds[owner.labelIndex]
+            if not bounds then
+              bounds = { minX = owner.x, minY = owner.y,
+                maxX = owner.x + 8, maxY = owner.y + 8 }
+              labelBounds[owner.labelIndex] = bounds
+            else
+              bounds.minX = math.min(bounds.minX, owner.x)
+              bounds.minY = math.min(bounds.minY, owner.y)
+              bounds.maxX = math.max(bounds.maxX, owner.x + 8)
+              bounds.maxY = math.max(bounds.maxY, owner.y + 8)
+            end
+          end
         end
       end
     end
     local labels = {}
     for index, labelCount in pairs(labelCounts) do
-      table.insert(labels, string.format(
-        "{\"index\":%d,\"cellCount\":%d}", index, labelCount
-      ))
+      local bounds = labelBounds[index]
+      if bounds then
+        table.insert(labels, string.format(
+          "{\"index\":%d,\"cellCount\":%d,\"x\":%d,\"y\":%d," ..
+          "\"width\":%d,\"height\":%d}", index, labelCount,
+          bounds.minX, bounds.minY, bounds.maxX - bounds.minX,
+          bounds.maxY - bounds.minY
+        ))
+      else
+        table.insert(labels, string.format(
+          "{\"index\":%d,\"cellCount\":%d}", index, labelCount
+        ))
+      end
     end
     print(string.format(
       "DQMENU {\"type\":\"group\",\"frame\":%d,\"recordId\":%s," ..

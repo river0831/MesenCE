@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .database import DatabaseError, GameDatabase, load_database, validate_rom
+from .dictionary_catalog import validate_vocabulary
 from .dialogue_overlay import (
     load_mesen_font_characters,
     shortest_unique_prefix,
@@ -133,6 +134,7 @@ class SubtitleEventRouter:
         self,
         translations: dict[str, Any],
         database: GameDatabase | None = None,
+        vocabulary: dict[str, Any] | None = None,
         activation_coverage: float = 0.25,
     ):
         if not 0 < activation_coverage <= 1:
@@ -146,17 +148,21 @@ class SubtitleEventRouter:
             for record in (database.records if database else ())
             if record.presentation is not None
         }
-        units = build_text_units(translations, database)
+        units = build_text_units(translations, database, vocabulary)
         self._units_by_id = {unit.id: unit for unit in units}
         self._layout_units = {
             (unit.record_id, unit.source_index): unit
             for unit in units if unit.kind == "label"
+        }
+        self._vocabulary_units = {
+            unit.record_id: unit for unit in units if unit.kind == "vocabulary"
         }
         self._dialogue_units = {
             (unit.record_id, unit.source_start, unit.source_end_exclusive): unit
             for unit in units if unit.kind == "dialogue"
         }
         self._visible_units: dict[str, int] = {}
+        self._visible_bounds: dict[str, PpuBounds] = {}
         self._scope_units = {
             f"{unit.kind}:{unit.record_id}": {
                 candidate.id for candidate in units
@@ -181,7 +187,9 @@ class SubtitleEventRouter:
             )
         for unit_id in scope_units:
             self._visible_units.pop(unit_id, None)
+            self._visible_bounds.pop(unit_id, None)
         self._visible_units.update(counts)
+        self._visible_bounds.update(dict(update.unit_bounds))
         return self._scene_state()
 
     def _scene_state(self) -> dict[str, Any]:
@@ -190,12 +198,14 @@ class SubtitleEventRouter:
             (
                 self._units_by_id[unit_id]
                 for unit_id in self._visible_units
-                if self._units_by_id[unit_id].kind == "label"
+                if self._units_by_id[unit_id].kind in ("label", "vocabulary")
             ),
             key=lambda unit: unit.id,
         )
         for unit in layout_units:
-            items.append(unit.snapshot_item(self._visible_units[unit.id]))
+            items.append(unit.snapshot_item(
+                self._visible_units[unit.id], self._visible_bounds.get(unit.id)
+            ))
 
         dialogue_by_record: dict[str, list[TextUnit]] = {}
         for unit_id in self._visible_units:
@@ -255,9 +265,12 @@ class SubtitleEventRouter:
         if isinstance(event.get("frame"), int):
             self._frame = event["frame"]
         if marker == menu_marker:
-            if event.get("type") != "group" or event.get("recordId") not in self._layouts:
+            if event.get("type") != "group":
                 return None
             record_id = event["recordId"]
+            vocabulary_unit = self._vocabulary_units.get(record_id)
+            if record_id not in self._layouts and vocabulary_unit is None:
+                return None
             label_counts = event.get("labels")
             if isinstance(label_counts, list):
                 visible = {
@@ -280,13 +293,32 @@ class SubtitleEventRouter:
             else:
                 visible = {}
             unit_counts = []
+            unit_bounds = []
             for index, count in visible.items():
-                unit = self._layout_units.get((record_id, index))
+                unit = (
+                    vocabulary_unit if vocabulary_unit is not None and index == 1
+                    else self._layout_units.get((record_id, index))
+                )
                 if unit is not None:
                     unit_counts.append((unit.id, count))
+                    item = next((
+                        candidate for candidate in (label_counts or [])
+                        if isinstance(candidate, dict) and candidate.get("index") == index
+                    ), None)
+                    if item is not None and all(
+                        isinstance(item.get(key), int)
+                        for key in ("x", "y", "width", "height")
+                    ):
+                        unit_bounds.append((unit.id, PpuBounds(
+                            item["x"], item["y"], item["width"], item["height"]
+                        )))
             return self.apply_visibility(VisibilityUpdate(
-                scope_id=f"label:{record_id}",
+                scope_id=(
+                    f"vocabulary:{record_id}" if vocabulary_unit is not None
+                    else f"label:{record_id}"
+                ),
                 unit_counts=tuple(unit_counts),
+                unit_bounds=tuple(unit_bounds),
             ))
         if event.get("type") == "reset":
             record_id = str(event.get("recordId"))
@@ -334,6 +366,8 @@ def build_config(
     *,
     display_segments: bool = False,
     database: GameDatabase | None = None,
+    dictionary_catalog: dict[str, Any] | None = None,
+    vocabulary: dict[str, Any] | None = None,
 ) -> str:
     records_by_id = {record["id"]: record for record in catalog.get("records", [])}
     all_raw = [bytes.fromhex(record["rawHex"]) for record in catalog.get("records", [])]
@@ -382,6 +416,24 @@ def build_config(
                     % (index, start_x, end_x, start_y, end_y)
                 )
             lines.extend(["  } },"])
+        if dictionary_catalog is not None and vocabulary is not None:
+            validate_vocabulary(dictionary_catalog, vocabulary)
+            entries = {
+                entry["id"]: entry for entry in dictionary_catalog.get("entries", [])
+            }
+            for word in vocabulary.get("records", []):
+                entry = entries[word["id"]]
+                if entry["prgEndExclusive"] <= entry["prgStart"]:
+                    continue
+                lines.append(
+                    "  { id = %s, startAddress = %d, endAddress = %d, "
+                    "dynamic = true, labels = {} },"
+                    % (
+                        _lua_string(word["id"]),
+                        database.cpu_address_base + entry["prgStart"],
+                        database.cpu_address_base + entry["prgEndExclusive"] - 1,
+                    )
+                )
     lines.extend([
         "}",
         "local records = {",
@@ -438,6 +490,8 @@ def build_script(
     *,
     display_segments: bool = False,
     database: GameDatabase | None = None,
+    dictionary_catalog: dict[str, Any] | None = None,
+    vocabulary: dict[str, Any] | None = None,
 ) -> str:
     if template.count(CONFIG_MARKER) != 1:
         raise ValueError("glyph provenance template must contain exactly one config marker")
@@ -449,6 +503,8 @@ def build_script(
             character_map,
             display_segments=display_segments,
             database=database,
+            dictionary_catalog=dictionary_catalog,
+            vocabulary=vocabulary,
         ),
     )
 
@@ -466,6 +522,8 @@ def run(
     external_subtitles: bool,
     subtitle_companion_path: Path | None,
     snapshot_trace_path: Path | None = None,
+    dictionary_catalog_path: Path | None = None,
+    vocabulary_path: Path | None = None,
 ) -> int:
     if display_segments and external_subtitles:
         raise ValueError("choose either in-game or external segment display")
@@ -475,6 +533,21 @@ def run(
     if catalog.get("romSha256") != database.rom_sha256:
         raise DatabaseError("dialogue catalog does not match the bound ROM")
     translations = json.loads(translations_path.read_text(encoding="utf-8"))
+    if (dictionary_catalog_path is None) != (vocabulary_path is None):
+        raise ValueError("dictionary catalog and vocabulary must be provided together")
+    dictionary_catalog = (
+        json.loads(dictionary_catalog_path.read_text(encoding="utf-8"))
+        if dictionary_catalog_path is not None else None
+    )
+    vocabulary = (
+        json.loads(vocabulary_path.read_text(encoding="utf-8"))
+        if vocabulary_path is not None else None
+    )
+    if dictionary_catalog is not None:
+        if dictionary_catalog.get("romSha256") != database.rom_sha256:
+            raise DatabaseError("dictionary catalog does not match the bound ROM")
+        assert vocabulary is not None
+        validate_vocabulary(dictionary_catalog, vocabulary)
     if display_segments and font_source_path is not None:
         validate_presentation_characters(
             translations, load_mesen_font_characters(font_source_path)
@@ -486,6 +559,8 @@ def run(
         template_path.read_text(encoding="utf-8"),
         display_segments=display_segments,
         database=database,
+        dictionary_catalog=dictionary_catalog,
+        vocabulary=vocabulary,
     )
     with tempfile.TemporaryDirectory(prefix="nes-dialogue-glyph-provenance-") as folder:
         generated = Path(folder) / "dialogue-glyph-provenance.lua"
@@ -501,7 +576,7 @@ def run(
 
         if external_subtitles and subtitle_companion_path is None:
             raise ValueError("external subtitles require a companion path")
-        router = SubtitleEventRouter(translations, database)
+        router = SubtitleEventRouter(translations, database, vocabulary)
         if snapshot_trace_path is not None:
             snapshot_trace_path.parent.mkdir(parents=True, exist_ok=True)
         with ExitStack() as stack:
@@ -556,6 +631,8 @@ def main() -> None:
     parser.add_argument("--font-source", type=Path)
     parser.add_argument("--external-subtitles", action="store_true")
     parser.add_argument("--subtitle-companion", type=Path)
+    parser.add_argument("--dictionary-catalog", type=Path)
+    parser.add_argument("--vocabulary", type=Path)
     parser.add_argument(
         "--snapshot-trace", type=Path,
         help="write renderer-independent translation snapshots as JSONL",
@@ -567,6 +644,7 @@ def main() -> None:
         args.display_segments, args.font_source,
         args.external_subtitles, args.subtitle_companion,
         args.snapshot_trace,
+        args.dictionary_catalog, args.vocabulary,
     ))
 
 

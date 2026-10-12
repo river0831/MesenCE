@@ -387,6 +387,8 @@ python3 -m Tools.NesTranslation.dialogue_glyph_provenance \
   --catalog Research/dragon-quest-jp/generated/dialogue-catalog-validated.json \
   --translations Research/dragon-quest-jp/database/dialogue-translations.json \
   --character-map Research/dragon-quest-jp/database/character-map.json \
+  --dictionary-catalog Research/dragon-quest-jp/generated/prg-dictionary-catalog.json \
+  --vocabulary Research/dragon-quest-jp/database/vocabulary-translations.json \
   --external-subtitles \
   --subtitle-companion Tools/NesTranslation/subtitle_companion_macos.py \
   --snapshot-trace Research/dragon-quest-jp/generated/visible-snapshots.jsonl
@@ -396,6 +398,12 @@ python3 -m Tools.NesTranslation.dialogue_glyph_provenance \
 snapshots sent to the companion, including frame numbers and unit deltas. It
 does not contain ROM bytes. The trace can also be recorded without
 `--external-subtitles` when only a diagnostic capture is needed.
+
+With the dictionary catalog and vocabulary options, dictionary-backed words
+become independent text units. Their translation rectangles come from the
+currently tagged Nametable cells, so inventory rows are not assigned fixed
+screen coordinates. A later overwrite removes the corresponding unit through
+the same complete-snapshot path used by menus and dialogue.
 
 Replay a capture without starting Mesen or loading the ROM:
 

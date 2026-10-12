@@ -27,7 +27,7 @@ class TextUnit:
 
     id: str
     record_id: str
-    kind: Literal["label", "dialogue"]
+    kind: Literal["label", "dialogue", "vocabulary"]
     text: str
     ppu_bounds: PpuBounds
     total_count: int
@@ -64,19 +64,24 @@ class VisibilityUpdate:
 
     scope_id: str
     unit_counts: tuple[tuple[str, int], ...]
+    unit_bounds: tuple[tuple[str, PpuBounds], ...] = ()
 
     def __post_init__(self) -> None:
         ids = [unit_id for unit_id, _ in self.unit_counts]
+        bound_ids = [unit_id for unit_id, _ in self.unit_bounds]
         if not self.scope_id:
             raise ValueError("visibility scope must not be empty")
         if len(ids) != len(set(ids)):
             raise ValueError("visibility update contains duplicate unit IDs")
         if any(not unit_id or count <= 0 for unit_id, count in self.unit_counts):
             raise ValueError("visible unit IDs and counts must be positive")
+        if len(bound_ids) != len(set(bound_ids)) or set(bound_ids) - set(ids):
+            raise ValueError("visibility bounds must reference unique visible unit IDs")
 
 
 def build_text_units(
-    translations: dict[str, Any], database: GameDatabase | None = None
+    translations: dict[str, Any], database: GameDatabase | None = None,
+    vocabulary: dict[str, Any] | None = None,
 ) -> tuple[TextUnit, ...]:
     """Normalize label records and reviewed dialogue segments."""
     units: list[TextUnit] = []
@@ -122,6 +127,17 @@ def build_text_units(
                 line_count=len(lines),
                 line_height=box["lineHeight"],
             ))
+    for record in (vocabulary or {}).get("records", []):
+        source_text = str(record.get("sourceText", ""))
+        units.append(TextUnit(
+            id=f"{record['id']}#vocabulary",
+            record_id=record["id"],
+            kind="vocabulary",
+            text=record["display"],
+            ppu_bounds=PpuBounds(0, 0, 8, 8),
+            total_count=max(len(source_text), 1),
+            font_size=7.5,
+        ))
     ids = [unit.id for unit in units]
     if len(ids) != len(set(ids)):
         raise DatabaseError("duplicate normalized text unit id")
