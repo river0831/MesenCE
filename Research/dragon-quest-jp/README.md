@@ -347,6 +347,10 @@ External dialogue selection uses visible coverage rather than the greatest
 glyph index alone. Each runtime snapshot counts sourced Nametable cells inside
 every reviewed alignment interval. An interval activates at 80% coverage and
 remains active while at least one of its cells is visible; intervals with zero
-visible cells are removed. Multiple genuinely visible source sentences can
-therefore produce multiple translated lines without exposing a later sentence
-merely because both previously shared one coarse record range.
+visible cells are removed from the active set. If scrolling creates a gap in
+which no interval has yet reached the activation threshold, the last committed
+subtitle remains on screen until the next interval replaces it atomically.
+Only the dialogue reset returns presentation to menu layout. Multiple genuinely
+visible source sentences can produce multiple translated lines without
+exposing a later sentence merely because both previously shared one coarse
+record range.

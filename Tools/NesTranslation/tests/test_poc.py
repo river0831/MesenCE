@@ -337,8 +337,14 @@ class ReadAnalysisTests(unittest.TestCase):
             '"visibleCount":0},{"sourceStart":22,"sourceEndExclusive":46,'
             '"visibleCount":0}]}'
         )
-        assert cleared is not None
-        self.assertFalse(cleared["visible"])
+        self.assertIsNone(cleared)
+        replacement = router.consume(
+            'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
+            '"segments":[{"sourceStart":46,"sourceEndExclusive":64,'
+            '"visibleCount":15}]}'
+        )
+        assert replacement is not None
+        self.assertEqual(replacement["text"], "戰鬥中受傷時，")
         hidden = router.consume(
             'DQGLYPH {"type":"reset","recordId":"chr-fc-38a7"}'
         )

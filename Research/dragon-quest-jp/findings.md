@@ -490,8 +490,11 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Runtime coverage snapshots count current sourced Nametable cells for every
   alignment interval. The external router activates an interval at 80%
   coverage, keeps it while any of its cells remain visible, and removes it at
-  zero. This hysteresis avoids both premature later text and flicker while a
-  visible sentence scrolls away.
+  zero. A visual run exposed a handoff gap when the old interval reached zero
+  before the new interval reached 80%; falling back to menu layout was visibly
+  wrong even though both coverage measurements were accurate. The router now
+  holds the last committed subtitle through that gap and replaces it atomically
+  when the next interval qualifies. Only record reset exits subtitle mode.
 - Multiple active intervals are rendered in source order. This implements the
   proposed Nametable-visible-position -> original interval -> translated unit
   mapping without proportionally truncating Chinese characters.

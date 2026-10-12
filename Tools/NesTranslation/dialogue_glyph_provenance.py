@@ -223,9 +223,9 @@ class SubtitleEventRouter:
                 for line in segment["lines"]
             ]
             if not lines:
-                if self._subtitle_state is not None:
-                    self._subtitle_state = None
-                    return self._layout_state()
+                # Keep the previously committed subtitle while the game
+                # scrolls between alignment units. A new sufficiently-covered
+                # unit replaces it atomically; only reset ends subtitle mode.
                 return None
             self._subtitle_state = {
                 "visible": True,
