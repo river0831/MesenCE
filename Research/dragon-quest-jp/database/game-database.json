@@ -15,6 +15,7 @@
       "addressHighOffset": 0,
       "addressLowOffset": 1,
       "valueOffset": 2,
+      "writerPc": 43963,
       "confidence": "code-confirmed"
     }
   },

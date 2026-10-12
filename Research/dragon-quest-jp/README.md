@@ -139,3 +139,21 @@ A newly sourced record takes focus immediately, and labels are drawn after its
 group remains stable for two frames. Bulk untagged writes clear a group and
 hide its overlay. Small per-frame changes are treated as cursor or dynamic-
 field updates so moving the menu cursor does not flicker the translation.
+
+## Capture one NPC dialogue
+
+Stand next to a repeatable NPC before launching this bounded capture. Open the
+main command menu, choose `はなす`, advance the complete dialogue, and close
+Mesen. The trace combines decoder reads, token dispatch at CPU `$BE6A`, shared-
+dictionary expansion, decoded `$0300` PPU-buffer entries, and physical
+Nametable writes without modifying emulated memory. The hooks are restricted
+to confirmed decoder sites so instruction fetches and unrelated ROM traffic
+are not included.
+
+```sh
+python3 -m Tools.NesTranslation.capture \
+  --mesen bin/osx-arm64/Release/osx-arm64/publish/Mesen.app/Contents/MacOS/Mesen \
+  --script Research/dragon-quest-jp/runtime/dialogue-trace.lua \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --output Research/dragon-quest-jp/generated/dialogue.jsonl
+```

@@ -21,6 +21,11 @@ wide assumptions. The range must fit the NES's 2 KiB internal RAM, offsets must
 be distinct and smaller than `entrySize`, and the entry requires an explicit
 confidence value.
 
+`writerPc` is the CPU PC observed immediately after the value-byte store. A
+runtime adapter must accept an aligned RAM write as an upload entry only when
+the callback reports this PC. This discriminator is required because games may
+reuse part of the nominal buffer range as unrelated scratch memory.
+
 An optional `presentation` describes how a display adapter renders a record.
 The initial `label-overlay` mode contains one or more labels with display text,
 native-screen coordinates, and a positive `clear` rectangle. `translation`

@@ -42,6 +42,53 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - No child-menu translation is in the database yet.
 - Dialogue page boundaries and dialogue close behavior remain untested.
 
+## First NPC-dialogue capture
+
+- A bounded run captured the main menu at frame 10467, the `はなす` selection
+  beginning at frame 10489, and subsequent advance inputs at frames 10516,
+  10649, and 10668.
+- One renderer fetches record data with `LDA ($99),Y` at CPU `$BD30`; a Mesen
+  read callback observes `$BD32` after the effective read. The same indirect
+  instruction also performs bus reads of zero-page `$99/$9A`, so those pointer
+  bytes must be filtered rather than reported as text.
+- The second capture confirmed that the effective reads at this site came from
+  PRG. The earlier apparent absence of a PRG source was an instrumentation
+  error, not evidence for a RAM-backed dialogue stream.
+- CPU `$BE6A` is the stronger identity hook: the accumulator holds the decoded
+  source token immediately before comparison with `$6D`, while `$99/$9A`
+  identify its current source. Capturing this execution point distinguishes an
+  originating token from later reads used to search or expand the dictionary.
+- Dictionary output was observed at frames 10529-10613. Reads at CPU `$BEF2`
+  select the expanded character bytes after the `$6D+` source token has chosen
+  an entry. Dictionary scans performed at `$BE7C` are lookup traffic and must
+  not be mistaken for displayed text.
+- Confidence: `code-confirmed` for the record fetch at `$BD30`, token dispatch
+  at `$BE6A`, and decoded dictionary fetch at `$BEF2`; `runtime-confirmed` for
+  PRG-backed effective reads and dictionary expansion during this dialogue.
+
+### Glyph-bitmap staging discovered by the corrected token hook
+
+- The corrected `$BE6A` execution hook fired 524 times in the short dialogue
+  capture, proving that the hook itself is active.
+- During the visible dialogue animation, 38 apparent source values were read
+  repeatedly from RAM `$03B0`. They were written at CPU `$C4BB` after PPU data
+  reads in the `$C49D-$C4CF` routine. The values are rows of a dynamically
+  staged 8x8 glyph bitmap, not a serialized dialogue record.
+- `$03B0` lies inside the nominal `$0300-$03BF` PPU-update-buffer range and is
+  congruent with the configured value-byte offset. Address alignment alone
+  therefore misclassifies these writes as three-byte update entries. The RAM
+  range is reused as scratch storage in this rendering mode.
+- A valid generic provenance adapter must qualify buffer entries by producer
+  path and/or entry header validity, not only by RAM address. For this ROM,
+  writes from `$C4BB` must not create text-record provenance.
+- The first PRG-backed dictionary token observed in this run was `$D7` at CPU
+  `$8501` (frame 418), which expanded through dictionary address `$8AEE`.
+  This is a real token-to-dictionary link, but its semantic association with
+  the NPC sentence is not yet established.
+- Confidence: `runtime-confirmed` for `$03B0` reuse and the `$C4BB` producer;
+  `code-confirmed` for the surrounding PPU-read loop; `semantic-probable` that
+  these bytes are glyph bitmap rows pending direct PPU-view confirmation.
+
 ## Shared compressed-text dictionary
 
 - Entering the empty item path caused a sequential read of physical PRG

@@ -46,6 +46,7 @@ class PpuUpdateBuffer:
     address_high_offset: int
     address_low_offset: int
     value_offset: int
+    writer_pc: int
     confidence: str
 
 
@@ -180,6 +181,11 @@ def load_database(path: Path) -> GameDatabase:
             raise DatabaseError("runtime.ppuUpdateBuffer offsets must fit entrySize")
         if len(set(offsets.values())) != len(offsets):
             raise DatabaseError("runtime.ppuUpdateBuffer offsets must be distinct")
+        writer_pc = _non_negative_int(
+            buffer, "writerPc", "runtime.ppuUpdateBuffer"
+        )
+        if writer_pc > 0xFFFF:
+            raise DatabaseError("runtime.ppuUpdateBuffer.writerPc must fit 16 bits")
         ppu_update_buffer = PpuUpdateBuffer(
             ram_start=ram_start,
             ram_end_exclusive=ram_end,
@@ -187,6 +193,7 @@ def load_database(path: Path) -> GameDatabase:
             address_high_offset=offsets["addressHighOffset"],
             address_low_offset=offsets["addressLowOffset"],
             value_offset=offsets["valueOffset"],
+            writer_pc=writer_pc,
             confidence=_require(buffer, "confidence", str),
         )
 

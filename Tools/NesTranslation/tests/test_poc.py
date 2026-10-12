@@ -22,6 +22,11 @@ ROM = ROOT / "test_roms/Dragon Quest (Japan).nes"
 TRACE = ROOT / "Research/dragon-quest-jp/traces/main-menu-synthetic.jsonl"
 
 
+def prg_byte(cpu_address: int) -> int:
+    rom = ROM.read_bytes()
+    return rom[16 + cpu_address - 0x8000]
+
+
 def read_event(prg_offset: int, frame: int = 1) -> RomReadEvent:
     return RomReadEvent(
         type="rom-read",
@@ -56,6 +61,7 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(database.ppu_update_buffer.ram_end_exclusive, 0x03C0)
         self.assertEqual(database.ppu_update_buffer.entry_size, 3)
         self.assertEqual(database.ppu_update_buffer.value_offset, 2)
+        self.assertEqual(database.ppu_update_buffer.writer_pc, 0xABBB)
         self.assertEqual(database.ppu_update_buffer.confidence, "code-confirmed")
 
     def test_wrong_rom_hash_is_rejected(self) -> None:
@@ -93,6 +99,15 @@ class DatabaseTests(unittest.TestCase):
             with self.assertRaisesRegex(DatabaseError, "offsets must fit"):
                 load_database(path)
 
+    def test_invalid_ppu_buffer_writer_pc_is_rejected(self) -> None:
+        value = json.loads(DATABASE.read_text(encoding="utf-8"))
+        value["runtime"]["ppuUpdateBuffer"]["writerPc"] = 0x10000
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "database.json"
+            path.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(DatabaseError, "writerPc must fit"):
+                load_database(path)
+
     def test_overlay_script_is_generated_from_database(self) -> None:
         database = load_database(DATABASE)
         template_path = (
@@ -122,6 +137,7 @@ class DatabaseTests(unittest.TestCase):
         self.assertIn("endAddress = 33946", script)
         self.assertIn("ramStart = 768", script)
         self.assertIn("valueOffset = 2", script)
+        self.assertIn("writerPc = 43963", script)
 
     def test_provenance_rejects_negative_ttl(self) -> None:
         database = load_database(DATABASE)
@@ -156,6 +172,20 @@ class DatabaseTests(unittest.TestCase):
 
 
 class ReadAnalysisTests(unittest.TestCase):
+    def test_dialogue_decoder_instruction_addresses_match_rom(self) -> None:
+        self.assertEqual(
+            bytes(prg_byte(address) for address in range(0xBD30, 0xBD32)),
+            bytes((0xB1, 0x99)),  # LDA ($99),Y
+        )
+        self.assertEqual(
+            bytes(prg_byte(address) for address in range(0xBE6A, 0xBE6C)),
+            bytes((0xC9, 0x6D)),  # CMP #$6D
+        )
+        self.assertEqual(
+            bytes(prg_byte(address) for address in range(0xBEF2, 0xBEF4)),
+            bytes((0xB1, 0x99)),  # LDA ($99),Y
+        )
+
     def test_clusters_contiguous_prg_reads_and_excludes_known_range(self) -> None:
         items = [
             {"type": "rom-read", "frame": 10, "cpuAddress": 0x8459,

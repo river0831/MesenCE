@@ -65,6 +65,10 @@ end
 
 local function onBufferWrite(address, value)
   if not isBufferValueAddress(address) then return end
+  if cpuPc() ~= ppuUpdateBuffer.writerPc then
+    bufferTags[address] = nil
+    return
+  end
   if activeSource and frame <= sourceExpiresAfterFrame then
     bufferTags[address] = {
       recordId = activeSource.recordId,

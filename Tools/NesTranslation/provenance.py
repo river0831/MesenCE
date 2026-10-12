@@ -59,6 +59,7 @@ def build_lua_config(database: GameDatabase, source_ttl_frames: int = 3) -> str:
             f"  addressHighOffset = {buffer.address_high_offset},",
             f"  addressLowOffset = {buffer.address_low_offset},",
             f"  valueOffset = {buffer.value_offset},",
+            f"  writerPc = {buffer.writer_pc},",
             "}",
         ])
     return "\n".join(lines)
