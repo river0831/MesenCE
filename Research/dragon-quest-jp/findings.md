@@ -641,5 +641,11 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   translation suitable for the existing external mirror and visible-coverage
   routing.
 - Record identity is `runtime-confirmed`; translation segmentation is
-  `semantic-probable` pending one visual new-game run. The full suite contains
-  56 passing tests.
+  now `runtime-confirmed` after a full new-game visual run. All eight translated
+  intervals appeared in order without premature text, overlap, missing units,
+  or residue after the speech.
+- The validation trace contained 584 snapshots and no audit errors. Two
+  expected overlap-start warnings occurred while the strength window covered
+  the main menu; the final visible-menu warning only records that capture was
+  manually stopped with the menu open. The full suite contains 56 passing
+  tests.
