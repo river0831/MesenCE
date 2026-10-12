@@ -23,6 +23,7 @@ from Tools.NesTranslation.dialogue_overlay import (
     validate_presentation_characters,
 )
 from Tools.NesTranslation.dialogue_glyph_provenance import (
+    build_text_units,
     build_script as build_glyph_provenance_script,
     group_visible_cells,
     logical_glyphs,
@@ -359,6 +360,26 @@ class ReadAnalysisTests(unittest.TestCase):
         assert hidden is not None
         self.assertFalse(hidden["visible"])
         self.assertIsNone(router.consume("ordinary emulator output"))
+
+    def test_text_units_normalize_layout_and_dialogue_sources(self) -> None:
+        spec = json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8"))
+        units = build_text_units(spec, load_database(DATABASE))
+        by_id = {unit.id: unit for unit in units}
+
+        menu = by_id["dq.menu.main#label-4"]
+        self.assertEqual(menu.text, "道具")
+        self.assertEqual(menu.ppu_bounds.as_dict(), {
+            "x": 174, "y": 48, "width": 40, "height": 12,
+        })
+        self.assertEqual(menu.total_count, 10)
+        self.assertIsNone(menu.source_start)
+
+        dialogue = by_id["chr-fc-38a7#glyph-0-22"]
+        self.assertEqual(dialogue.text, "離開城堡後，旁邊有座城鎮。")
+        self.assertEqual(dialogue.total_count, 22)
+        self.assertEqual(dialogue.source_start, 0)
+        self.assertEqual(dialogue.source_end_exclusive, 22)
+        self.assertEqual(dialogue.line_height, 15)
 
     def test_subtitle_router_maps_menu_groups_to_layout_labels(self) -> None:
         router = SubtitleEventRouter(

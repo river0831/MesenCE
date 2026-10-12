@@ -32,6 +32,104 @@ class LogicalGlyph:
     source_offset: int
 
 
+@dataclass(frozen=True)
+class PpuBounds:
+    """A renderer-independent rectangle in the NES 256x240 viewport."""
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+    def as_dict(self) -> dict[str, int]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class TextUnit:
+    """One independently visible translation, regardless of its source kind."""
+
+    id: str
+    record_id: str
+    text: str
+    ppu_bounds: PpuBounds
+    total_count: int
+    font_size: float
+    source_start: int | None = None
+    source_end_exclusive: int | None = None
+    line_count: int = 1
+    line_height: int | None = None
+
+    def snapshot_item(
+        self, visible_count: int, ppu_bounds: PpuBounds | None = None
+    ) -> dict[str, Any]:
+        item: dict[str, Any] = {
+            "unitId": self.id,
+            "recordId": self.record_id,
+            "text": self.text,
+            "ppuBounds": (ppu_bounds or self.ppu_bounds).as_dict(),
+            "visibleCount": visible_count,
+            "totalCount": self.total_count,
+            "visibleRatio": min(visible_count / self.total_count, 1.0),
+            "fontSize": self.font_size,
+        }
+        if self.source_start is not None:
+            item["sourceStart"] = self.source_start
+        if self.source_end_exclusive is not None:
+            item["sourceEndExclusive"] = self.source_end_exclusive
+        return item
+
+
+def build_text_units(
+    translations: dict[str, Any], database: GameDatabase | None = None
+) -> tuple[TextUnit, ...]:
+    """Normalize menu labels and dialogue segments into one read model."""
+    units: list[TextUnit] = []
+    for record in database.records if database else ():
+        if record.presentation is None:
+            continue
+        for index, label in enumerate(record.presentation.labels, 1):
+            total = (
+                ((label.clear.width + 7) // 8)
+                * ((label.clear.height + 7) // 8)
+            )
+            units.append(TextUnit(
+                id=f"{record.id}#label-{index}",
+                record_id=record.id,
+                text=label.text,
+                ppu_bounds=PpuBounds(
+                    label.clear.x, label.clear.y,
+                    label.clear.width, label.clear.height,
+                ),
+                total_count=total,
+                font_size=7.5,
+            ))
+    for record in translations.get("records", []):
+        box = record["box"]
+        for segment in record.get("segments", []):
+            start = segment["sourceStart"]
+            end = segment["sourceEndExclusive"]
+            lines = segment["lines"]
+            units.append(TextUnit(
+                id=f"{record['id']}#glyph-{start}-{end}",
+                record_id=record["id"],
+                text="\n".join(lines),
+                ppu_bounds=PpuBounds(
+                    box["x"], box["y"], box["width"], box["height"]
+                ),
+                total_count=end - start,
+                font_size=8.5,
+                source_start=start,
+                source_end_exclusive=end,
+                line_count=len(lines),
+                line_height=box["lineHeight"],
+            ))
+    ids = [unit.id for unit in units]
+    if len(ids) != len(set(ids)):
+        raise DatabaseError("duplicate normalized text unit id")
+    return tuple(units)
+
+
 def logical_glyphs(
     record: dict[str, Any], character_map: dict[int, dict[str, Any]]
 ) -> tuple[LogicalGlyph, ...]:
@@ -144,6 +242,15 @@ class SubtitleEventRouter:
             for record in (database.records if database else ())
             if record.presentation is not None
         }
+        units = build_text_units(translations, database)
+        self._layout_units = {
+            (unit.record_id, int(unit.id.rsplit("-", 1)[1])): unit
+            for unit in units if "#label-" in unit.id
+        }
+        self._dialogue_units = {
+            (unit.record_id, unit.source_start, unit.source_end_exclusive): unit
+            for unit in units if unit.source_start is not None
+        }
         self._visible_layouts: dict[str, dict[int, int]] = {}
         self._visible_dialogue: dict[str, list[dict[str, Any]]] = {}
         self._frame = 0
@@ -151,61 +258,28 @@ class SubtitleEventRouter:
     def _scene_state(self) -> dict[str, Any]:
         items = []
         for record_id in sorted(self._visible_layouts):
-            record = self._layouts[record_id]
-            assert record.presentation is not None
             visible_labels = self._visible_layouts[record_id]
-            for index, label in enumerate(record.presentation.labels, 1):
-                if index not in visible_labels:
-                    continue
-                total = (
-                    ((label.clear.width + 7) // 8)
-                    * ((label.clear.height + 7) // 8)
-                )
-                visible = visible_labels[index]
-                items.append({
-                    "unitId": f"{record_id}#label-{index}",
-                    "recordId": record_id,
-                    "text": label.text,
-                    "ppuBounds": {
-                        "x": label.clear.x,
-                        "y": label.clear.y,
-                        "width": label.clear.width,
-                        "height": label.clear.height,
-                    },
-                    "visibleCount": visible,
-                    "totalCount": total,
-                    "visibleRatio": min(visible / total, 1.0),
-                    "fontSize": 7.5,
-                })
+            for index in sorted(visible_labels):
+                unit = self._layout_units[(record_id, index)]
+                items.append(unit.snapshot_item(visible_labels[index]))
         for record_id in sorted(self._visible_dialogue):
-            record = self._records[record_id]
-            box = record["box"]
             segments = self._visible_dialogue[record_id]
-            total_lines = sum(len(segment["lines"]) for segment in segments)
-            content_height = total_lines * box["lineHeight"]
-            next_y = box["y"] + max((box["height"] - content_height) // 2, 0)
-            for segment in segments:
-                item_height = len(segment["lines"]) * box["lineHeight"]
-                items.append({
-                    "unitId": (
-                        f"{record_id}#glyph-{segment['sourceStart']}-"
-                        f"{segment['sourceEndExclusive']}"
-                    ),
-                    "recordId": record_id,
-                    "text": "\n".join(segment["lines"]),
-                    "ppuBounds": {
-                        "x": box["x"],
-                        "y": next_y,
-                        "width": box["width"],
-                        "height": item_height,
-                    },
-                    "sourceStart": segment["sourceStart"],
-                    "sourceEndExclusive": segment["sourceEndExclusive"],
-                    "visibleCount": segment["visibleCount"],
-                    "totalCount": segment["totalCount"],
-                    "visibleRatio": segment["visibleRatio"],
-                    "fontSize": 8.5,
-                })
+            units = [
+                self._dialogue_units[(
+                    record_id, segment["sourceStart"],
+                    segment["sourceEndExclusive"],
+                )]
+                for segment in segments
+            ]
+            box = units[0].ppu_bounds
+            total_height = sum(
+                unit.line_count * (unit.line_height or 0) for unit in units
+            )
+            next_y = box.y + max((box.height - total_height) // 2, 0)
+            for unit, segment in zip(units, segments):
+                item_height = unit.line_count * (unit.line_height or 0)
+                bounds = PpuBounds(box.x, next_y, box.width, item_height)
+                items.append(unit.snapshot_item(segment["visibleCount"], bounds))
                 next_y += item_height
         return {
             "frame": self._frame,

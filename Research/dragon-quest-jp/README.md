@@ -374,3 +374,9 @@ unit/record IDs, translated text, PPU bounds, visible and total cell/glyph
 counts, coverage ratio, and presentation font size. This snapshot is a direct
 projection of tracked PPU state; it does not identify a game scene or retain a
 previous subtitle.
+
+Before projection, database menu labels and reviewed dialogue segments are
+normalized into the same internal `TextUnit` read model. This adds no game
+scene semantics: a unit only describes translated text, PPU-space bounds,
+coverage size, and an optional source interval. The proven Lua collectors
+remain separate input adapters.

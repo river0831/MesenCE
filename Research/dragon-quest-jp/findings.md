@@ -542,4 +542,9 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   mirror generic while preventing independent text fields from occupying the
   same full dialogue box.
 - Confidence: `runtime-confirmed` for the reviewed combined menu/dialogue run;
-  47 automated tests cover snapshot composition and non-overlapping placement.
+  48 automated tests cover snapshot composition, normalized text units, and
+  non-overlapping placement.
+- Menu labels and dialogue segments are normalized to one internal `TextUnit`
+  model before snapshot projection. This removes their different database
+  shapes from presentation without claiming their runtime provenance
+  collectors are already interchangeable.
