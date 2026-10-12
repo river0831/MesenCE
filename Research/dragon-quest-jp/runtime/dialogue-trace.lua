@@ -21,7 +21,10 @@ local tokenDispatchPc = 0xBE6A -- CMP #$6D before dictionary dispatch
 local dictionaryStart = 0x8858
 local dictionaryEnd = 0x8B20
 local ppuBufferWriterNextPc = 0xABBB
-local glyphBitmapWriterNextPc = 0xC4BB
+local chrWindowWriterNextPc = 0xC4BB
+local chrStreamSelectorPc = 0xC433
+local chrWindowSetupPc = 0xC498
+local currentChrStreamSelector = nil
 
 local function cpuPc()
   local state = emu.getCpuState(emu.cpuType.nes)
@@ -94,17 +97,45 @@ local function onTokenDispatch()
   ))
 end
 
+local function onChrStreamSelector()
+  if not isCapturing() then return end
+  currentChrStreamSelector = emu.read(0x3C, emu.memType.nesDebug) +
+    emu.read(0x3D, emu.memType.nesDebug) * 256
+  print(string.format(
+    "DQTRACE {\"type\":\"chr-stream-selector\",\"frame\":%d," ..
+    "\"value\":%d,\"cpuPc\":%d}",
+    frame, currentChrStreamSelector, chrStreamSelectorPc
+  ))
+end
+
+local function onChrWindowSetup()
+  if not isCapturing() then return end
+  local sourcePointer = emu.read(0x99, emu.memType.nesDebug) +
+    emu.read(0x9A, emu.memType.nesDebug) * 256
+  local ppuAddress = emu.read(0xDC, emu.memType.nesDebug) +
+    emu.read(0xDD, emu.memType.nesDebug) * 256
+  print(string.format(
+    "DQTRACE {\"type\":\"chr-text-window\",\"frame\":%d," ..
+    "\"selector\":%s,\"sourcePointer\":%d,\"ppuAddress\":%d," ..
+    "\"cpuPc\":%d}",
+    frame,
+    currentChrStreamSelector and tostring(currentChrStreamSelector) or "null",
+    sourcePointer, ppuAddress, chrWindowSetupPc
+  ))
+end
+
+local function onChrWindowWrite(address, value)
+  if not isCapturing() or cpuPc() ~= chrWindowWriterNextPc then return end
+  print(string.format(
+    "DQTRACE {\"type\":\"chr-text-byte\",\"frame\":%d," ..
+    "\"ramAddress\":%d,\"value\":%d,\"cpuPc\":%d}",
+    frame, address, value, chrWindowWriterNextPc
+  ))
+end
+
 local function onBufferWrite(address, value)
   if not isCapturing() or (address - 0x0300) % 3 ~= 2 then return end
   local pc = cpuPc()
-  if pc == glyphBitmapWriterNextPc then
-    print(string.format(
-      "DQTRACE {\"type\":\"glyph-bitmap-byte\",\"frame\":%d," ..
-      "\"ramAddress\":%d,\"value\":%d,\"cpuPc\":%d}",
-      frame, address, value, pc
-    ))
-    return
-  end
   if pc ~= ppuBufferWriterNextPc then return end
   local high = emu.read(address - 2, emu.memType.nesDebug)
   local low = emu.read(address - 1, emu.memType.nesDebug)
@@ -158,6 +189,19 @@ emu.addMemoryCallback(
   emu.cpuType.nes, emu.memType.nesMemory
 )
 emu.addMemoryCallback(
+  onChrStreamSelector, emu.callbackType.exec,
+  chrStreamSelectorPc, chrStreamSelectorPc,
+  emu.cpuType.nes, emu.memType.nesMemory
+)
+emu.addMemoryCallback(
+  onChrWindowSetup, emu.callbackType.exec, chrWindowSetupPc, chrWindowSetupPc,
+  emu.cpuType.nes, emu.memType.nesMemory
+)
+emu.addMemoryCallback(
+  onChrWindowWrite, emu.callbackType.write, 0x03B0, 0x03B7,
+  emu.cpuType.nes, emu.memType.nesMemory
+)
+emu.addMemoryCallback(
   onBufferWrite, emu.callbackType.write, 0x0302, 0x03BF,
   emu.cpuType.nes, emu.memType.nesMemory
 )
@@ -168,6 +212,8 @@ emu.addMemoryCallback(
 
 print(string.format(
   "DQTRACE_READY mode=dialogue captureFrames=%d scriptFetchNextPc=%d " ..
-  "decodedFetchNextPc=%d tokenDispatchPc=%d",
-  captureFrames, scriptFetchNextPc, decodedFetchNextPc, tokenDispatchPc
+  "decodedFetchNextPc=%d tokenDispatchPc=%d chrStreamSelectorPc=%d " ..
+  "chrWindowSetupPc=%d",
+  captureFrames, scriptFetchNextPc, decodedFetchNextPc, tokenDispatchPc,
+  chrStreamSelectorPc, chrWindowSetupPc
 ))

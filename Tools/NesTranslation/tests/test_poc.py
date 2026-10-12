@@ -7,6 +7,7 @@ from pathlib import Path
 
 from Tools.NesTranslation.database import DatabaseError, load_database, validate_rom
 from Tools.NesTranslation.analyze_reads import cluster_reads
+from Tools.NesTranslation.chr_records import ines_chr_layout, split_chr_records
 from Tools.NesTranslation.display import DebugRenderer
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
@@ -172,6 +173,31 @@ class DatabaseTests(unittest.TestCase):
 
 
 class ReadAnalysisTests(unittest.TestCase):
+    def test_chr_record_splitter_preserves_offsets_and_unknown_bytes(self) -> None:
+        header = bytearray(b"NES\x1a" + bytes(12))
+        header[4] = 1
+        header[5] = 1
+        prg = bytes(16 * 1024)
+        chr_data = bytes((0xAA, 0xFC, 0x01, 0xE7, 0xFC)) + bytes(8187)
+        rom = bytes(header) + prg + chr_data
+        layout = ines_chr_layout(rom)
+        self.assertEqual(layout.file_offset, 16 + 16 * 1024)
+        records = split_chr_records(rom, 0xFC, maximum_length=8)
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[0].chr_start, 0)
+        self.assertEqual(records[0].raw_hex, "aa fc")
+        self.assertEqual(records[1].chr_start, 2)
+        self.assertEqual(records[1].raw_hex, "01 e7 fc")
+
+    def test_dragon_quest_runtime_chr_record_is_reproducible(self) -> None:
+        records = split_chr_records(
+            ROM.read_bytes(), 0xFC, minimum_length=2, maximum_length=256
+        )
+        record = next(item for item in records if item.chr_start == 0x3397)
+        self.assertEqual(record.chr_end_exclusive, 0x33C1)
+        self.assertTrue(record.raw_hex.startswith("6d 19 e7 22 15 19 11 d7"))
+        self.assertTrue(record.raw_hex.endswith("fc"))
+
     def test_dialogue_decoder_instruction_addresses_match_rom(self) -> None:
         self.assertEqual(
             bytes(prg_byte(address) for address in range(0xBD30, 0xBD32)),
@@ -184,6 +210,14 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(
             bytes(prg_byte(address) for address in range(0xBEF2, 0xBEF4)),
             bytes((0xB1, 0x99)),  # LDA ($99),Y
+        )
+        self.assertEqual(
+            bytes(prg_byte(address) for address in range(0xC433, 0xC435)),
+            bytes((0x06, 0x3C)),  # ASL $3C after selector setup
+        )
+        self.assertEqual(
+            bytes(prg_byte(address) for address in range(0xC498, 0xC49A)),
+            bytes((0xA5, 0x99)),  # begin glyph PPU-address adjustment
         )
 
     def test_clusters_contiguous_prg_reads_and_excludes_known_range(self) -> None:

@@ -157,3 +157,20 @@ python3 -m Tools.NesTranslation.capture \
   --rom "test_roms/Dragon Quest (Japan).nes" \
   --output Research/dragon-quest-jp/generated/dialogue.jsonl
 ```
+
+The dialogue trace established that this ROM also stores compressed text in
+CHR ROM. Export lossless `$FC`-terminated CHR candidates with:
+
+```sh
+python3 -m Tools.NesTranslation.chr_records \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --terminator fc \
+  --minimum-length 2 \
+  --maximum-length 256 \
+  --output Research/dragon-quest-jp/generated/chr-fc-records.json
+```
+
+This is deliberately a broad candidate export. It preserves every byte and
+physical CHR/file offset, but does not claim that all candidates are text.
+Runtime evidence cross-validates the first NPC-dialogue candidate at CHR
+`$3397-$33C1`.

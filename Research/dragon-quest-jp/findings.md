@@ -66,14 +66,13 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   at `$BE6A`, and decoded dictionary fetch at `$BEF2`; `runtime-confirmed` for
   PRG-backed effective reads and dictionary expansion during this dialogue.
 
-### Glyph-bitmap staging discovered by the corrected token hook
+### CHR-backed dialogue staging discovered by the corrected token hook
 
 - The corrected `$BE6A` execution hook fired 524 times in the short dialogue
   capture, proving that the hook itself is active.
-- During the visible dialogue animation, 38 apparent source values were read
-  repeatedly from RAM `$03B0`. They were written at CPU `$C4BB` after PPU data
-  reads in the `$C49D-$C4CF` routine. The values are rows of a dynamically
-  staged 8x8 glyph bitmap, not a serialized dialogue record.
+- During the visible dialogue animation, source values were read repeatedly
+  from RAM `$03B0`. They were written at CPU `$C4BB` after PPU data reads in
+  the `$C49D-$C4CF` routine.
 - `$03B0` lies inside the nominal `$0300-$03BF` PPU-update-buffer range and is
   congruent with the configured value-byte offset. Address alignment alone
   therefore misclassifies these writes as three-byte update entries. The RAM
@@ -85,9 +84,21 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   `$8501` (frame 418), which expanded through dictionary address `$8AEE`.
   This is a real token-to-dictionary link, but its semantic association with
   the NPC sentence is not yet established.
-- Confidence: `runtime-confirmed` for `$03B0` reuse and the `$C4BB` producer;
-  `code-confirmed` for the surrounding PPU-read loop; `semantic-probable` that
-  these bytes are glyph bitmap rows pending direct PPU-view confirmation.
+- A follow-up trace captured one selector value (`$00BF`) at CPU `$C433`, then
+  42 PPU read windows beginning at `$1397` and advancing one byte at a time.
+  Each window copies eight bytes to `$03B0-$03B7`; consecutive windows overlap
+  by seven bytes. The first byte from each window forms the compressed token
+  stream `6D 19 E7 22 15 19 11 D7 ... FC` consumed by the text decoder.
+- That exact stream occurs once in the ROM at physical CHR offset `$3397`
+  (file offset `$B3A7`). PPU `$1397` therefore mapped to physical CHR `$3397`
+  in this run, selecting the second 8 KiB CHR bank.
+- The record begins immediately after an `$FC` at CHR `$3396` and reaches its
+  own `$FC` at CHR `$33C0`, giving the half-open candidate range
+  `$3397-$33C1` (42 bytes). This is now a static extraction candidate rather
+  than a PRG record.
+- Confidence: `runtime-confirmed` for `$03B0-$03B7` as the overlapping CHR text
+  window, the `$C4BB` producer, and the PPU `$1397+` sequence;
+  `cross-validated` for the physical CHR `$3397-$33C0` token stream.
 
 ## Shared compressed-text dictionary
 
