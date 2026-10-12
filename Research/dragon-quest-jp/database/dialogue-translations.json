@@ -45,8 +45,13 @@
       "segments": [
         {
           "sourceStart": 0,
+          "sourceEndExclusive": 22,
+          "lines": ["離開城堡後，旁邊有座城鎮。"]
+        },
+        {
+          "sourceStart": 22,
           "sourceEndExclusive": 46,
-          "lines": ["離開城堡後，旁邊有座城鎮。", "先在那裡備齊武器和防具。"]
+          "lines": ["先在那裡備齊武器和防具。"]
         },
         {
           "sourceStart": 46,

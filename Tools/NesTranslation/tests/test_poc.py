@@ -308,13 +308,37 @@ class ReadAnalysisTests(unittest.TestCase):
     def test_subtitle_router_maps_segment_and_reset_events(self) -> None:
         spec = json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8"))
         router = SubtitleEventRouter(spec, load_database(DATABASE))
+        partial = router.consume(
+            'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
+            '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
+            '"visibleCount":10}]}'
+        )
+        self.assertIsNone(partial)
         shown = router.consume(
-            'DQGLYPH {"type":"segment","recordId":"chr-fc-38a7",'
-            '"sourceStart":64,"sourceEndExclusive":79}'
+            'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
+            '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
+            '"visibleCount":18},{"sourceStart":22,"sourceEndExclusive":46,'
+            '"visibleCount":0}]}'
         )
         assert shown is not None
         self.assertTrue(shown["visible"])
-        self.assertEqual(shown["text"], "回城鎮住進旅店，")
+        self.assertEqual(shown["text"], "離開城堡後，旁邊有座城鎮。")
+        both = router.consume(
+            'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
+            '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
+            '"visibleCount":22},{"sourceStart":22,"sourceEndExclusive":46,'
+            '"visibleCount":20}]}'
+        )
+        assert both is not None
+        self.assertIn("先在那裡備齊武器和防具。", both["text"])
+        cleared = router.consume(
+            'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
+            '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
+            '"visibleCount":0},{"sourceStart":22,"sourceEndExclusive":46,'
+            '"visibleCount":0}]}'
+        )
+        assert cleared is not None
+        self.assertFalse(cleared["visible"])
         hidden = router.consume(
             'DQGLYPH {"type":"reset","recordId":"chr-fc-38a7"}'
         )

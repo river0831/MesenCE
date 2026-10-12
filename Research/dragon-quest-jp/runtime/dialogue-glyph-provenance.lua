@@ -198,6 +198,31 @@ local function emitVisibleRanges()
   ))
 end
 
+local function emitSegmentCoverage()
+  if not activeRecord then return end
+  local parts = {}
+  for _, segment in ipairs(activeRecord.segments) do
+    local visible = 0
+    for _, cell in pairs(cells) do
+      if cell.recordId == activeRecord.id
+          and cell.glyphIndex >= segment.sourceStart
+          and cell.glyphIndex < segment.sourceEndExclusive then
+        visible = visible + 1
+      end
+    end
+    table.insert(parts, string.format(
+      "{\"sourceStart\":%d,\"sourceEndExclusive\":%d," ..
+      "\"visibleCount\":%d}",
+      segment.sourceStart, segment.sourceEndExclusive, visible
+    ))
+  end
+  print(string.format(
+    "DQGLYPH {\"type\":\"coverage\",\"frame\":%d,\"recordId\":%s," ..
+    "\"segments\":[%s]}", frame, jsonString(activeRecord.id),
+    table.concat(parts, ",")
+  ))
+end
+
 local function chooseSegment()
   local newest = -1
   local record = nil
@@ -232,6 +257,7 @@ local function onEndFrame()
   emitLayoutGroups()
   if changed then
     emitVisibleRanges()
+    emitSegmentCoverage()
     changed = false
   end
 

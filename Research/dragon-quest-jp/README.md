@@ -342,3 +342,11 @@ menu records travel through the existing exact `$0300` PPU-buffer-to-Nametable
 path. Their database labels are normalized from the 256x240 NES coordinate
 space and drawn at corresponding positions in the companion. Dialogue subtitle
 state has priority; when it ends, any still-visible menu layout is restored.
+
+External dialogue selection uses visible coverage rather than the greatest
+glyph index alone. Each runtime snapshot counts sourced Nametable cells inside
+every reviewed alignment interval. An interval activates at 80% coverage and
+remains active while at least one of its cells is visible; intervals with zero
+visible cells are removed. Multiple genuinely visible source sentences can
+therefore produce multiple translated lines without exposing a later sentence
+merely because both previously shared one coarse record range.

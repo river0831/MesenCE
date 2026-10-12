@@ -481,3 +481,20 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - The AppKit companion supports mutually exclusive centered subtitle and
   position-preserving layout modes. This is `code-confirmed` through event-
   routing tests and remains `visual-provisional` pending a main-menu run.
+
+## Visible-coverage dialogue alignment
+
+- Visual review showed that the original `[0, 46)` translation interval joined
+  two independently presented Japanese sentences. It has been split into
+  `[0, 22)` and `[22, 46)`, with one reviewed Chinese sentence per interval.
+- Runtime coverage snapshots count current sourced Nametable cells for every
+  alignment interval. The external router activates an interval at 80%
+  coverage, keeps it while any of its cells remain visible, and removes it at
+  zero. This hysteresis avoids both premature later text and flicker while a
+  visible sentence scrolls away.
+- Multiple active intervals are rendered in source order. This implements the
+  proposed Nametable-visible-position -> original interval -> translated unit
+  mapping without proportionally truncating Chinese characters.
+- Confidence: `code-confirmed` for interval validation, coverage routing,
+  hysteresis, and multi-interval composition; visual result remains
+  `visual-provisional` pending another long-dialogue run.

@@ -128,8 +128,14 @@ class SubtitleEventRouter:
     """Turn runtime provenance events into renderer-agnostic subtitle state."""
 
     def __init__(
-        self, translations: dict[str, Any], database: GameDatabase | None = None
+        self,
+        translations: dict[str, Any],
+        database: GameDatabase | None = None,
+        activation_coverage: float = 0.8,
     ):
+        if not 0 < activation_coverage <= 1:
+            raise ValueError("activation coverage must be in (0, 1]")
+        self._activation_coverage = activation_coverage
         self._records = {
             record["id"]: record for record in translations.get("records", [])
         }
@@ -141,6 +147,7 @@ class SubtitleEventRouter:
         self._visible_layouts: dict[str, int] = {}
         self._layout_order = 0
         self._subtitle_state: dict[str, Any] | None = None
+        self._active_segments: dict[str, set[tuple[int, int]]] = {}
 
     def _layout_state(self) -> dict[str, Any]:
         if not self._visible_layouts:
@@ -188,27 +195,49 @@ class SubtitleEventRouter:
             return None if self._subtitle_state else self._layout_state()
         if event.get("type") == "reset":
             self._subtitle_state = None
+            self._active_segments.pop(str(event.get("recordId")), None)
             return self._layout_state()
+        if event.get("type") == "coverage":
+            record = self._records.get(event.get("recordId"))
+            if record is None:
+                return None
+            active = self._active_segments.setdefault(record["id"], set())
+            coverage_by_range = {
+                (item.get("sourceStart"), item.get("sourceEndExclusive")): item
+                for item in event.get("segments", [])
+                if isinstance(item, dict)
+            }
+            for segment in record.get("segments", []):
+                key = (segment["sourceStart"], segment["sourceEndExclusive"])
+                item = coverage_by_range.get(key, {})
+                visible = int(item.get("visibleCount", 0))
+                total = segment["sourceEndExclusive"] - segment["sourceStart"]
+                if visible == 0:
+                    active.discard(key)
+                elif visible / total >= self._activation_coverage:
+                    active.add(key)
+            lines = [
+                line
+                for segment in record.get("segments", [])
+                if (segment["sourceStart"], segment["sourceEndExclusive"]) in active
+                for line in segment["lines"]
+            ]
+            if not lines:
+                if self._subtitle_state is not None:
+                    self._subtitle_state = None
+                    return self._layout_state()
+                return None
+            self._subtitle_state = {
+                "visible": True,
+                "mode": "subtitle",
+                "recordId": record["id"],
+                "text": "\n".join(lines),
+            }
+            return self._subtitle_state
         if event.get("type") != "segment":
             return None
-        record = self._records.get(event.get("recordId"))
-        if record is None:
-            return None
-        for segment in record.get("segments", []):
-            if (
-                segment.get("sourceStart") == event.get("sourceStart")
-                and segment.get("sourceEndExclusive")
-                == event.get("sourceEndExclusive")
-            ):
-                self._subtitle_state = {
-                    "visible": True,
-                    "mode": "subtitle",
-                    "recordId": record["id"],
-                    "sourceStart": segment["sourceStart"],
-                    "sourceEndExclusive": segment["sourceEndExclusive"],
-                    "text": "\n".join(segment["lines"]),
-                }
-                return self._subtitle_state
+        # Retained in the Lua trace for in-frame diagnostics. External
+        # presentation is driven by complete visible-coverage snapshots.
         return None
 
 
