@@ -229,3 +229,17 @@ discards source or expanded bytes. Scores are review ordering only. CHR bitmap
 data can coincidentally resemble dictionary tokens, so even a `high` record has
 confidence `static-candidate` until runtime reads or another independent source
 cross-validates it.
+
+Match captured overlapping CHR staging windows back to stable catalog IDs:
+
+```sh
+python3 -m Tools.NesTranslation.runtime_catalog_match \
+  --trace Research/dragon-quest-jp/generated/dialogue-visual-validation.jsonl \
+  --catalog Research/dragon-quest-jp/generated/dialogue-catalog.json \
+  --output Research/dragon-quest-jp/generated/dialogue-runtime-matches.json
+```
+
+The matcher consumes only the first byte of each `$03B0-$03B7` overlapping
+window, requires a stable selector and monotonic PPU-source progression, and
+then performs an exact lossless match against catalog source bytes. It does not
+use decoded Japanese text to decide identity.

@@ -155,6 +155,11 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Graphical CHR data can share byte values with dictionary tokens. Therefore
   the catalog assigns every unobserved result `static-candidate` confidence and
   requires runtime source reads to measure false positives.
+- An offline runtime matcher now reconstructs the source stream from the first
+  byte of each overlapping `$03B0-$03B7` staging window and matches exact raw
+  bytes to stable catalog IDs. Replaying the existing validation trace produces
+  exactly one hit, `chr-fc-3397`, from 42 runtime bytes. This confirms the
+  catalog identity without comparing rendered pixels or Japanese semantics.
 
 ## Shared compressed-text dictionary
 

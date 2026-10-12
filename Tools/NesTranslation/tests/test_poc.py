@@ -21,6 +21,10 @@ from Tools.NesTranslation.overlay import build_overlay_script
 from Tools.NesTranslation.provenance import build_provenance_script
 from Tools.NesTranslation.replay import replay
 from Tools.NesTranslation.resolver import TextResolver
+from Tools.NesTranslation.runtime_catalog_match import (
+    extract_runtime_bytes,
+    match_catalog,
+)
 from Tools.NesTranslation.text_review import load_character_map, render_bytes
 
 
@@ -277,6 +281,47 @@ class ReadAnalysisTests(unittest.TestCase):
         review = render_catalog_review(catalog, {"high"})
         self.assertIn("chr-fc-3397 — high", review)
         self.assertNotIn("chr-fc-0000", review)
+
+    def test_runtime_windows_match_catalog_only_when_addresses_are_contiguous(self) -> None:
+        events = []
+        for offset, value in enumerate((0x55, 0x62, 0xFC)):
+            events.extend((
+                {
+                    "type": "chr-text-window",
+                    "frame": 10 + offset,
+                    "selector": 191,
+                    "ppuAddress": 0x1397 + offset,
+                },
+                {
+                    "type": "chr-text-byte",
+                    "frame": 10 + offset,
+                    "ramAddress": 0x03B0,
+                    "value": value,
+                },
+                {
+                    "type": "chr-text-byte",
+                    "frame": 10 + offset,
+                    "ramAddress": 0x03B1,
+                    "value": 0xAA,
+                },
+            ))
+        runtime_bytes = extract_runtime_bytes(events)
+        catalog = {
+            "records": [{
+                "id": "chr-fc-test",
+                "rawHex": "55 62 fc",
+                "decoded": "＊「<END>",
+                "evidence": {"likelihood": "high"},
+            }]
+        }
+        hits = match_catalog(runtime_bytes, catalog)
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0]["ppuStart"], 0x1397)
+        self.assertEqual(hits[0]["confidence"], "runtime-confirmed")
+
+        broken = list(events)
+        broken[6]["ppuAddress"] = 0x1400
+        self.assertEqual(match_catalog(extract_runtime_bytes(broken), catalog), [])
 
     def test_dialogue_decoder_instruction_addresses_match_rom(self) -> None:
         self.assertEqual(
