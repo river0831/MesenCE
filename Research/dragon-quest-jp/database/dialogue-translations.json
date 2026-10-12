@@ -96,6 +96,45 @@
         { "sourceStart": 259, "sourceEndExclusive": 278, "lines": ["那麼，後會有期，勇者！"] }
       ],
       "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
+    },
+    {
+      "id": "chr-fc-3847",
+      "sourceText": "宝箱を全部取ったなら、その中に鍵が入っていたはずだ。鍵は一度使うとなくなってしまうが、その鍵で扉を開けたとき、お前の旅が始まるだろう。",
+      "translation": "拿完所有宝箱后，里面应该有一把钥匙。钥匙使用一次就会消失；用它打开门，你的旅程便会开始。",
+      "pages": [
+        { "lines": ["拿完所有寶箱後，", "裡面應該有一把鑰匙。"] },
+        { "lines": ["鑰匙使用一次就會消失；", "用它打開門，旅程便會開始。"] }
+      ],
+      "segments": [
+        { "sourceStart": 0, "sourceEndExclusive": 36, "lines": ["拿完所有寶箱後，", "裡面應該有一把鑰匙。"] },
+        { "sourceStart": 36, "sourceEndExclusive": 73, "lines": ["鑰匙使用一次就會消失。"] },
+        { "sourceStart": 73, "sourceEndExclusive": 90, "lines": ["用它打開門，", "旅程便會開始。"] }
+      ],
+      "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
+    },
+    {
+      "id": "chr-fc-3002",
+      "sourceText": "ローラ姫のことをご存知か？",
+      "translation": "你知道公主的事情吗？",
+      "pages": [
+        { "lines": ["是否知道公主之事？"] }
+      ],
+      "segments": [
+        { "sourceStart": 0, "sourceEndExclusive": 14, "lines": ["是否知道公主之事？"] }
+      ],
+      "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
+    },
+    {
+      "id": "chr-fc-35e7",
+      "sourceText": "物品を見つけた。",
+      "translation": "发现了物品。",
+      "pages": [
+        { "lines": ["發現了物品。"] }
+      ],
+      "segments": [
+        { "sourceStart": 0, "sourceEndExclusive": 7, "lines": ["發現了物品。"] }
+      ],
+      "box": { "x": 52, "y": 158, "width": 152, "height": 18, "lineHeight": 14 }
     }
   ]
 }

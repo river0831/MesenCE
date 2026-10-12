@@ -649,3 +649,22 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   the main menu; the final visible-menu warning only records that capture was
   manually stopped with the menu open. The full suite contains 56 passing
   tests.
+
+### Opening-room instructions and treasure feedback
+
+- A bounded opening-room capture observed 8 dialogue streams and 530 runtime
+  bytes. Exact catalog matching identified 6 occurrences covering 503 bytes;
+  the newly confirmed records are `chr-fc-3847`, `chr-fc-3002`, and
+  `chr-fc-35e7`.
+- `chr-fc-3847` explains that the treasure chests contain a single-use key and
+  that opening the door begins the journey. Its three reviewed translation
+  intervals cover all logical glyphs in `[0,90)`. `chr-fc-3002` is the
+  princess-information question and covers `[0,14)`. `chr-fc-35e7` is the
+  generic treasure-found result and covers `[0,7)` without guessing the
+  dynamically substituted item name.
+- The remaining 27 runtime bytes belong to two dynamic variants: a line with
+  the player name and a line with an encoded item name. They remain untranslated
+  until a masked-source identity can be cross-validated; they are not silently
+  treated as static records. Confidence for the three catalog identities:
+  `runtime-confirmed`; translation segmentation: `semantic-probable` pending
+  the next visual run. The full suite contains 57 passing tests.

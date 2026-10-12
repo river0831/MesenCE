@@ -224,7 +224,10 @@ class DatabaseTests(unittest.TestCase):
             "records": [
                 {
                     "id": item["id"],
-                    "rawHex": ("55 62 fc", "6d fe fc", "70 fd fc")[index],
+                    "rawHex": (
+                        ("55 62 fc", "6d fe fc", "70 fd fc")[index]
+                        if index < 3 else f"{0x80 + index:02x} fc"
+                    ),
                     "runtime": {"status": "runtime-confirmed"},
                 }
                 for index, item in enumerate(spec["records"])
@@ -283,6 +286,18 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(len(opening["segments"]), 8)
         self.assertEqual(opening["segments"][0]["sourceStart"], 0)
         self.assertEqual(opening["segments"][-1]["sourceEndExclusive"], 278)
+
+    def test_opening_room_dialogues_have_complete_reviewed_segments(self) -> None:
+        spec = json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8"))
+        expected_counts = {
+            "chr-fc-3847": 90,
+            "chr-fc-3002": 14,
+            "chr-fc-35e7": 7,
+        }
+        records = {record["id"]: record for record in spec["records"]}
+        for record_id, glyph_count in expected_counts.items():
+            with self.subTest(record_id=record_id):
+                validate_segments(records[record_id], glyph_count)
 
 
 class ReadAnalysisTests(unittest.TestCase):
