@@ -26,6 +26,8 @@ from Tools.NesTranslation.dialogue_glyph_provenance import (
     build_script as build_glyph_provenance_script,
     group_visible_cells,
     logical_glyphs,
+    select_segment,
+    validate_segments,
 )
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
@@ -249,6 +251,11 @@ class DatabaseTests(unittest.TestCase):
         with self.assertRaisesRegex(DatabaseError, "么这"):
             validate_presentation_characters(broken, supported)
 
+        segment_broken = json.loads(json.dumps(spec, ensure_ascii=False))
+        segment_broken["records"][0]["segments"] = [{"lines": ["这"]}]
+        with self.assertRaisesRegex(DatabaseError, "这"):
+            validate_presentation_characters(segment_broken, supported)
+
 
 class ReadAnalysisTests(unittest.TestCase):
     def test_logical_glyphs_skip_controls_and_collapse_modifier(self) -> None:
@@ -277,6 +284,26 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(rows[0]["endExclusive"], 22)
         self.assertEqual(rows[1]["start"], 30)
 
+    def test_segment_selection_uses_newest_visible_glyph(self) -> None:
+        segments = [
+            {"sourceStart": 0, "sourceEndExclusive": 46, "lines": ["one"]},
+            {"sourceStart": 46, "sourceEndExclusive": 64, "lines": ["two"]},
+        ]
+        self.assertEqual(select_segment(segments, [37, 45]), 0)
+        self.assertEqual(select_segment(segments, [37, 46]), 1)
+        self.assertIsNone(select_segment(segments, []))
+
+    def test_segments_must_cover_logical_glyphs_without_gaps(self) -> None:
+        valid = {"id": "sample", "segments": [
+            {"sourceStart": 0, "sourceEndExclusive": 2, "lines": ["one"]},
+            {"sourceStart": 2, "sourceEndExclusive": 4, "lines": ["two"]},
+        ]}
+        validate_segments(valid, 4)
+        broken = json.loads(json.dumps(valid))
+        broken["segments"][1]["sourceStart"] = 3
+        with self.assertRaisesRegex(DatabaseError, "contiguous"):
+            validate_segments(broken, 4)
+
     def test_glyph_provenance_script_contains_catalog_positions(self) -> None:
         catalog = json.loads((
             ROOT / "Research/dragon-quest-jp/generated/dialogue-catalog-validated.json"
@@ -291,6 +318,7 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertNotIn("__NES_TRANSLATION_GLYPH_PROVENANCE_CONFIG__", script)
         self.assertIn('id = "chr-fc-38a7"', script)
         self.assertIn("expandedIndex = 0", script)
+        self.assertIn("sourceEndExclusive = 90", script)
 
     def test_character_map_renders_dialogue_and_combines_dakuten(self) -> None:
         character_map = load_character_map(CHARACTER_MAP)

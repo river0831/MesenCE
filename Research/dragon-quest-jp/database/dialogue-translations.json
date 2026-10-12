@@ -19,6 +19,13 @@
       "pages": [
         { "lines": ["這裡什麼也拿不到。"] }
       ],
+      "segments": [
+        {
+          "sourceStart": 0,
+          "sourceEndExclusive": 13,
+          "lines": ["這裡什麼也拿不到。"]
+        }
+      ],
       "box": { "x": 52, "y": 158, "width": 152, "height": 18, "lineHeight": 14 }
     },
     {
@@ -33,6 +40,28 @@
             "受傷時回城鎮住進旅店，",
             "傷勢就會恢復。"
           ]
+        }
+      ],
+      "segments": [
+        {
+          "sourceStart": 0,
+          "sourceEndExclusive": 46,
+          "lines": ["離開城堡後，旁邊有座城鎮。", "先在那裡備齊武器和防具。"]
+        },
+        {
+          "sourceStart": 46,
+          "sourceEndExclusive": 64,
+          "lines": ["戰鬥中受傷時，"]
+        },
+        {
+          "sourceStart": 64,
+          "sourceEndExclusive": 79,
+          "lines": ["回城鎮住進旅店，"]
+        },
+        {
+          "sourceStart": 79,
+          "sourceEndExclusive": 90,
+          "lines": ["傷勢就會恢復。"]
         }
       ],
       "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }

@@ -15,6 +15,11 @@ local pendingBeforeMatch = {}
 local pendingUploads = {}
 local cells = {}
 local changed = false
+local lastChangedFrame = -1
+local stableFrames = 4
+local selectedSegment = nil
+local foreground = 0xFFFFFF
+local background = 0x000000
 
 for _, record in ipairs(records) do
   maxPrefixLength = math.max(maxPrefixLength, #record.matchPrefix)
@@ -147,8 +152,55 @@ local function emitVisibleRanges()
   ))
 end
 
+local function chooseSegment()
+  local newest = -1
+  local record = nil
+  for _, cell in pairs(cells) do
+    if cell.glyphIndex > newest then
+      newest = cell.glyphIndex
+      record = activeRecord
+    end
+  end
+  if not record then return nil end
+  for _, segment in ipairs(record.segments) do
+    if newest >= segment.sourceStart and newest < segment.sourceEndExclusive then
+      return segment
+    end
+  end
+  return nil
+end
+
+local function drawSelectedSegment()
+  if not displaySegments or not activeRecord or not selectedSegment then return end
+  emu.selectDrawSurface(emu.drawSurface.consoleScreen)
+  emu.drawRectangle(activeRecord.x, activeRecord.y, activeRecord.width,
+    activeRecord.height, background, true, 1)
+  for index, line in ipairs(selectedSegment.lines) do
+    emu.drawString(activeRecord.x + 4,
+      activeRecord.y + 4 + (index - 1) * activeRecord.lineHeight,
+      line, foreground, background, 0, 1)
+  end
+end
+
 local function onEndFrame()
-  if changed then emitVisibleRanges(); changed = false end
+  if changed then
+    emitVisibleRanges()
+    selectedSegment = nil
+    lastChangedFrame = frame
+    changed = false
+  elseif displaySegments and not selectedSegment
+      and frame - lastChangedFrame >= stableFrames then
+    selectedSegment = chooseSegment()
+    if selectedSegment then
+      print(string.format(
+        "DQGLYPH {\"type\":\"segment\",\"frame\":%d," ..
+        "\"recordId\":%s,\"sourceStart\":%d,\"sourceEndExclusive\":%d}",
+        frame, jsonString(activeRecord.id), selectedSegment.sourceStart,
+        selectedSegment.sourceEndExclusive
+      ))
+    end
+  end
+  drawSelectedSegment()
   frame = frame + 1
 end
 

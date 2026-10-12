@@ -421,3 +421,18 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Confidence: `code-confirmed` for logical-index construction and row grouping;
   `runtime-confirmed` for complete 0-89 propagation, forward range movement,
   overwritten-cell removal, and final clearing in the tested long dialogue.
+
+## Range-driven translation segment selection
+
+- The reviewed translation data now maps contiguous logical source intervals
+  to presentation lines. Coverage is validated against each catalog record's
+  exact logical glyph count, preventing gaps, overlaps, and stale endpoints.
+- Selection uses the greatest currently visible logical glyph index. This
+  intentionally ignores a few older tagged cells that may survive briefly
+  during a scroll and always chooses the furthest-progressed reviewed segment.
+- Presentation is suppressed whenever provenance changes and resumes after
+  four stable frames. The policy does not observe controller input and does not
+  assume that one source line equals one translated line.
+- Confidence: `code-confirmed` for validation and deterministic selection;
+  visual behavior remains `semantic-probable` until the segmented overlay is
+  exercised through the full long dialogue.

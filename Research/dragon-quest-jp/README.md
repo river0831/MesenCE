@@ -304,3 +304,11 @@ by each currently tagged Nametable row. Dakuten and other modifiers do not
 advance the logical index. Controls and unknown bytes remain in the catalog but
 are not guessed to be visible glyphs. This is a read-only diagnostic: it does
 not draw translations or modify ROM/emulated memory.
+
+Add `--display-segments` and
+`--font-source Core/Shared/Video/DrawStringCommand.cpp` to turn on the
+experimental range-driven presentation. Each reviewed `segments[]` entry maps
+an exact logical source interval to one or more translated lines. The adapter
+uses the newest visible logical glyph as its segment anchor, hides presentation
+while sourced cells are changing, and displays the selected segment after four
+stable frames. Controller input is not observed.

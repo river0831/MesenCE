@@ -11,7 +11,11 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .database import DatabaseError, load_database, validate_rom
-from .dialogue_overlay import shortest_unique_prefix
+from .dialogue_overlay import (
+    load_mesen_font_characters,
+    shortest_unique_prefix,
+    validate_presentation_characters,
+)
 from .text_review import load_character_map
 
 
@@ -78,6 +82,47 @@ def group_visible_cells(
     return result
 
 
+def validate_segments(record: dict[str, Any], glyph_count: int) -> None:
+    segments = record.get("segments")
+    if not isinstance(segments, list) or not segments:
+        raise DatabaseError(f"dialogue segments must be non-empty: {record.get('id')}")
+    expected_start = 0
+    for index, segment in enumerate(segments):
+        if not isinstance(segment, dict):
+            raise DatabaseError(f"dialogue segment must be an object: {record.get('id')}")
+        start = segment.get("sourceStart")
+        end = segment.get("sourceEndExclusive")
+        lines = segment.get("lines")
+        if start != expected_start or not isinstance(end, int) or end <= start:
+            raise DatabaseError(
+                f"dialogue segments must be contiguous at segment {index}: "
+                f"{record.get('id')}"
+            )
+        if not isinstance(lines, list) or not lines or not all(
+            isinstance(line, str) and line for line in lines
+        ):
+            raise DatabaseError(f"dialogue segment lines must be non-empty: {record.get('id')}")
+        expected_start = end
+    if expected_start != glyph_count:
+        raise DatabaseError(
+            f"dialogue segments must cover {glyph_count} glyphs: {record.get('id')}"
+        )
+
+
+def select_segment(
+    segments: list[dict[str, Any]], visible_indices: Iterable[int]
+) -> int | None:
+    """Select the segment containing the newest currently visible glyph."""
+    indices = list(visible_indices)
+    if not indices:
+        return None
+    anchor = max(indices)
+    for index, segment in enumerate(segments):
+        if segment["sourceStart"] <= anchor < segment["sourceEndExclusive"]:
+            return index
+    return None
+
+
 def _lua_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -86,6 +131,8 @@ def build_config(
     catalog: dict[str, Any],
     translations: dict[str, Any],
     character_map: dict[int, dict[str, Any]],
+    *,
+    display_segments: bool = False,
 ) -> str:
     records_by_id = {record["id"]: record for record in catalog.get("records", [])}
     all_raw = [bytes.fromhex(record["rawHex"]) for record in catalog.get("records", [])]
@@ -102,6 +149,7 @@ def build_config(
             raise DatabaseError(f"dialogue runtime.{key} must be non-negative")
 
     lines = [
+        f"local displaySegments = {'true' if display_segments else 'false'}",
         f"local chrStreamSelectorPc = {runtime['chrStreamSelectorPc']}",
         f"local chrWindowSetupPc = {runtime['chrWindowSetupPc']}",
         f"local chrWindowWriterPc = {runtime['chrWindowWriterPc']}",
@@ -122,10 +170,25 @@ def build_config(
         glyphs = logical_glyphs(record, character_map)
         if not glyphs:
             raise DatabaseError(f"dialogue record has no logical glyphs: {record_id}")
+        validate_segments(translation, len(glyphs))
+        box = translation.get("box")
+        if not isinstance(box, dict):
+            raise DatabaseError(f"dialogue box must be an object: {record_id}")
         lines.extend([
             "  {",
             f"    id = {_lua_string(record_id)},",
             "    matchPrefix = { " + ", ".join(map(str, prefix)) + " },",
+            f"    x = {box['x']}, y = {box['y']}, width = {box['width']},",
+            f"    height = {box['height']}, lineHeight = {box['lineHeight']},",
+            "    segments = {",
+        ])
+        for segment in translation["segments"]:
+            lines.append("      { sourceStart = %d, sourceEndExclusive = %d, lines = { %s } }," % (
+                segment["sourceStart"], segment["sourceEndExclusive"],
+                ", ".join(_lua_string(line) for line in segment["lines"]),
+            ))
+        lines.extend([
+            "    },",
             "    glyphs = {",
         ])
         for glyph in glyphs:
@@ -144,11 +207,16 @@ def build_script(
     translations: dict[str, Any],
     character_map: dict[int, dict[str, Any]],
     template: str,
+    *,
+    display_segments: bool = False,
 ) -> str:
     if template.count(CONFIG_MARKER) != 1:
         raise ValueError("glyph provenance template must contain exactly one config marker")
     return template.replace(
-        CONFIG_MARKER, build_config(catalog, translations, character_map)
+        CONFIG_MARKER,
+        build_config(
+            catalog, translations, character_map, display_segments=display_segments
+        ),
     )
 
 
@@ -160,6 +228,8 @@ def run(
     catalog_path: Path,
     translations_path: Path,
     character_map_path: Path,
+    display_segments: bool,
+    font_source_path: Path | None,
 ) -> int:
     database = load_database(database_path)
     validate_rom(database, rom_path)
@@ -167,11 +237,16 @@ def run(
     if catalog.get("romSha256") != database.rom_sha256:
         raise DatabaseError("dialogue catalog does not match the bound ROM")
     translations = json.loads(translations_path.read_text(encoding="utf-8"))
+    if display_segments and font_source_path is not None:
+        validate_presentation_characters(
+            translations, load_mesen_font_characters(font_source_path)
+        )
     script = build_script(
         catalog,
         translations,
         load_character_map(character_map_path),
         template_path.read_text(encoding="utf-8"),
+        display_segments=display_segments,
     )
     with tempfile.TemporaryDirectory(prefix="nes-dialogue-glyph-provenance-") as folder:
         generated = Path(folder) / "dialogue-glyph-provenance.lua"
@@ -193,10 +268,13 @@ def main() -> None:
     parser.add_argument("--catalog", required=True, type=Path)
     parser.add_argument("--translations", required=True, type=Path)
     parser.add_argument("--character-map", required=True, type=Path)
+    parser.add_argument("--display-segments", action="store_true")
+    parser.add_argument("--font-source", type=Path)
     args = parser.parse_args()
     raise SystemExit(run(
         args.mesen, args.template, args.rom, args.game_database, args.catalog,
         args.translations, args.character_map,
+        args.display_segments, args.font_source,
     ))
 
 

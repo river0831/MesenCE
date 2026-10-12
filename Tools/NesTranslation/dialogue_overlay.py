@@ -74,10 +74,14 @@ def validate_presentation_characters(
     spec: dict[str, Any], supported: set[str]
 ) -> None:
     for record in spec["records"]:
+        presentation_groups = list(record["pages"])
+        segments = record.get("segments", [])
+        if isinstance(segments, list):
+            presentation_groups.extend(segments)
         missing = sorted({
             character
-            for page in record["pages"]
-            for line in page["lines"]
+            for group in presentation_groups
+            for line in group["lines"]
             for character in line
             if character not in supported
         })
