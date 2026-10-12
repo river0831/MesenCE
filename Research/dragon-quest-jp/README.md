@@ -243,3 +243,8 @@ The matcher consumes only the first byte of each `$03B0-$03B7` overlapping
 window, requires a stable selector and monotonic PPU-source progression, and
 then performs an exact lossless match against catalog source bytes. It does not
 use decoded Japanese text to decide identity.
+
+For a focused multi-dialogue validation capture, use
+`runtime/dialogue-catalog-trace.lua`. It starts after the main command menu is
+read, runs for 3600 frames, and omits Nametable and PPU-buffer logging. Open the
+menu once, speak to two or more NPCs, finish their dialogue, then close Mesen.
