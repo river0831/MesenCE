@@ -18,7 +18,9 @@ from Tools.NesTranslation.dictionary_codec import (
 from Tools.NesTranslation.display import DebugRenderer
 from Tools.NesTranslation.dialogue_overlay import (
     build_dialogue_overlay,
+    load_mesen_font_characters,
     load_translation_spec,
+    validate_presentation_characters,
 )
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
@@ -209,8 +211,8 @@ class DatabaseTests(unittest.TestCase):
         script = build_dialogue_overlay(catalog, spec, template)
         self.assertNotIn("__NES_TRANSLATION_DIALOGUE_CONFIG__", script)
         self.assertIn('id = "chr-fc-35c8"', script)
-        self.assertIn("raw = { 85, 98, 252 }", script)
-        self.assertIn("这里什么也拿不到。", script)
+        self.assertIn("matchPrefix = { 85, 98, 252 }", script)
+        self.assertIn("這裡什麼也拿不到。", script)
         self.assertIn("local visibilityStart = 576", script)
         self.assertIn("and not activeIsVisible", script)
         self.assertIn("frame - lastVisibilityWriteFrame >= stableRegionFrames", script)
@@ -229,6 +231,17 @@ class DatabaseTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(DatabaseError, "not runtime-confirmed"):
             build_dialogue_overlay(catalog, spec, "-- __NES_TRANSLATION_DIALOGUE_CONFIG__")
+
+    def test_dialogue_presentation_uses_only_mesen_hud_glyphs(self) -> None:
+        spec = load_translation_spec(DIALOGUE_TRANSLATIONS)
+        supported = load_mesen_font_characters(
+            ROOT / "Core/Shared/Video/DrawStringCommand.cpp"
+        )
+        validate_presentation_characters(spec, supported)
+        broken = json.loads(json.dumps(spec, ensure_ascii=False))
+        broken["records"][0]["pages"][0]["lines"] = ["这里什么也拿不到。"]
+        with self.assertRaisesRegex(DatabaseError, "么这"):
+            validate_presentation_characters(broken, supported)
 
 
 class ReadAnalysisTests(unittest.TestCase):

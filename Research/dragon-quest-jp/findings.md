@@ -194,6 +194,17 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   implementation treated the long dialogue's final rendering pass as a close;
   the explicit pending/visible phases correct that lifecycle race. This remains
   provisional until both records are visually retested.
+- Visual testing exposed that Mesen's Lua HUD uses a fixed Japanese glyph map,
+  not a system CJK font. Unsupported simplified characters were silently
+  skipped, which looked like missing translation words. Generation now checks
+  every presentation character against the actual compiled glyph table;
+  canonical translations remain simplified while display pages use supported
+  traditional forms.
+- Waiting for the full `$FC` record also delayed translation until the final
+  Japanese page. The generator now computes each translated record's shortest
+  unique raw-byte prefix against all 547 catalog records. Runtime identity can
+  therefore be established near the start of the first page, while Nametable
+  stability and bulk rewrites advance the configured translated pages.
 
 ## Shared compressed-text dictionary
 

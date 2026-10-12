@@ -10,8 +10,9 @@ local frame = 0
 local selector = nil
 local expectingFirstByte = false
 local stream = {}
-local maxRecordLength = 0
+local maxPrefixLength = 0
 local activeRecord = nil
+local activePage = 1
 local visibleSinceFrame = -1
 local activeIsVisible = false
 local lastVisibilityWriteFrame = -1
@@ -19,7 +20,7 @@ local writesInVisibilityRegion = 0
 local stableRegionFrames = 8
 
 for _, record in ipairs(records) do
-  maxRecordLength = math.max(maxRecordLength, #record.raw)
+  maxPrefixLength = math.max(maxPrefixLength, #record.matchPrefix)
 end
 
 local function cpuPc()
@@ -29,21 +30,21 @@ end
 
 local function jsonString(value) return string.format("%q", value) end
 
-local function suffixMatches(raw)
-  if #stream < #raw then return false end
-  local first = #stream - #raw + 1
-  for index = 1, #raw do
-    if stream[first + index - 1] ~= raw[index] then return false end
+local function prefixMatches(prefix)
+  if #stream < #prefix then return false end
+  for index = 1, #prefix do
+    if stream[index] ~= prefix[index] then return false end
   end
   return true
 end
 
 local function consumeSourceByte(value)
   table.insert(stream, value)
-  while #stream > maxRecordLength do table.remove(stream, 1) end
+  if #stream > maxPrefixLength or activeRecord then return end
   for _, record in ipairs(records) do
-    if suffixMatches(record.raw) then
+    if prefixMatches(record.matchPrefix) then
       activeRecord = record
+      activePage = 1
       visibleSinceFrame = frame
       activeIsVisible = false
       lastVisibilityWriteFrame = frame
@@ -90,7 +91,8 @@ local function drawDialogue()
     activeRecord.x, activeRecord.y, activeRecord.width, activeRecord.height,
     background, true, 1
   )
-  for index, line in ipairs(activeRecord.lines) do
+  local page = activeRecord.pages[activePage]
+  for index, line in ipairs(page) do
     emu.drawString(
       activeRecord.x + 4,
       activeRecord.y + 4 + (index - 1) * activeRecord.lineHeight,
@@ -113,13 +115,23 @@ local function onEndFrame()
       and activeIsVisible
       and frame > visibleSinceFrame + hideGraceFrames
       and writesInVisibilityRegion >= clearWriteThreshold then
-    print(string.format(
-      "DQDIALOGUE {\"type\":\"hide\",\"frame\":%d,\"recordId\":%s," ..
-      "\"regionWrites\":%d}",
-      frame, jsonString(activeRecord.id), writesInVisibilityRegion
-    ))
-    activeRecord = nil
-    activeIsVisible = false
+    if activePage < #activeRecord.pages then
+      activePage = activePage + 1
+      activeIsVisible = false
+      lastVisibilityWriteFrame = frame
+      print(string.format(
+        "DQDIALOGUE {\"type\":\"page\",\"frame\":%d,\"recordId\":%s," ..
+        "\"page\":%d}", frame, jsonString(activeRecord.id), activePage
+      ))
+    else
+      print(string.format(
+        "DQDIALOGUE {\"type\":\"hide\",\"frame\":%d,\"recordId\":%s," ..
+        "\"regionWrites\":%d}",
+        frame, jsonString(activeRecord.id), writesInVisibilityRegion
+      ))
+      activeRecord = nil
+      activeIsVisible = false
+    end
   end
   writesInVisibilityRegion = 0
   drawDialogue()
@@ -149,5 +161,5 @@ emu.addMemoryCallback(
 emu.addEventCallback(onEndFrame, emu.eventType.endFrame)
 
 print(string.format(
-  "DQDIALOGUE_READY records=%d maxRecordLength=%d", #records, maxRecordLength
+  "DQDIALOGUE_READY records=%d maxPrefixLength=%d", #records, maxPrefixLength
 ))

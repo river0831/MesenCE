@@ -273,10 +273,15 @@ python3 -m Tools.NesTranslation.dialogue_overlay \
   --rom "test_roms/Dragon Quest (Japan).nes" \
   --game-database Research/dragon-quest-jp/database/game-database.json \
   --catalog Research/dragon-quest-jp/generated/dialogue-catalog-validated.json \
-  --translations Research/dragon-quest-jp/database/dialogue-translations.json
+  --translations Research/dragon-quest-jp/database/dialogue-translations.json \
+  --font-source Core/Shared/Video/DrawStringCommand.cpp
 ```
 
 The committed translation specification contains only stable IDs, reviewed
 source/translation text, layout, and exact-ROM runtime configuration. Raw CHR
 record bytes are injected from the locally generated catalog into a temporary
 Lua script and are not duplicated in the tracked translation database.
+`--font-source` validates every presentation character against Mesen's built-in
+HUD glyph table so unsupported Chinese characters fail generation instead of
+silently disappearing. Canonical translations remain simplified Chinese;
+`pages[].lines` may use font-compatible traditional presentation glyphs.
