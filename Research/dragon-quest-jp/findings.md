@@ -408,6 +408,16 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   for each visible Nametable row. This is the input needed to test translation
   segment selection during dialogue scrolling; it does not yet choose or draw
   a translated segment.
-- Confidence: `code-confirmed` for logical-index construction and row grouping
-  through automated tests; runtime behavior remains `semantic-probable` until
-  a long scrolling dialogue is captured in Mesen.
+- The first long-dialogue validation identified `chr-fc-38a7` and propagated
+  every logical glyph index from 0 through 89. The initial window accumulated
+  indices `[0, 46)`. Subsequent overwrite/scroll phases advanced into
+  `[46, 64)`, `[64, 79)`, and `[79, 90)` while clearing cells belonging to
+  displaced rows. Closing the dialogue produced an empty row set.
+- The transient ranges during a scroll are intentionally not assumed to be a
+  stable translation page. A presentation adapter should debounce until the
+  sourced cells settle, then map the union of visible source intervals to a
+  reviewed translation segment. This avoids tying translation changes to the
+  controller button that happened to trigger the scroll.
+- Confidence: `code-confirmed` for logical-index construction and row grouping;
+  `runtime-confirmed` for complete 0-89 propagation, forward range movement,
+  overwritten-cell removal, and final clearing in the tested long dialogue.
