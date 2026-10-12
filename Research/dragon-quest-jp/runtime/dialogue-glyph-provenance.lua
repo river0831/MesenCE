@@ -20,9 +20,23 @@ local emptySinceFrame = nil
 local emptyGraceFrames = 20
 local foreground = 0xFFFFFF
 local background = 0x000000
+local layoutSource = nil
+local layoutSourceExpires = -1
+local layoutPending = {}
+local layoutCells = {}
+local layoutDirty = {}
+local layoutSourceTtlFrames = 3
 
 for _, record in ipairs(records) do
   maxPrefixLength = math.max(maxPrefixLength, #record.matchPrefix)
+end
+
+for _, record in ipairs(layoutRecords) do
+  emu.addMemoryCallback(function(address, value)
+    layoutSource = record
+    layoutSourceExpires = frame + layoutSourceTtlFrames
+  end, emu.callbackType.read, record.startAddress, record.endAddress,
+    emu.cpuType.nes, emu.memType.nesMemory)
 end
 
 local function cpuPc()
@@ -107,9 +121,27 @@ local function onBufferWrite(address, value)
   else
     table.insert(pendingBeforeMatch, candidate)
   end
+  if layoutSource and frame <= layoutSourceExpires then
+    layoutPending[candidate.ppuAddress % 0x400] = {
+      recordId = layoutSource.id,
+      value = value,
+    }
+  end
 end
 
 local function onNametableWrite(address, value)
+  local oldLayout = layoutCells[address]
+  local newLayout = layoutPending[address]
+  if newLayout and newLayout.value == value then
+    layoutCells[address] = newLayout.recordId
+    layoutPending[address] = nil
+    layoutDirty[newLayout.recordId] = true
+    if oldLayout and oldLayout ~= newLayout.recordId then layoutDirty[oldLayout] = true end
+  elseif oldLayout then
+    layoutCells[address] = nil
+    layoutDirty[oldLayout] = true
+  end
+  layoutPending[address] = nil
   -- A later game write owns the cell. Only the exact queued destination/value
   -- inherits a tag; every unrelated write clears old provenance.
   local pending = pendingUploads[address]
@@ -121,6 +153,20 @@ local function onNametableWrite(address, value)
     cells[address] = nil
     changed = true
   end
+end
+
+local function emitLayoutGroups()
+  for recordId, _ in pairs(layoutDirty) do
+    local count = 0
+    for _, owner in pairs(layoutCells) do
+      if owner == recordId then count = count + 1 end
+    end
+    print(string.format(
+      "DQMENU {\"type\":\"group\",\"frame\":%d,\"recordId\":%s," ..
+      "\"cellCount\":%d}", frame, jsonString(recordId), count
+    ))
+  end
+  layoutDirty = {}
 end
 
 local function emitVisibleRanges()
@@ -183,6 +229,7 @@ local function drawSelectedSegment()
 end
 
 local function onEndFrame()
+  emitLayoutGroups()
   if changed then
     emitVisibleRanges()
     changed = false
@@ -219,6 +266,7 @@ local function onEndFrame()
   end
   drawSelectedSegment()
   frame = frame + 1
+  if layoutSource and frame > layoutSourceExpires then layoutSource = nil end
 end
 
 emu.addMemoryCallback(onChrStreamSelector, emu.callbackType.exec,

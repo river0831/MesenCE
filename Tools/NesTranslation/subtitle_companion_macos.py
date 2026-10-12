@@ -27,7 +27,7 @@ class SubtitleController(NSObject):
     def applicationDidFinishLaunching_(self, notification):  # noqa: N802
         del notification
         screen = NSScreen.mainScreen().visibleFrame()
-        width, height = 760, 132
+        width, height = 760, 300
         rect = NSMakeRect(
             screen.origin.x + (screen.size.width - width) / 2,
             screen.origin.y + 24,
@@ -56,6 +56,7 @@ class SubtitleController(NSObject):
         self.label.setMaximumNumberOfLines_(3)
         self.label.setStringValue_("等待游戏对话…")
         self.window.contentView().addSubview_(self.label)
+        self.layoutLabels = []
         self.window.orderFrontRegardless()
         threading.Thread(target=self._read_commands, daemon=True).start()
 
@@ -65,18 +66,44 @@ class SubtitleController(NSObject):
                 command = json.loads(line)
             except (ValueError, TypeError):
                 continue
-            text = command.get("text", "") if command.get("visible") else ""
+            payload = json.dumps(command, ensure_ascii=False)
             self.performSelectorOnMainThread_withObject_waitUntilDone_(
-                "setSubtitle:", text, False
+                "applyState:", payload, False
             )
         self.performSelectorOnMainThread_withObject_waitUntilDone_(
             "finish:", None, False
         )
 
-    def setSubtitle_(self, text):  # noqa: N802
-        self.label.setStringValue_(text)
-        if text:
+    def applyState_(self, payload):  # noqa: N802
+        command = json.loads(payload)
+        for label in self.layoutLabels:
+            label.removeFromSuperview()
+        self.layoutLabels = []
+        if not command.get("visible"):
+            self.label.setStringValue_("")
+            return
+        if command.get("mode") == "subtitle":
+            self.label.setStringValue_(command.get("text", ""))
             self.window.orderFrontRegardless()
+            return
+        self.label.setStringValue_("")
+        bounds = self.window.contentView().bounds()
+        for item in command.get("labels", []):
+            field = NSTextField.alloc().initWithFrame_(NSMakeRect(
+                item["x"] * bounds.size.width,
+                (1.0 - item["y"]) * bounds.size.height - 24,
+                120,
+                30,
+            ))
+            field.setEditable_(False)
+            field.setBezeled_(False)
+            field.setDrawsBackground_(False)
+            field.setTextColor_(NSColor.whiteColor())
+            field.setFont_(NSFont.systemFontOfSize_(22))
+            field.setStringValue_(item["text"])
+            self.window.contentView().addSubview_(field)
+            self.layoutLabels.append(field)
+        self.window.orderFrontRegardless()
 
     def finish_(self, value):
         del value

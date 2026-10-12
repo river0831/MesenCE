@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-from .database import DatabaseError, load_database, validate_rom
+from .database import DatabaseError, GameDatabase, load_database, validate_rom
 from .dialogue_overlay import (
     load_mesen_font_characters,
     shortest_unique_prefix,
@@ -127,22 +127,68 @@ def select_segment(
 class SubtitleEventRouter:
     """Turn runtime provenance events into renderer-agnostic subtitle state."""
 
-    def __init__(self, translations: dict[str, Any]):
+    def __init__(
+        self, translations: dict[str, Any], database: GameDatabase | None = None
+    ):
         self._records = {
             record["id"]: record for record in translations.get("records", [])
         }
+        self._layouts = {
+            record.id: record
+            for record in (database.records if database else ())
+            if record.presentation is not None
+        }
+        self._visible_layouts: dict[str, int] = {}
+        self._layout_order = 0
+        self._subtitle_state: dict[str, Any] | None = None
+
+    def _layout_state(self) -> dict[str, Any]:
+        if not self._visible_layouts:
+            return {"visible": False, "mode": "empty", "text": ""}
+        record_id = max(self._visible_layouts, key=self._visible_layouts.__getitem__)
+        record = self._layouts[record_id]
+        assert record.presentation is not None
+        return {
+            "visible": True,
+            "mode": "layout",
+            "recordId": record_id,
+            "labels": [
+                {
+                    "text": label.text,
+                    "x": label.x / 256.0,
+                    "y": label.y / 240.0,
+                }
+                for label in record.presentation.labels
+            ],
+        }
 
     def consume(self, line: str) -> dict[str, Any] | None:
-        marker = "DQGLYPH "
-        position = line.find(marker)
+        glyph_marker = "DQGLYPH "
+        menu_marker = "DQMENU "
+        position = line.find(glyph_marker)
+        marker = glyph_marker
+        if position < 0:
+            position = line.find(menu_marker)
+            marker = menu_marker
         if position < 0:
             return None
         try:
             event = json.loads(line[position + len(marker):])
         except json.JSONDecodeError:
             return None
+        if marker == menu_marker:
+            if event.get("type") != "group" or event.get("recordId") not in self._layouts:
+                return None
+            record_id = event["recordId"]
+            if event.get("cellCount", 0) > 0:
+                self._layout_order += 1
+                self._visible_layouts[record_id] = self._layout_order
+            else:
+                self._visible_layouts.pop(record_id, None)
+            return None if self._subtitle_state else self._layout_state()
         if event.get("type") == "reset":
-            return {"visible": False, "recordId": event.get("recordId"), "text": ""}
+            self._subtitle_state = None
+            return self._layout_state()
         if event.get("type") != "segment":
             return None
         record = self._records.get(event.get("recordId"))
@@ -154,13 +200,15 @@ class SubtitleEventRouter:
                 and segment.get("sourceEndExclusive")
                 == event.get("sourceEndExclusive")
             ):
-                return {
+                self._subtitle_state = {
                     "visible": True,
+                    "mode": "subtitle",
                     "recordId": record["id"],
                     "sourceStart": segment["sourceStart"],
                     "sourceEndExclusive": segment["sourceEndExclusive"],
                     "text": "\n".join(segment["lines"]),
                 }
+                return self._subtitle_state
         return None
 
 
@@ -174,6 +222,7 @@ def build_config(
     character_map: dict[int, dict[str, Any]],
     *,
     display_segments: bool = False,
+    database: GameDatabase | None = None,
 ) -> str:
     records_by_id = {record["id"]: record for record in catalog.get("records", [])}
     all_raw = [bytes.fromhex(record["rawHex"]) for record in catalog.get("records", [])]
@@ -197,8 +246,24 @@ def build_config(
         f"local scratchFirstAddress = {runtime['scratchFirstAddress']}",
         f"local visibilityStart = {runtime['visibilityStart']}",
         f"local visibilityEndExclusive = {runtime['visibilityEndExclusive']}",
-        "local records = {",
+        "local layoutRecords = {",
     ]
+    if database is not None:
+        for record in database.records:
+            if record.presentation is None:
+                continue
+            lines.append(
+                "  { id = %s, startAddress = %d, endAddress = %d },"
+                % (
+                    _lua_string(record.id),
+                    database.cpu_address_base + record.prg_start,
+                    database.cpu_address_base + record.prg_end_exclusive - 1,
+                )
+            )
+    lines.extend([
+        "}",
+        "local records = {",
+    ])
     for translation in translations.get("records", []):
         record_id = translation.get("id")
         record = records_by_id.get(record_id)
@@ -250,13 +315,18 @@ def build_script(
     template: str,
     *,
     display_segments: bool = False,
+    database: GameDatabase | None = None,
 ) -> str:
     if template.count(CONFIG_MARKER) != 1:
         raise ValueError("glyph provenance template must contain exactly one config marker")
     return template.replace(
         CONFIG_MARKER,
         build_config(
-            catalog, translations, character_map, display_segments=display_segments
+            catalog,
+            translations,
+            character_map,
+            display_segments=display_segments,
+            database=database,
         ),
     )
 
@@ -292,6 +362,7 @@ def run(
         load_character_map(character_map_path),
         template_path.read_text(encoding="utf-8"),
         display_segments=display_segments,
+        database=database,
     )
     with tempfile.TemporaryDirectory(prefix="nes-dialogue-glyph-provenance-") as folder:
         generated = Path(folder) / "dialogue-glyph-provenance.lua"
@@ -307,7 +378,7 @@ def run(
 
         if subtitle_companion_path is None:
             raise ValueError("external subtitles require a companion path")
-        router = SubtitleEventRouter(translations)
+        router = SubtitleEventRouter(translations, database)
         with subprocess.Popen(
             ["/usr/bin/python3", str(subtitle_companion_path)],
             stdin=subprocess.PIPE,

@@ -467,3 +467,17 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Confidence: `code-confirmed` for event routing through automated tests;
   external-window placement and visual behavior remain `visual-provisional`
   until exercised alongside Mesen.
+
+### External menu layout mode
+
+- The unified runtime script now observes the already-confirmed menu-record ->
+  `$0300` update buffer -> Nametable path alongside dialogue glyph provenance.
+  It emits only record ID and sourced-cell count; presentation text and layout
+  continue to come from the database rather than Lua constants.
+- The external router maps visible menu records to all of their translated
+  labels, normalizing the existing 256x240 presentation coordinates for the
+  companion window. It keeps menu and subtitle state separately so dialogue
+  can take priority and the prior visible menu can return afterward.
+- The AppKit companion supports mutually exclusive centered subtitle and
+  position-preserving layout modes. This is `code-confirmed` through event-
+  routing tests and remains `visual-provisional` pending a main-menu run.

@@ -336,3 +336,9 @@ The runtime event router is renderer-independent. The current companion is a
 small AppKit prototype which accepts ordinary JSON subtitle state over stdin;
 it neither embeds game-specific logic nor changes the emulator frame. This
 also removes the Mesen HUD bitmap-font restriction from translated text.
+
+The same external window also accepts `layout` state for short UI text. Known
+menu records travel through the existing exact `$0300` PPU-buffer-to-Nametable
+path. Their database labels are normalized from the 256x240 NES coordinate
+space and drawn at corresponding positions in the companion. Dialogue subtitle
+state has priority; when it ends, any still-visible menu layout is restored.

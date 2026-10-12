@@ -307,7 +307,7 @@ class ReadAnalysisTests(unittest.TestCase):
 
     def test_subtitle_router_maps_segment_and_reset_events(self) -> None:
         spec = json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8"))
-        router = SubtitleEventRouter(spec)
+        router = SubtitleEventRouter(spec, load_database(DATABASE))
         shown = router.consume(
             'DQGLYPH {"type":"segment","recordId":"chr-fc-38a7",'
             '"sourceStart":64,"sourceEndExclusive":79}'
@@ -321,6 +321,24 @@ class ReadAnalysisTests(unittest.TestCase):
         assert hidden is not None
         self.assertFalse(hidden["visible"])
         self.assertIsNone(router.consume("ordinary emulator output"))
+
+    def test_subtitle_router_maps_menu_groups_to_layout_labels(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+        )
+        shown = router.consume(
+            'DQMENU {"type":"group","recordId":"dq.menu.main","cellCount":113}'
+        )
+        assert shown is not None
+        self.assertEqual(shown["mode"], "layout")
+        self.assertEqual(len(shown["labels"]), 8)
+        self.assertEqual(shown["labels"][3]["text"], "道具")
+        hidden = router.consume(
+            'DQMENU {"type":"group","recordId":"dq.menu.main","cellCount":0}'
+        )
+        assert hidden is not None
+        self.assertFalse(hidden["visible"])
 
     def test_glyph_provenance_script_contains_catalog_positions(self) -> None:
         catalog = json.loads((
