@@ -202,9 +202,15 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   traditional forms.
 - Waiting for the full `$FC` record also delayed translation until the final
   Japanese page. The generator now computes each translated record's shortest
-  unique raw-byte prefix against all 547 catalog records. Runtime identity can
-  therefore be established near the start of the first page, while Nametable
-  stability and bulk rewrites advance the configured translated pages.
+  unique raw-byte prefix against all 547 catalog records, so runtime identity
+  can be established near the start of the dialogue.
+- A first attempt to advance translated pages on a bulk dialogue-region rewrite
+  confused the final window close with an internal page change. The native box
+  disappeared while a later overlay page remained over the map. Until a
+  distinct page-boundary signal is captured, the long prototype record uses
+  one complete four-line translation page and treats the first later bulk
+  rewrite as the final hide. This is conservative and does not claim exact
+  page synchronization.
 
 ## Shared compressed-text dictionary
 

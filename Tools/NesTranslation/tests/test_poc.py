@@ -213,6 +213,7 @@ class DatabaseTests(unittest.TestCase):
         self.assertIn('id = "chr-fc-35c8"', script)
         self.assertIn("matchPrefix = { 85, 98, 252 }", script)
         self.assertIn("這裡什麼也拿不到。", script)
+        self.assertIn("離開城堡後，旁邊有座城鎮。", script)
         self.assertIn("local visibilityStart = 576", script)
         self.assertIn("and not activeIsVisible", script)
         self.assertIn("frame - lastVisibilityWriteFrame >= stableRegionFrames", script)
