@@ -574,3 +574,17 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   and final clearing matched the live run. Confidence: `runtime-confirmed`;
   50 automated tests additionally cover validation, serialization fidelity,
   and frame-timed replay.
+
+### Automated snapshot audit
+
+- A standalone auditor checks the renderer-independent trace for duplicate
+  units, invalid/out-of-viewport rectangles, inconsistent coverage, incorrect
+  deltas, overlap starts, quick reappearance, long-lived units, and a trace
+  ending before translations clear.
+- The validated 186-snapshot trace produced zero errors. Four warnings marked
+  the start of expected overlap while the strength window covered the lower
+  main-menu labels at frames 18248-18249; sustained overlap is intentionally
+  reported only once per pair.
+- Confidence: `code-confirmed`; 52 automated tests cover valid traces and the
+  major error/warning classes. The real-trace result agrees with the earlier
+  successful visual replay.

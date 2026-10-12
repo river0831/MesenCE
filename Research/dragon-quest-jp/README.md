@@ -350,6 +350,21 @@ python3 -m Tools.NesTranslation.snapshot_replay \
 `--speed 2` replays at twice the recorded frame rate. `--fps` defaults to 60
 and can be adjusted for another system or capture convention.
 
+Audit a recorded trace without opening a window:
+
+```sh
+python3 -m Tools.NesTranslation.snapshot_audit \
+  --trace Research/dragon-quest-jp/generated/visible-snapshots-validation.jsonl \
+  --json-output Research/dragon-quest-jp/output/visible-snapshot-audit.json \
+  --markdown-output Research/dragon-quest-jp/output/visible-snapshot-audit.md
+```
+
+The command returns a failing exit status for deterministic data errors such
+as invalid PPU bounds, duplicate units, inconsistent coverage, or incorrect
+snapshot deltas. Spatial overlap, rapid reappearance, long-lived units, and a
+trace ending with visible translations are warnings for review. Continuous
+overlap is reported once when it begins instead of once per snapshot.
+
 The runtime event router is renderer-independent. The current companion is a
 small AppKit prototype which accepts ordinary JSON subtitle state over stdin;
 it neither embeds game-specific logic nor changes the emulator frame. This

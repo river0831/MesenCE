@@ -43,6 +43,7 @@ from Tools.NesTranslation.runtime_catalog_match import (
     match_catalog,
 )
 from Tools.NesTranslation.snapshot_replay import load_snapshots, replay_snapshots
+from Tools.NesTranslation.snapshot_audit import audit_snapshots, render_markdown
 from Tools.NesTranslation.text_review import load_character_map, render_bytes
 
 
@@ -548,6 +549,56 @@ class ReadAnalysisTests(unittest.TestCase):
             path.write_text('{"frame":1,"items":[]}\n', encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "line 1"):
                 load_snapshots(path)
+
+    def test_snapshot_audit_accepts_balanced_non_overlapping_trace(self) -> None:
+        unit = {
+            "unitId": "menu#label-1", "recordId": "menu", "text": "交談",
+            "ppuBounds": {"x": 8, "y": 8, "width": 32, "height": 12},
+            "visibleCount": 4, "totalCount": 4, "visibleRatio": 1.0,
+            "fontSize": 7.5,
+        }
+        snapshots = [
+            {"frame": 1, "mode": "visible-translation-snapshot",
+             "visible": True, "items": [unit],
+             "delta": {"appeared": ["menu#label-1"], "updated": [],
+                       "disappeared": []}},
+            {"frame": 10, "mode": "visible-translation-snapshot",
+             "visible": False, "items": [],
+             "delta": {"appeared": [], "updated": [],
+                       "disappeared": ["menu#label-1"]}},
+        ]
+        report = audit_snapshots(snapshots)
+        self.assertEqual(report["summary"], {"errors": 0, "warnings": 0})
+        self.assertIn("No issues found", render_markdown(report))
+
+    def test_snapshot_audit_reports_schema_delta_overlap_and_flicker(self) -> None:
+        first = {
+            "unitId": "one", "recordId": "menu", "text": "一",
+            "ppuBounds": {"x": 250, "y": 0, "width": 10, "height": 8},
+            "visibleCount": 2, "totalCount": 1, "visibleRatio": 0.5,
+            "fontSize": 7.5,
+        }
+        second = {
+            **first, "unitId": "two",
+            "ppuBounds": {"x": 248, "y": 0, "width": 8, "height": 8},
+            "visibleCount": 1, "visibleRatio": 1.0,
+        }
+        snapshots = [
+            {"frame": 1, "mode": "visible-translation-snapshot",
+             "visible": True, "items": [first, second], "delta": {}},
+            {"frame": 2, "mode": "visible-translation-snapshot",
+             "visible": False, "items": [],
+             "delta": {"appeared": [], "updated": [],
+                       "disappeared": ["one", "two"]}},
+            {"frame": 3, "mode": "visible-translation-snapshot",
+             "visible": True, "items": [second],
+             "delta": {"appeared": ["two"], "updated": [],
+                       "disappeared": []}},
+        ]
+        report = audit_snapshots(snapshots)
+        codes = {finding["code"] for finding in report["findings"]}
+        self.assertTrue({"out-of-bounds", "invalid-coverage", "overlap",
+                         "delta-mismatch", "flicker", "visible-at-end"} <= codes)
 
     def test_glyph_provenance_script_contains_catalog_positions(self) -> None:
         catalog = json.loads((
