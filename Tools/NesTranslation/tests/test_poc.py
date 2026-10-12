@@ -11,6 +11,7 @@ from Tools.NesTranslation.dialogue_catalog import build_catalog, render_catalog_
 from Tools.NesTranslation.analyze_reads import cluster_reads
 from Tools.NesTranslation.chr_records import ines_chr_layout, split_chr_records
 from Tools.NesTranslation.catalog_validation import apply_runtime_matches
+from Tools.NesTranslation.capture import build_capture_script
 from Tools.NesTranslation.dictionary_codec import (
     expand_tokens,
     ines_prg,
@@ -77,6 +78,15 @@ def read_event(prg_offset: int, frame: int = 1) -> RomReadEvent:
 
 
 class DatabaseTests(unittest.TestCase):
+    def test_capture_script_can_start_immediately_with_longer_limit(self) -> None:
+        script = build_capture_script(
+            "print('trace')", start_immediately=True, frame_limit=18000
+        )
+        self.assertTrue(script.startswith("DQ_CAPTURE_IMMEDIATELY = true\n"))
+        self.assertIn("DQ_CAPTURE_FRAME_LIMIT = 18000", script)
+        with self.assertRaisesRegex(ValueError, "positive"):
+            build_capture_script("", start_immediately=False, frame_limit=0)
+
     def test_database_matches_exact_rom_bytes(self) -> None:
         database = load_database(DATABASE)
         validate_rom(database, ROM)

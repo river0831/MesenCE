@@ -161,6 +161,24 @@ python3 -m Tools.NesTranslation.capture \
 The dialogue trace established that this ROM also stores compressed text in
 CHR ROM. Export lossless `$FC`-terminated CHR candidates with:
 
+For a new-game/opening capture that must begin before the main command menu,
+launch the lightweight catalog trace immediately and extend its bounded frame
+limit:
+
+```sh
+python3 -m Tools.NesTranslation.capture \
+  --mesen bin/osx-arm64/Release/osx-arm64/publish/Mesen.app/Contents/MacOS/Mesen \
+  --script Research/dragon-quest-jp/runtime/dialogue-catalog-trace.lua \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --output Research/dragon-quest-jp/generated/opening-dialogue.jsonl \
+  --start-immediately \
+  --frame-limit 18000
+```
+
+This remains read-only. The generated temporary Lua configuration and captured
+trace are kept outside tracked source; the longer limit provides five minutes
+at 60 FPS for name entry and the opening dialogue.
+
 ```sh
 python3 -m Tools.NesTranslation.chr_records \
   --rom "test_roms/Dragon Quest (Japan).nes" \

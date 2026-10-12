@@ -3,8 +3,8 @@
 -- mapper selector plus overlapping CHR staging windows. No memory is modified.
 
 local frame = 0
-local captureStartFrame = nil
-local captureFrames = 3600
+local captureStartFrame = DQ_CAPTURE_IMMEDIATELY and 0 or nil
+local captureFrames = DQ_CAPTURE_FRAME_LIMIT or 3600
 local mainMenuStart = 0x8459
 local mainMenuEnd = 0x849A
 local chrWindowWriterNextPc = 0xC4BB
@@ -97,5 +97,6 @@ emu.addMemoryCallback(
 )
 
 print(string.format(
-  "DQTRACE_READY mode=dialogue-catalog captureFrames=%d", captureFrames
+  "DQTRACE_READY mode=dialogue-catalog captureFrames=%d immediate=%s",
+  captureFrames, tostring(DQ_CAPTURE_IMMEDIATELY == true)
 ))

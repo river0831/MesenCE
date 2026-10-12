@@ -618,3 +618,14 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Confidence: `code-confirmed`; 54 tests include direct generic visibility
   updates, scope isolation, the lifecycle fixture, and existing runtime event
   adapters.
+
+### Opening-sequence capture mode
+
+- The bounded runtime capture can now start at emulator launch instead of
+  waiting for the main command menu, with a configurable positive frame limit.
+  This is required to discover title/name-entry and opening dialogue sources.
+- Configuration is injected into a temporary Lua copy; the checked-in trace
+  remains reusable and neither ROM nor emulated memory is modified.
+- Confidence: `code-confirmed`; 55 tests cover configuration generation and
+  reject invalid limits. Runtime identification still requires one new-game
+  playthrough.

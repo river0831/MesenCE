@@ -6,23 +6,58 @@ import argparse
 import json
 import subprocess
 import sys
+import tempfile
 from collections import Counter
 from pathlib import Path
 
 from .live import parse_trace_payload
 
 
-def capture(mesen: Path, script: Path, rom: Path, output: Path) -> int:
+def build_capture_script(
+    template: str, *, start_immediately: bool, frame_limit: int | None
+) -> str:
+    if frame_limit is not None and frame_limit <= 0:
+        raise ValueError("capture frame limit must be positive")
+    config = [
+        f"DQ_CAPTURE_IMMEDIATELY = {'true' if start_immediately else 'false'}"
+    ]
+    if frame_limit is not None:
+        config.append(f"DQ_CAPTURE_FRAME_LIMIT = {frame_limit}")
+    return "\n".join(config) + "\n" + template
+
+
+def capture(
+    mesen: Path,
+    script: Path,
+    rom: Path,
+    output: Path,
+    *,
+    start_immediately: bool = False,
+    frame_limit: int | None = None,
+) -> int:
+    generated_folder: tempfile.TemporaryDirectory[str] | None = None
+    runtime_script = script
+    if start_immediately or frame_limit is not None:
+        generated_folder = tempfile.TemporaryDirectory(prefix="nes-capture-")
+        runtime_script = Path(generated_folder.name) / script.name
+        runtime_script.write_text(build_capture_script(
+            script.read_text(encoding="utf-8"),
+            start_immediately=start_immediately,
+            frame_limit=frame_limit,
+        ), encoding="utf-8")
     command = [
         str(mesen),
         "--enableStdout",
         "--doNotSaveSettings",
-        str(script),
+        str(runtime_script),
         str(rom),
     ]
     output.parent.mkdir(parents=True, exist_ok=True)
     counts: Counter[str] = Counter()
-    print("Waiting for the main menu to start diagnostic capture...", flush=True)
+    if start_immediately:
+        print("Starting diagnostic capture with the game...", flush=True)
+    else:
+        print("Waiting for the main menu to start diagnostic capture...", flush=True)
     try:
         with output.open("w", encoding="utf-8") as trace_file, subprocess.Popen(
             command,
@@ -56,6 +91,8 @@ def capture(mesen: Path, script: Path, rom: Path, output: Path) -> int:
         flush=True,
     )
     print(f"Trace: {output}", flush=True)
+    if generated_folder is not None:
+        generated_folder.cleanup()
     return result
 
 
@@ -65,8 +102,14 @@ def main() -> None:
     parser.add_argument("--script", required=True, type=Path)
     parser.add_argument("--rom", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--start-immediately", action="store_true")
+    parser.add_argument("--frame-limit", type=int)
     args = parser.parse_args()
-    raise SystemExit(capture(args.mesen, args.script, args.rom, args.output))
+    raise SystemExit(capture(
+        args.mesen, args.script, args.rom, args.output,
+        start_immediately=args.start_immediately,
+        frame_limit=args.frame_limit,
+    ))
 
 
 if __name__ == "__main__":
