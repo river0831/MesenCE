@@ -565,5 +565,12 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   same companion using recorded frame gaps, with configurable FPS and speed.
   This makes rendering and lifecycle regressions repeatable without replaying
   the game interaction.
-- Confidence: `code-confirmed`; 50 automated tests now include trace
-  validation, serialization fidelity, and frame-timed replay.
+- The end-to-end validation capture contained 186 snapshots spanning frames
+  17547-19053, including the main menu, status window, and reviewed long
+  dialogue. Its deltas contained 47 appearances, 106 updates, and 47
+  disappearances; the trace ended with no visible translation.
+- The same trace was replayed through the AppKit companion without Mesen. The
+  user confirmed that menu, status, dialogue transitions, overlap handling,
+  and final clearing matched the live run. Confidence: `runtime-confirmed`;
+  50 automated tests additionally cover validation, serialization fidelity,
+  and frame-timed replay.
