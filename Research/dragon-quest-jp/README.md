@@ -380,3 +380,9 @@ normalized into the same internal `TextUnit` read model. This adds no game
 scene semantics: a unit only describes translated text, PPU-space bounds,
 coverage size, and an optional source interval. The proven Lua collectors
 remain separate input adapters.
+
+The router's live state is a single `unitId -> visibleCount` map. Each input
+adapter replaces only the units supported by its latest Nametable snapshot;
+units absent from that snapshot are removed. Menu and dialogue lifetimes are
+therefore derived from current PPU provenance, not controller actions or a
+remembered presentation mode.

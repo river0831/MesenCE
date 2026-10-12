@@ -548,3 +548,7 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   model before snapshot projection. This removes their different database
   shapes from presentation without claiming their runtime provenance
   collectors are already interchangeable.
+- Current presentation state is one map keyed by normalized `unitId`. Menu and
+  dialogue adapters replace their matching entries from each complete coverage
+  event, so the snapshot retains no separate mode or stale subtitle fallback.
+  Confidence: `code-confirmed` by the 48 routing tests.

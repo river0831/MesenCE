@@ -243,6 +243,7 @@ class SubtitleEventRouter:
             if record.presentation is not None
         }
         units = build_text_units(translations, database)
+        self._units_by_id = {unit.id: unit for unit in units}
         self._layout_units = {
             (unit.record_id, int(unit.id.rsplit("-", 1)[1])): unit
             for unit in units if "#label-" in unit.id
@@ -251,35 +252,49 @@ class SubtitleEventRouter:
             (unit.record_id, unit.source_start, unit.source_end_exclusive): unit
             for unit in units if unit.source_start is not None
         }
-        self._visible_layouts: dict[str, dict[int, int]] = {}
-        self._visible_dialogue: dict[str, list[dict[str, Any]]] = {}
+        self._visible_units: dict[str, int] = {}
         self._frame = 0
+
+    def _clear_record_units(self, record_id: str, dialogue: bool) -> None:
+        for unit_id in tuple(self._visible_units):
+            unit = self._units_by_id[unit_id]
+            if unit.record_id == record_id and (
+                (unit.source_start is not None) == dialogue
+            ):
+                del self._visible_units[unit_id]
 
     def _scene_state(self) -> dict[str, Any]:
         items = []
-        for record_id in sorted(self._visible_layouts):
-            visible_labels = self._visible_layouts[record_id]
-            for index in sorted(visible_labels):
-                unit = self._layout_units[(record_id, index)]
-                items.append(unit.snapshot_item(visible_labels[index]))
-        for record_id in sorted(self._visible_dialogue):
-            segments = self._visible_dialogue[record_id]
-            units = [
-                self._dialogue_units[(
-                    record_id, segment["sourceStart"],
-                    segment["sourceEndExclusive"],
-                )]
-                for segment in segments
-            ]
+        layout_units = sorted(
+            (
+                self._units_by_id[unit_id]
+                for unit_id in self._visible_units
+                if self._units_by_id[unit_id].source_start is None
+            ),
+            key=lambda unit: unit.id,
+        )
+        for unit in layout_units:
+            items.append(unit.snapshot_item(self._visible_units[unit.id]))
+
+        dialogue_by_record: dict[str, list[TextUnit]] = {}
+        for unit_id in self._visible_units:
+            unit = self._units_by_id[unit_id]
+            if unit.source_start is not None:
+                dialogue_by_record.setdefault(unit.record_id, []).append(unit)
+        for record_id in sorted(dialogue_by_record):
+            units = sorted(
+                dialogue_by_record[record_id],
+                key=lambda unit: unit.source_start or 0,
+            )
             box = units[0].ppu_bounds
             total_height = sum(
                 unit.line_count * (unit.line_height or 0) for unit in units
             )
             next_y = box.y + max((box.height - total_height) // 2, 0)
-            for unit, segment in zip(units, segments):
+            for unit in units:
                 item_height = unit.line_count * (unit.line_height or 0)
                 bounds = PpuBounds(box.x, next_y, box.width, item_height)
-                items.append(unit.snapshot_item(segment["visibleCount"], bounds))
+                items.append(unit.snapshot_item(self._visible_units[unit.id], bounds))
                 next_y += item_height
         return {
             "frame": self._frame,
@@ -328,14 +343,15 @@ class SubtitleEventRouter:
                     for index, label in enumerate(presentation.labels, 1)
                 }
             else:
-                visible = set()
-            if visible:
-                self._visible_layouts[record_id] = visible
-            else:
-                self._visible_layouts.pop(record_id, None)
+                visible = {}
+            self._clear_record_units(record_id, dialogue=False)
+            for index, count in visible.items():
+                unit = self._layout_units.get((record_id, index))
+                if unit is not None:
+                    self._visible_units[unit.id] = count
             return self._scene_state()
         if event.get("type") == "reset":
-            self._visible_dialogue.pop(str(event.get("recordId")), None)
+            self._clear_record_units(str(event.get("recordId")), dialogue=True)
             return self._scene_state()
         if event.get("type") == "coverage":
             record = self._records.get(event.get("recordId"))
@@ -346,23 +362,15 @@ class SubtitleEventRouter:
                 for item in event.get("segments", [])
                 if isinstance(item, dict)
             }
-            visible_segments = []
+            self._clear_record_units(record["id"], dialogue=True)
             for segment in record.get("segments", []):
                 key = (segment["sourceStart"], segment["sourceEndExclusive"])
                 item = coverage_by_range.get(key, {})
                 visible = int(item.get("visibleCount", 0))
                 total = segment["sourceEndExclusive"] - segment["sourceStart"]
                 if total > 0 and visible / total >= self._activation_coverage:
-                    visible_segments.append({
-                        **segment,
-                        "visibleCount": visible,
-                        "totalCount": total,
-                        "visibleRatio": visible / total,
-                    })
-            if visible_segments:
-                self._visible_dialogue[record["id"]] = visible_segments
-            else:
-                self._visible_dialogue.pop(record["id"], None)
+                    unit = self._dialogue_units[(record["id"], *key)]
+                    self._visible_units[unit.id] = visible
             return self._scene_state()
         if event.get("type") != "segment":
             return None
