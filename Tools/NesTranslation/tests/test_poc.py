@@ -224,7 +224,7 @@ class DatabaseTests(unittest.TestCase):
             "records": [
                 {
                     "id": item["id"],
-                    "rawHex": "55 62 fc" if index == 0 else "6d fe fc",
+                    "rawHex": ("55 62 fc", "6d fe fc", "70 fd fc")[index],
                     "runtime": {"status": "runtime-confirmed"},
                 }
                 for index, item in enumerate(spec["records"])
@@ -273,6 +273,16 @@ class DatabaseTests(unittest.TestCase):
         segment_broken["records"][0]["segments"] = [{"lines": ["这"]}]
         with self.assertRaisesRegex(DatabaseError, "这"):
             validate_presentation_characters(segment_broken, supported)
+
+    def test_opening_speech_has_complete_reviewed_segments(self) -> None:
+        spec = json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8"))
+        opening = next(
+            record for record in spec["records"] if record["id"] == "chr-fc-3908"
+        )
+        validate_segments(opening, 278)
+        self.assertEqual(len(opening["segments"]), 8)
+        self.assertEqual(opening["segments"][0]["sourceStart"], 0)
+        self.assertEqual(opening["segments"][-1]["sourceEndExclusive"], 278)
 
 
 class ReadAnalysisTests(unittest.TestCase):

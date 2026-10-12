@@ -629,3 +629,17 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Confidence: `code-confirmed`; 55 tests cover configuration generation and
   reject invalid limits. Runtime identification still requires one new-game
   playthrough.
+
+### Opening king speech
+
+- The startup capture observed one continuous 277-byte CHR source stream from
+  frames 2409-3672. Raising the bounded-record ceiling from 256 to 512 exposed
+  `chr-fc-3908`; the exact runtime matcher then covered all 277 bytes with no
+  unmatched source bytes.
+- The speech is divided at its eight reviewed dialogue boundaries into logical
+  glyph intervals covering `[0,278)`. Each interval has a Traditional Chinese
+  translation suitable for the existing external mirror and visible-coverage
+  routing.
+- Record identity is `runtime-confirmed`; translation segmentation is
+  `semantic-probable` pending one visual new-game run. The full suite contains
+  56 passing tests.

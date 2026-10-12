@@ -184,7 +184,7 @@ python3 -m Tools.NesTranslation.chr_records \
   --rom "test_roms/Dragon Quest (Japan).nes" \
   --terminator fc \
   --minimum-length 2 \
-  --maximum-length 256 \
+  --maximum-length 512 \
   --output Research/dragon-quest-jp/generated/chr-fc-records.json
 ```
 
@@ -247,6 +247,10 @@ discards source or expanded bytes. Scores are review ordering only. CHR bitmap
 data can coincidentally resemble dictionary tokens, so even a `high` record has
 confidence `static-candidate` until runtime reads or another independent source
 cross-validates it.
+
+The 512-byte ceiling is required for the 277-byte opening speech at
+`chr-fc-3908`; the earlier 256-byte ceiling silently excluded that complete
+bounded record.
 
 Match captured overlapping CHR staging windows back to stable catalog IDs:
 
