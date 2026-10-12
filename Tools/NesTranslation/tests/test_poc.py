@@ -8,6 +8,11 @@ from pathlib import Path
 from Tools.NesTranslation.database import DatabaseError, load_database, validate_rom
 from Tools.NesTranslation.analyze_reads import cluster_reads
 from Tools.NesTranslation.chr_records import ines_chr_layout, split_chr_records
+from Tools.NesTranslation.dictionary_codec import (
+    expand_tokens,
+    ines_prg,
+    read_dictionary,
+)
 from Tools.NesTranslation.display import DebugRenderer
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
@@ -173,6 +178,43 @@ class DatabaseTests(unittest.TestCase):
 
 
 class ReadAnalysisTests(unittest.TestCase):
+    def test_dictionary_expansion_preserves_source_provenance(self) -> None:
+        dictionary = (bytes((0x55, 0x62)), bytes((0x24, 0xF8)))
+        result = expand_tokens(
+            bytes((0x6D, 0x10, 0x6E, 0xFC)),
+            dictionary,
+            0x6D,
+            source_offset=0x3300,
+            modifier_values=frozenset((0xF8,)),
+        )
+        self.assertEqual(result[0].source_offset, 0x3300)
+        self.assertEqual(result[0].dictionary_index, 0)
+        self.assertEqual(result[0].expanded, (0x55, 0x62))
+        self.assertEqual(result[1].kind, "glyph")
+        self.assertEqual(result[2].dictionary_index, 1)
+        self.assertEqual(result[3].kind, "control")
+
+    def test_dragon_quest_dictionary_expands_runtime_record(self) -> None:
+        rom = ROM.read_bytes()
+        layout = ines_chr_layout(rom)
+        source = rom[
+            layout.file_offset + 0x3397:layout.file_offset + 0x33C1
+        ]
+        dictionary = read_dictionary(ines_prg(rom), 0x0858, 0x0B21, 0xFA)
+        self.assertEqual(len(dictionary), 123)
+        result = expand_tokens(
+            source,
+            dictionary,
+            0x6D,
+            source_offset=0x3397,
+            modifier_values=frozenset((0xF8,)),
+        )
+        self.assertEqual(result[0].expanded, (0x55, 0x62))
+        self.assertEqual(result[2].value, 0xE7)
+        self.assertEqual(result[2].expanded, (0x24, 0xF8))
+        self.assertEqual(result[-1].value, 0xFC)
+        self.assertEqual(result[-1].kind, "control")
+
     def test_chr_record_splitter_preserves_offsets_and_unknown_bytes(self) -> None:
         header = bytearray(b"NES\x1a" + bytes(12))
         header[4] = 1

@@ -174,3 +174,20 @@ This is deliberately a broad candidate export. It preserves every byte and
 physical CHR/file offset, but does not claim that all candidates are text.
 Runtime evidence cross-validates the first NPC-dialogue candidate at CHR
 `$3397-$33C1`.
+
+Expand that candidate through the PRG shared dictionary while retaining every
+source offset and control byte:
+
+```sh
+python3 -m Tools.NesTranslation.dictionary_codec \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --chr-start 0x3397 \
+  --chr-end 0x33c1 \
+  --dictionary-start 0x858 \
+  --dictionary-end 0xb21 \
+  --dictionary-terminator fa \
+  --token-base 6d \
+  --modifier f8 \
+  --control-minimum f0 \
+  --output Research/dragon-quest-jp/generated/dialogue-3397-expanded.json
+```

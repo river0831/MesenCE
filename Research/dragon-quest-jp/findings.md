@@ -100,6 +100,23 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   window, the `$C4BB` producer, and the PPU `$1397+` sequence;
   `cross-validated` for the physical CHR `$3397-$33C0` token stream.
 
+### Static expansion of the first CHR dialogue record
+
+- The PRG dictionary at `$0858-$0B20` contains exactly 123 `$FA`-terminated
+  entries, matching source tokens `$6D-$E7` when `$6D` is subtracted.
+- Expanding CHR `$3397-$33C1` produces 48 bytes from 42 source tokens. Each
+  exported token retains its CHR offset, original value, dictionary index, and
+  expansion rather than losing provenance in a flattened string.
+- The flattened byte stream is:
+  `55 62 19 24 F8 22 15 19 11 0F F8 5F 1C F8 10 19 1E 30 FE 28 19 5F 35 15 1F 5F 0A 0B 1F 11 32 0F F8 2F 0B FE 28 38 1C 0E 32 18 F8 5F F2 2F 61 FC`.
+- With only previously evidenced hiragana mappings applied, the review form
+  is `<55><62>たびのしたくが できたなら<FE>また わしに あいにくるがよい<FE>まってるぞ <F2>よ<61><FC>`.
+  Unknown/control bytes remain explicit; no meaning is assigned to them from
+  Japanese semantics alone.
+- Confidence: `code-confirmed` for dictionary indexing and delimiters;
+  `cross-validated` for the expanded bytes; `semantic-probable` for the review
+  transcription until compared with a captured dialogue screenshot.
+
 ## Shared compressed-text dictionary
 
 - Entering the empty item path caused a sequential read of physical PRG
