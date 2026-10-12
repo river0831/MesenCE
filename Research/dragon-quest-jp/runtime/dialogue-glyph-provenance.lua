@@ -123,6 +123,28 @@ local function onChrWindowWrite(address, value)
   consumeSourceByte(value)
 end
 
+local function screenTilePixel(ppuAddress)
+  local offset = (ppuAddress - 0x2000) % 0x1000
+  local within = offset % 0x400
+  if within >= 0x3C0 then return nil, nil end
+  local nameTable = math.floor(offset / 0x400)
+  local worldX = (nameTable % 2) * 256 + (within % 32) * 8
+  local worldY = math.floor(nameTable / 2) * 240 +
+    math.floor(within / 32) * 8
+  local state = emu.getState()
+  local temporary = state["ppu.tmpVideoRamAddr"] or 0
+  local fineX = state["ppu.xScroll"] or 0
+  local scrollX = (temporary & 0x1F) * 8 + fineX
+  if (temporary & 0x400) ~= 0 then scrollX = scrollX + 256 end
+  local scrollY = ((temporary & 0x3E0) >> 2) +
+    ((temporary & 0x7000) >> 12)
+  if (temporary & 0x800) ~= 0 then scrollY = scrollY + 240 end
+  local screenX = (worldX - scrollX) % 512
+  local screenY = (worldY - scrollY) % 480
+  if screenX >= 256 or screenY >= 240 then return nil, nil end
+  return screenX, screenY
+end
+
 local function onBufferWrite(address, value)
   if (address - 0x0300) % 3 ~= 2 or cpuPc() ~= ppuBufferWriterPc then return end
   local candidate = {
@@ -136,13 +158,11 @@ local function onBufferWrite(address, value)
     table.insert(pendingBeforeMatch, candidate)
   end
   if layoutSource and frame <= layoutSourceExpires then
-    local physical = candidate.ppuAddress % 0x400
-    local x = physical % 32
-    local y = math.floor(physical / 32)
+    local x, y = screenTilePixel(candidate.ppuAddress)
     local labelIndex = nil
     for _, label in ipairs(layoutSource.labels) do
-      if x >= label.startX and x < label.endX
-          and y >= label.startY and y < label.endY then
+      if x and y and x < label.endX and x + 8 > label.startX
+          and y < label.endY and y + 8 > label.startY then
         labelIndex = label.index
         break
       end

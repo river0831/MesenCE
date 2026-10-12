@@ -513,4 +513,18 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   a Nametable tile region. Runtime group events report sourced-cell counts per
   label, and the scene contains only labels whose own region remains present.
 - Confidence: `code-confirmed` through routing tests; the label-region behavior
-  remains `visual-provisional` until the combined-window run is reviewed.
+  is `runtime-confirmed` for the reviewed main-menu/status-window run.
+
+### PPU-coordinate translation mirror
+
+- The external AppKit view now uses a `256x240` logical canvas with a default
+  `768x720` content size and fixed NES aspect ratio. Both short labels and
+  dialogue boxes are placed from database PPU pixel rectangles and relaid out
+  on resize.
+- Directly comparing those rectangles with physical Nametable offsets lost the
+  first command label after map scrolling. Runtime mapping now combines the
+  logical PPU write address with `ppu.tmpVideoRamAddr` and `ppu.xScroll` to
+  obtain the tile's current screen position before assigning label ownership.
+- A visual run confirmed all eight main-command translations and correct
+  higher-window coverage after the viewport correction. Confidence:
+  `runtime-confirmed` for this Dragon Quest scene.

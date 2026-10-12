@@ -366,6 +366,10 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(shown["mode"], "scene")
         self.assertEqual(len(shown["labels"]), 8)
         self.assertEqual(shown["labels"][3]["text"], "道具")
+        self.assertEqual(
+            shown["labels"][3]["ppuBounds"],
+            {"x": 174, "y": 48, "width": 40, "height": 12},
+        )
         hidden = router.consume(
             'DQMENU {"type":"group","recordId":"dq.menu.main","cellCount":0}'
         )
@@ -404,6 +408,10 @@ class ReadAnalysisTests(unittest.TestCase):
         assert scene is not None
         self.assertEqual(len(scene["labels"]), 8)
         self.assertEqual(scene["subtitles"], ["離開城堡後，旁邊有座城鎮。"])
+        self.assertEqual(
+            scene["subtitleItems"][0]["ppuBounds"],
+            {"x": 52, "y": 150, "width": 152, "height": 66},
+        )
         scene = router.consume(
             'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
             '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
@@ -443,7 +451,9 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("delta % 32 == 0", script)
         self.assertIn("assignCell(destination, cell)", script)
         self.assertIn("labelIndex = labelIndex", script)
-        self.assertIn("startX = 16, endX = 20", script)
+        self.assertIn("startX = 128, endX = 160", script)
+        self.assertIn('state["ppu.tmpVideoRamAddr"]', script)
+        self.assertIn('state["ppu.xScroll"]', script)
 
     def test_character_map_renders_dialogue_and_combines_dakuten(self) -> None:
         character_map = load_character_map(CHARACTER_MAP)

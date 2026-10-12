@@ -360,3 +360,10 @@ requires at least three agreeing tiles and one logical glyph may occupy only
 one current cell. Short UI labels are likewise tracked individually through
 their database `clear` rectangles, so a higher window hides only the labels it
 actually covers instead of keeping or removing an entire menu record.
+
+The macOS companion is a `256x240` logical translation mirror, initially shown
+at `3x` size. Label and dialogue rectangles use PPU pixel coordinates and are
+scaled with the window. Label ownership is resolved in screen space by
+combining each logical Nametable address with the current NES temporary VRAM
+address and fine-X scroll, rather than confusing physical Nametable offsets
+with visible coordinates.

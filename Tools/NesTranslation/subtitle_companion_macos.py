@@ -14,20 +14,23 @@ from AppKit import (
     NSColor,
     NSFont,
     NSMakeRect,
+    NSMakeSize,
     NSScreen,
     NSTextField,
     NSWindow,
     NSWindowStyleMaskClosable,
+    NSWindowStyleMaskResizable,
     NSWindowStyleMaskTitled,
 )
 from Foundation import NSObject
+from objc import python_method
 
 
 class SubtitleController(NSObject):
     def applicationDidFinishLaunching_(self, notification):  # noqa: N802
         del notification
         screen = NSScreen.mainScreen().visibleFrame()
-        width, height = 760, 300
+        width, height = 768, 720
         rect = NSMakeRect(
             screen.origin.x + (screen.size.width - width) / 2,
             screen.origin.y + 24,
@@ -36,30 +39,22 @@ class SubtitleController(NSObject):
         )
         self.window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
             rect,
-            NSWindowStyleMaskTitled | NSWindowStyleMaskClosable,
+            NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+            | NSWindowStyleMaskResizable,
             NSBackingStoreBuffered,
             False,
         )
-        self.window.setTitle_("NES Translation Subtitles")
+        self.window.setTitle_("NES Translation Mirror")
         self.window.setLevel_(3)
         self.window.setBackgroundColor_(NSColor.blackColor())
-        self.label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(20, 12, width - 40, 92)
-        )
-        self.label.setEditable_(False)
-        self.label.setSelectable_(False)
-        self.label.setBezeled_(False)
-        self.label.setDrawsBackground_(False)
-        self.label.setTextColor_(NSColor.whiteColor())
-        self.label.setFont_(NSFont.systemFontOfSize_(25))
-        self.label.setAlignment_(1)
-        self.label.setMaximumNumberOfLines_(3)
-        self.label.setStringValue_("等待游戏对话…")
-        self.window.contentView().addSubview_(self.label)
-        self.layoutLabels = []
+        self.window.setContentAspectRatio_(NSMakeSize(256, 240))
+        self.window.setDelegate_(self)
+        self.drawFields = []
+        self.latestCommand = {"visible": False}
         self.window.orderFrontRegardless()
         threading.Thread(target=self._read_commands, daemon=True).start()
 
+    @python_method
     def _read_commands(self):
         for line in sys.stdin:
             try:
@@ -75,30 +70,50 @@ class SubtitleController(NSObject):
         )
 
     def applyState_(self, payload):  # noqa: N802
-        command = json.loads(payload)
-        for label in self.layoutLabels:
-            label.removeFromSuperview()
-        self.layoutLabels = []
-        if not command.get("visible"):
-            self.label.setStringValue_("")
-            return
-        self.label.setStringValue_("\n".join(command.get("subtitles", [])))
+        self.latestCommand = json.loads(payload)
+        self._render()
+
+    def windowDidResize_(self, notification):  # noqa: N802
+        del notification
+        self._render()
+
+    @python_method
+    def _field(self, text, ppu_bounds, font_size):
         bounds = self.window.contentView().bounds()
+        scale_x = bounds.size.width / 256.0
+        scale_y = bounds.size.height / 240.0
+        x = ppu_bounds["x"] * scale_x
+        y = bounds.size.height - (
+            ppu_bounds["y"] + ppu_bounds["height"]
+        ) * scale_y
+        field = NSTextField.alloc().initWithFrame_(NSMakeRect(
+            x, y, ppu_bounds["width"] * scale_x,
+            ppu_bounds["height"] * scale_y,
+        ))
+        field.setEditable_(False)
+        field.setSelectable_(False)
+        field.setBezeled_(False)
+        field.setDrawsBackground_(False)
+        field.setTextColor_(NSColor.whiteColor())
+        field.setFont_(NSFont.systemFontOfSize_(font_size * scale_y))
+        field.setAlignment_(1)
+        field.setMaximumNumberOfLines_(0)
+        field.setStringValue_(text)
+        self.window.contentView().addSubview_(field)
+        self.drawFields.append(field)
+
+    @python_method
+    def _render(self):
+        for field in self.drawFields:
+            field.removeFromSuperview()
+        self.drawFields = []
+        command = self.latestCommand
+        if not command.get("visible"):
+            return
         for item in command.get("labels", []):
-            field = NSTextField.alloc().initWithFrame_(NSMakeRect(
-                item["x"] * bounds.size.width,
-                (1.0 - item["y"]) * bounds.size.height - 24,
-                120,
-                30,
-            ))
-            field.setEditable_(False)
-            field.setBezeled_(False)
-            field.setDrawsBackground_(False)
-            field.setTextColor_(NSColor.whiteColor())
-            field.setFont_(NSFont.systemFontOfSize_(22))
-            field.setStringValue_(item["text"])
-            self.window.contentView().addSubview_(field)
-            self.layoutLabels.append(field)
+            self._field(item["text"], item["ppuBounds"], 7.5)
+        for item in command.get("subtitleItems", []):
+            self._field(item["text"], item["ppuBounds"], 8.5)
         self.window.orderFrontRegardless()
 
     def finish_(self, value):

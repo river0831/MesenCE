@@ -157,8 +157,12 @@ class SubtitleEventRouter:
                 {
                     "recordId": record_id,
                     "text": label.text,
-                    "x": label.x / 256.0,
-                    "y": label.y / 240.0,
+                    "ppuBounds": {
+                        "x": label.clear.x,
+                        "y": label.clear.y,
+                        "width": label.clear.width,
+                        "height": label.clear.height,
+                    },
                 }
                 for index, label in enumerate(record.presentation.labels, 1)
                 if index in visible_labels
@@ -168,11 +172,24 @@ class SubtitleEventRouter:
             for record_id in sorted(self._visible_dialogue)
             for line in self._visible_dialogue[record_id]
         ]
+        subtitle_items = [
+            {
+                "recordId": record_id,
+                "text": "\n".join(self._visible_dialogue[record_id]),
+                "ppuBounds": {
+                    key: self._records[record_id]["box"][key]
+                    for key in ("x", "y", "width", "height")
+                },
+                "lineHeight": self._records[record_id]["box"]["lineHeight"],
+            }
+            for record_id in sorted(self._visible_dialogue)
+        ]
         return {
             "visible": bool(labels or subtitles),
             "mode": "scene",
             "labels": labels,
             "subtitles": subtitles,
+            "subtitleItems": subtitle_items,
         }
 
     def consume(self, line: str) -> dict[str, Any] | None:
@@ -294,10 +311,10 @@ def build_config(
                 ),
             ])
             for index, label in enumerate(record.presentation.labels, 1):
-                start_x = label.clear.x // 8
-                start_y = label.clear.y // 8
-                end_x = (label.clear.x + label.clear.width + 7) // 8
-                end_y = (label.clear.y + label.clear.height + 7) // 8
+                start_x = label.clear.x
+                start_y = label.clear.y
+                end_x = label.clear.x + label.clear.width
+                end_y = label.clear.y + label.clear.height
                 lines.append(
                     "    { index = %d, startX = %d, endX = %d, "
                     "startY = %d, endY = %d },"
