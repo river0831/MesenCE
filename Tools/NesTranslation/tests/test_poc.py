@@ -27,6 +27,7 @@ from Tools.NesTranslation.dialogue_glyph_provenance import (
     group_visible_cells,
     logical_glyphs,
     select_segment,
+    SubtitleEventRouter,
     validate_segments,
 )
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
@@ -303,6 +304,23 @@ class ReadAnalysisTests(unittest.TestCase):
         broken["segments"][1]["sourceStart"] = 3
         with self.assertRaisesRegex(DatabaseError, "contiguous"):
             validate_segments(broken, 4)
+
+    def test_subtitle_router_maps_segment_and_reset_events(self) -> None:
+        spec = json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8"))
+        router = SubtitleEventRouter(spec)
+        shown = router.consume(
+            'DQGLYPH {"type":"segment","recordId":"chr-fc-38a7",'
+            '"sourceStart":64,"sourceEndExclusive":79}'
+        )
+        assert shown is not None
+        self.assertTrue(shown["visible"])
+        self.assertEqual(shown["text"], "回城鎮住進旅店，")
+        hidden = router.consume(
+            'DQGLYPH {"type":"reset","recordId":"chr-fc-38a7"}'
+        )
+        assert hidden is not None
+        self.assertFalse(hidden["visible"])
+        self.assertIsNone(router.consume("ordinary emulator output"))
 
     def test_glyph_provenance_script_contains_catalog_positions(self) -> None:
         catalog = json.loads((

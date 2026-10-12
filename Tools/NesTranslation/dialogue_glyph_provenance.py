@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -123,6 +124,46 @@ def select_segment(
     return None
 
 
+class SubtitleEventRouter:
+    """Turn runtime provenance events into renderer-agnostic subtitle state."""
+
+    def __init__(self, translations: dict[str, Any]):
+        self._records = {
+            record["id"]: record for record in translations.get("records", [])
+        }
+
+    def consume(self, line: str) -> dict[str, Any] | None:
+        marker = "DQGLYPH "
+        position = line.find(marker)
+        if position < 0:
+            return None
+        try:
+            event = json.loads(line[position + len(marker):])
+        except json.JSONDecodeError:
+            return None
+        if event.get("type") == "reset":
+            return {"visible": False, "recordId": event.get("recordId"), "text": ""}
+        if event.get("type") != "segment":
+            return None
+        record = self._records.get(event.get("recordId"))
+        if record is None:
+            return None
+        for segment in record.get("segments", []):
+            if (
+                segment.get("sourceStart") == event.get("sourceStart")
+                and segment.get("sourceEndExclusive")
+                == event.get("sourceEndExclusive")
+            ):
+                return {
+                    "visible": True,
+                    "recordId": record["id"],
+                    "sourceStart": segment["sourceStart"],
+                    "sourceEndExclusive": segment["sourceEndExclusive"],
+                    "text": "\n".join(segment["lines"]),
+                }
+        return None
+
+
 def _lua_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -230,7 +271,11 @@ def run(
     character_map_path: Path,
     display_segments: bool,
     font_source_path: Path | None,
+    external_subtitles: bool,
+    subtitle_companion_path: Path | None,
 ) -> int:
+    if display_segments and external_subtitles:
+        raise ValueError("choose either in-game or external segment display")
     database = load_database(database_path)
     validate_rom(database, rom_path)
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
@@ -252,10 +297,38 @@ def run(
         generated = Path(folder) / "dialogue-glyph-provenance.lua"
         generated.write_text(script, encoding="utf-8")
         print("Starting dialogue glyph provenance diagnostic...", flush=True)
-        with subprocess.Popen([
+        command = [
             str(mesen), "--enableStdout", "--doNotSaveSettings",
             str(generated), str(rom_path),
-        ]) as process:
+        ]
+        if not external_subtitles:
+            with subprocess.Popen(command) as process:
+                return process.wait()
+
+        if subtitle_companion_path is None:
+            raise ValueError("external subtitles require a companion path")
+        router = SubtitleEventRouter(translations)
+        with subprocess.Popen(
+            ["/usr/bin/python3", str(subtitle_companion_path)],
+            stdin=subprocess.PIPE,
+            text=True,
+        ) as companion, subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        ) as process:
+            assert process.stdout is not None
+            assert companion.stdin is not None
+            for line in process.stdout:
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                state = router.consume(line)
+                if state is not None and companion.poll() is None:
+                    companion.stdin.write(json.dumps(state, ensure_ascii=False) + "\n")
+                    companion.stdin.flush()
+            companion.stdin.close()
             return process.wait()
 
 
@@ -270,11 +343,14 @@ def main() -> None:
     parser.add_argument("--character-map", required=True, type=Path)
     parser.add_argument("--display-segments", action="store_true")
     parser.add_argument("--font-source", type=Path)
+    parser.add_argument("--external-subtitles", action="store_true")
+    parser.add_argument("--subtitle-companion", type=Path)
     args = parser.parse_args()
     raise SystemExit(run(
         args.mesen, args.template, args.rom, args.game_database, args.catalog,
         args.translations, args.character_map,
         args.display_segments, args.font_source,
+        args.external_subtitles, args.subtitle_companion,
     ))
 
 

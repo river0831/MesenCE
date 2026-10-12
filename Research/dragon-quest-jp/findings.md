@@ -450,3 +450,20 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Sustained emptiness resets the active record and logical cursor, allowing the
   same record to be recognized on a later interaction. These corrections
   remain `semantic-probable` pending a repeat visual run.
+
+## External subtitle presentation prototype
+
+- Visual testing demonstrated a structural limitation of drawing translated
+  text over the game's dialogue box: Japanese typewriter animation, scrolling,
+  and the replacement overlay necessarily compete for the same pixels. Timing
+  adjustments can change the symptom but cannot remove that conflict.
+- A renderer-independent event router now converts provenance `segment` and
+  `reset` events into simple visible/text state. The macOS prototype sends
+  that state to a separate AppKit window over JSON lines, leaving the emulated
+  256x240 frame untouched.
+- The companion window uses the system font, so presentation is no longer
+  limited to Mesen's built-in HUD glyph table. PPU provenance and translation
+  selection remain independent of this platform-specific view.
+- Confidence: `code-confirmed` for event routing through automated tests;
+  external-window placement and visual behavior remain `visual-provisional`
+  until exercised alongside Mesen.

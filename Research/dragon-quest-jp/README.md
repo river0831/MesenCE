@@ -315,3 +315,24 @@ newest glyph crosses a reviewed segment boundary. The current segment remains
 visible through ordinary glyph writes and short empty intervals during scroll;
 a sustained empty interval resets the record so it can be recognized again.
 Controller input is not observed.
+
+On macOS, run the same provenance adapter with a separate native subtitle
+window instead of drawing over the emulated frame:
+
+```sh
+python3 -m Tools.NesTranslation.dialogue_glyph_provenance \
+  --mesen bin/osx-arm64/Release/osx-arm64/publish/Mesen.app/Contents/MacOS/Mesen \
+  --template Research/dragon-quest-jp/runtime/dialogue-glyph-provenance.lua \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --game-database Research/dragon-quest-jp/database/game-database.json \
+  --catalog Research/dragon-quest-jp/generated/dialogue-catalog-validated.json \
+  --translations Research/dragon-quest-jp/database/dialogue-translations.json \
+  --character-map Research/dragon-quest-jp/database/character-map.json \
+  --external-subtitles \
+  --subtitle-companion Tools/NesTranslation/subtitle_companion_macos.py
+```
+
+The runtime event router is renderer-independent. The current companion is a
+small AppKit prototype which accepts ordinary JSON subtitle state over stdin;
+it neither embeds game-specific logic nor changes the emulator frame. This
+also removes the Mesen HUD bitmap-font restriction from translated text.
