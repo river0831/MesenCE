@@ -575,12 +575,30 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(shown["items"][0]["ppuBounds"], {
             "x": 168, "y": 64, "width": 24, "height": 8,
         })
+        dialogue = router.apply_visibility(VisibilityUpdate(
+            "dialogue:chr-fc-35e7", (("chr-fc-35e7#glyph-0-7", 7),)
+        ))
+        self.assertEqual([item["text"] for item in dialogue["items"]], [
+            "發現了物品。"
+        ])
+        restored = router.apply_visibility(VisibilityUpdate(
+            "dialogue:chr-fc-35e7", ()
+        ))
+        self.assertEqual([item["text"] for item in restored["items"]], ["鑰匙"])
         hidden = router.consume(
             'DQMENU {"type":"group","frame":10,"recordId":"dict-a1",'
             '"cellCount":0,"labels":[]}'
         )
         assert hidden is not None
         self.assertFalse(hidden["visible"])
+
+    def test_system_template_fragments_are_not_independent_text_units(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        units = build_text_units({}, vocabulary=vocabulary)
+        ids = {unit.id for unit in units}
+        self.assertIn("dict-a1#vocabulary", ids)
+        self.assertNotIn("dict-ba#vocabulary", ids)
+        self.assertNotIn("dict-bb#vocabulary", ids)
 
     def test_subtitle_router_maps_menu_groups_to_layout_labels(self) -> None:
         router = SubtitleEventRouter(
@@ -703,6 +721,52 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(first["ppuBounds"]["height"], 15)
         self.assertEqual(second["ppuBounds"]["y"], 183)
         self.assertEqual(second["ppuBounds"]["height"], 15)
+
+    def test_snapshot_keeps_newest_dialogue_suffix_that_fits_box(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+        )
+        units = [
+            unit for unit in router._units_by_id.values()
+            if unit.kind == "dialogue" and unit.record_id == "chr-fc-3397"
+        ]
+        fitted = router._fit_dialogue_units(units[:3], 45)
+        self.assertTrue(fitted)
+        self.assertLessEqual(
+            sum(unit.line_count * (unit.line_height or 0) for unit in fitted),
+            45,
+        )
+        self.assertEqual(fitted[-1], units[2])
+
+    def test_new_overlapping_dialogue_record_replaces_old_record(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+        )
+        records = {}
+        for unit in router._units_by_id.values():
+            if unit.kind == "dialogue":
+                records.setdefault(unit.record_id, unit)
+        overlapping = None
+        first = next(iter(records.values()))
+        for candidate in records.values():
+            if (
+                candidate.record_id != first.record_id
+                and router._bounds_overlap(first.ppu_bounds, candidate.ppu_bounds)
+            ):
+                overlapping = candidate
+                break
+        self.assertIsNotNone(overlapping)
+        assert overlapping is not None
+        router.apply_visibility(VisibilityUpdate(
+            f"dialogue:{first.record_id}", ((first.id, 1),)
+        ))
+        scene = router.apply_visibility(VisibilityUpdate(
+            f"dialogue:{overlapping.record_id}", ((overlapping.id, 1),)
+        ))
+        self.assertNotIn(first.id, {item["unitId"] for item in scene["items"]})
+        self.assertIn(overlapping.id, {item["unitId"] for item in scene["items"]})
 
     def test_snapshot_trace_load_and_timed_replay(self) -> None:
         snapshots = [
@@ -843,6 +907,7 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn('state["ppu.xScroll"]', script)
         self.assertIn('id = "dict-a1"', script)
         self.assertIn("dynamic = true", script)
+        self.assertNotIn('id = "dict-bb"', script)
 
     def test_character_map_renders_dialogue_and_combines_dakuten(self) -> None:
         character_map = load_character_map(CHARACTER_MAP)

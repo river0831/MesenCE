@@ -188,17 +188,70 @@ class SubtitleEventRouter:
         for unit_id in scope_units:
             self._visible_units.pop(unit_id, None)
             self._visible_bounds.pop(unit_id, None)
+        incoming_dialogue = [
+            self._units_by_id[unit_id]
+            for unit_id in counts
+            if self._units_by_id[unit_id].kind == "dialogue"
+        ]
+        if incoming_dialogue:
+            incoming_boxes = [unit.ppu_bounds for unit in incoming_dialogue]
+            for unit_id in tuple(self._visible_units):
+                visible = self._units_by_id[unit_id]
+                if (
+                    visible.kind == "dialogue"
+                    and visible.record_id != incoming_dialogue[0].record_id
+                    and any(
+                        self._bounds_overlap(visible.ppu_bounds, box)
+                        for box in incoming_boxes
+                    )
+                ):
+                    self._visible_units.pop(unit_id, None)
+                    self._visible_bounds.pop(unit_id, None)
         self._visible_units.update(counts)
         self._visible_bounds.update(dict(update.unit_bounds))
         return self._scene_state()
 
+    @staticmethod
+    def _bounds_overlap(first: PpuBounds, second: PpuBounds) -> bool:
+        return (
+            first.x < second.x + second.width
+            and second.x < first.x + first.width
+            and first.y < second.y + second.height
+            and second.y < first.y + first.height
+        )
+
+    @staticmethod
+    def _fit_dialogue_units(
+        units: list[TextUnit], available_height: int
+    ) -> list[TextUnit]:
+        """Keep the newest visible suffix that fits the current PPU box."""
+        fitted: list[TextUnit] = []
+        used_height = 0
+        for unit in reversed(units):
+            item_height = unit.line_count * (unit.line_height or 0)
+            if fitted and used_height + item_height > available_height:
+                break
+            fitted.append(unit)
+            used_height += item_height
+            if used_height >= available_height:
+                break
+        return list(reversed(fitted))
+
     def _scene_state(self) -> dict[str, Any]:
         items = []
+        dialogue_visible = any(
+            self._units_by_id[unit_id].kind == "dialogue"
+            for unit_id in self._visible_units
+        )
         layout_units = sorted(
             (
                 self._units_by_id[unit_id]
                 for unit_id in self._visible_units
                 if self._units_by_id[unit_id].kind in ("label", "vocabulary")
+                and not (
+                    dialogue_visible
+                    and self._units_by_id[unit_id].kind == "vocabulary"
+                )
             ),
             key=lambda unit: unit.id,
         )
@@ -218,6 +271,7 @@ class SubtitleEventRouter:
                 key=lambda unit: unit.source_start or 0,
             )
             box = units[0].ppu_bounds
+            units = self._fit_dialogue_units(units, box.height)
             total_height = sum(
                 unit.line_count * (unit.line_height or 0) for unit in units
             )
@@ -422,6 +476,8 @@ def build_config(
                 entry["id"]: entry for entry in dictionary_catalog.get("entries", [])
             }
             for word in vocabulary.get("records", []):
+                if word.get("category") == "system-template":
+                    continue
                 entry = entries[word["id"]]
                 if entry["prgEndExclusive"] <= entry["prgStart"]:
                     continue

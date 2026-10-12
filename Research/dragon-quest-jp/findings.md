@@ -704,11 +704,20 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Reviewed dictionary entries can now join the normalized state model as
   `vocabulary` text units. They use the same scoped visibility replacement and
   renderer-independent snapshots as fixed labels and dialogue segments.
-- The Lua adapter tags PPU-buffer writes from each exact dictionary PRG range,
-  derives the visible pixel rectangle from the resulting Nametable cells, and
-  emits that rectangle with the current cell count. No inventory row or window
-  coordinate is stored in the vocabulary database.
+- The first runtime attempt disproved a broad three-frame attribution window:
+  short dictionary reads such as `みつけた` incorrectly claimed later,
+  unrelated PPU writes and left stale fragments across menus and dialogue.
+- Dynamic vocabulary attribution is therefore single-use and byte-exact. A
+  dictionary read may tag only a matching PPU-buffer byte in the same frame;
+  that source is consumed immediately. The resulting Nametable cells still
+  supply the visible pixel rectangle, so no inventory row or window coordinate
+  is stored in the vocabulary database.
+- System-template fragments are composition inputs rather than independently
+  visible translations, and vocabulary is suppressed while a dialogue unit is
+  visible. Overlapping dialogue records use the newest PPU region, while a
+  long dialogue keeps only the newest visible suffix that fits its box.
 - Static menu labels retain their reviewed rectangles; only dynamic vocabulary
   entries override their output bounds. Confidence: `code-confirmed` for
-  configuration, routing, bounds, and clearing behavior in 63 tests;
-  runtime behavior remains pending a populated-inventory visual run.
+  configuration, routing, bounds, clearing, overlap replacement, and box
+  fitting behavior in 66 tests; corrected runtime behavior remains pending a
+  populated-inventory visual run.

@@ -23,6 +23,7 @@ local emptyGraceFrames = 20
 local foreground = 0xFFFFFF
 local background = 0x000000
 local layoutSource = nil
+local layoutSourceValue = nil
 local layoutSourceExpires = -1
 local layoutPending = {}
 local layoutCells = {}
@@ -36,7 +37,9 @@ end
 for _, record in ipairs(layoutRecords) do
   emu.addMemoryCallback(function(address, value)
     layoutSource = record
-    layoutSourceExpires = frame + layoutSourceTtlFrames
+    layoutSourceValue = value
+    layoutSourceExpires = record.dynamic and frame or
+      (frame + layoutSourceTtlFrames)
   end, emu.callbackType.read, record.startAddress, record.endAddress,
     emu.cpuType.nes, emu.memType.nesMemory)
 end
@@ -157,7 +160,9 @@ local function onBufferWrite(address, value)
   else
     table.insert(pendingBeforeMatch, candidate)
   end
-  if layoutSource and frame <= layoutSourceExpires then
+  local layoutMatches = layoutSource and frame <= layoutSourceExpires and
+    (not layoutSource.dynamic or candidate.value == layoutSourceValue)
+  if layoutMatches then
     local x, y = screenTilePixel(candidate.ppuAddress)
     local labelIndex = layoutSource.dynamic and 1 or nil
     if not layoutSource.dynamic then
@@ -177,6 +182,11 @@ local function onBufferWrite(address, value)
       y = y,
       dynamic = layoutSource.dynamic,
     }
+    if layoutSource.dynamic then
+      layoutSource = nil
+      layoutSourceValue = nil
+      layoutSourceExpires = -1
+    end
   end
 end
 

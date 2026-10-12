@@ -128,6 +128,8 @@ def build_text_units(
                 line_height=box["lineHeight"],
             ))
     for record in (vocabulary or {}).get("records", []):
+        if record.get("category") == "system-template":
+            continue
         source_text = str(record.get("sourceText", ""))
         units.append(TextUnit(
             id=f"{record['id']}#vocabulary",
