@@ -117,6 +117,30 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   `cross-validated` for the expanded bytes; `semantic-probable` for the review
   transcription until compared with a captured dialogue screenshot.
 
+### Control and punctuation review for CHR `$3397`
+
+- CHR tile inspection identifies `$55` as `＊`, `$62` as `「`, and `$61` as
+  `！`. Their repeated dialogue positions agree with the bitmaps.
+- `$F8` combines with the preceding kana as the voiced-sound modifier. The
+  review renderer uses a combining dakuten and Unicode normalization, while
+  the raw byte remains independently represented in the character map.
+- `$FE` branches to the `$BD4A` line-advance routine, which advances the text
+  destination by `$40` Nametable bytes (two tile rows). It renders as a line
+  break in review output.
+- `$F2` saves the current decoder pointer in `$9B/$9C`, changes `$99/$9A` to
+  RAM `$00B5`, and later returns through the normal dictionary-termination
+  path. A screenshot with the one-character player name `あ` shows `あ` at
+  exactly this position in `まっておるぞ あ よ！`, confirming a fixed-width
+  player-name insertion field.
+- `$FC` is retained as `<END>` and follows the record-ending control path.
+- The generated review contains no unmapped bytes and currently reads:
+  `＊「たびのしたくが できたなら` / `また わしに あいにくるがよい` /
+  `まっておるぞ {PLAYER_NAME}よ！<END>`.
+- Confidence: `cross-validated` for `$55/$61/$62/$F8`;
+  `code-confirmed` for `$FE/$FC` behavior and `$F2` pointer switching;
+  `runtime-confirmed` for interpreting RAM `$00B5` as the player name and for
+  the complete three-line transcription.
+
 ## Shared compressed-text dictionary
 
 - Entering the empty item path caused a sequential read of physical PRG

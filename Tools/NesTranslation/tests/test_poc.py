@@ -20,12 +20,14 @@ from Tools.NesTranslation.overlay import build_overlay_script
 from Tools.NesTranslation.provenance import build_provenance_script
 from Tools.NesTranslation.replay import replay
 from Tools.NesTranslation.resolver import TextResolver
+from Tools.NesTranslation.text_review import load_character_map, render_bytes
 
 
 ROOT = Path(__file__).parents[3]
 DATABASE = ROOT / "Research/dragon-quest-jp/database/game-database.json"
 ROM = ROOT / "test_roms/Dragon Quest (Japan).nes"
 TRACE = ROOT / "Research/dragon-quest-jp/traces/main-menu-synthetic.jsonl"
+CHARACTER_MAP = ROOT / "Research/dragon-quest-jp/database/character-map.json"
 
 
 def prg_byte(cpu_address: int) -> int:
@@ -178,6 +180,15 @@ class DatabaseTests(unittest.TestCase):
 
 
 class ReadAnalysisTests(unittest.TestCase):
+    def test_character_map_renders_dialogue_and_combines_dakuten(self) -> None:
+        character_map = load_character_map(CHARACTER_MAP)
+        self.assertEqual(character_map[0xF2]["confidence"], "runtime-confirmed")
+        rendered = render_bytes(
+            [0x55, 0x62, 0x19, 0x24, 0xF8, 0xFE, 0xF2, 0x2F, 0x61, 0xFC],
+            character_map,
+        )
+        self.assertEqual(rendered, "＊「たび\n{PLAYER_NAME}よ！<END>")
+
     def test_dictionary_expansion_preserves_source_provenance(self) -> None:
         dictionary = (bytes((0x55, 0x62)), bytes((0x24, 0xF8)))
         result = expand_tokens(

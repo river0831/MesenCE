@@ -191,3 +191,13 @@ python3 -m Tools.NesTranslation.dictionary_codec \
   --control-minimum f0 \
   --output Research/dragon-quest-jp/generated/dialogue-3397-expanded.json
 ```
+
+Render an evidence-bearing review without hiding unknown bytes:
+
+```sh
+python3 -m Tools.NesTranslation.text_review \
+  --expanded Research/dragon-quest-jp/generated/dialogue-3397-expanded.json \
+  --character-map Research/dragon-quest-jp/database/character-map.json \
+  --confidence runtime-confirmed \
+  --output Research/dragon-quest-jp/output/dialogue-3397-review.md
+```
