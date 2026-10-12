@@ -323,7 +323,9 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         assert shown is not None
         self.assertTrue(shown["visible"])
-        self.assertEqual(shown["subtitles"], ["離開城堡後，旁邊有座城鎮。"])
+        self.assertEqual([item["text"] for item in shown["items"]], [
+            "離開城堡後，旁邊有座城鎮。"
+        ])
         both = router.consume(
             'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
             '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
@@ -331,7 +333,9 @@ class ReadAnalysisTests(unittest.TestCase):
             '"visibleCount":20}]}'
         )
         assert both is not None
-        self.assertIn("先在那裡備齊武器和防具。", both["subtitles"])
+        self.assertIn("先在那裡備齊武器和防具。", [
+            item["text"] for item in both["items"]
+        ])
         cleared = router.consume(
             'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
             '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
@@ -346,7 +350,9 @@ class ReadAnalysisTests(unittest.TestCase):
             '"visibleCount":15}]}'
         )
         assert replacement is not None
-        self.assertEqual(replacement["subtitles"], ["戰鬥中受傷時，"])
+        self.assertEqual([item["text"] for item in replacement["items"]], [
+            "戰鬥中受傷時，"
+        ])
         hidden = router.consume(
             'DQGLYPH {"type":"reset","recordId":"chr-fc-38a7"}'
         )
@@ -363,13 +369,15 @@ class ReadAnalysisTests(unittest.TestCase):
             'DQMENU {"type":"group","recordId":"dq.menu.main","cellCount":113}'
         )
         assert shown is not None
-        self.assertEqual(shown["mode"], "scene")
-        self.assertEqual(len(shown["labels"]), 8)
-        self.assertEqual(shown["labels"][3]["text"], "道具")
+        self.assertEqual(shown["mode"], "visible-translation-snapshot")
+        self.assertEqual(len(shown["items"]), 8)
+        self.assertEqual(shown["items"][3]["text"], "道具")
         self.assertEqual(
-            shown["labels"][3]["ppuBounds"],
+            shown["items"][3]["ppuBounds"],
             {"x": 174, "y": 48, "width": 40, "height": 12},
         )
+        self.assertEqual(shown["items"][3]["unitId"], "dq.menu.main#label-4")
+        self.assertEqual(shown["items"][3]["visibleRatio"], 1.0)
         hidden = router.consume(
             'DQMENU {"type":"group","recordId":"dq.menu.main","cellCount":0}'
         )
@@ -388,7 +396,7 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         assert scene is not None
         self.assertEqual(
-            [label["text"] for label in scene["labels"]], ["交談", "咒文"]
+            [item["text"] for item in scene["items"]], ["交談", "咒文"]
         )
 
     def test_subtitle_router_composes_menu_and_dialogue_from_current_state(self) -> None:
@@ -406,12 +414,14 @@ class ReadAnalysisTests(unittest.TestCase):
             '"visibleCount":0}]}'
         )
         assert scene is not None
-        self.assertEqual(len(scene["labels"]), 8)
-        self.assertEqual(scene["subtitles"], ["離開城堡後，旁邊有座城鎮。"])
+        self.assertEqual(len(scene["items"]), 9)
+        self.assertEqual(scene["items"][-1]["text"], "離開城堡後，旁邊有座城鎮。")
         self.assertEqual(
-            scene["subtitleItems"][0]["ppuBounds"],
-            {"x": 52, "y": 150, "width": 152, "height": 66},
+            scene["items"][-1]["ppuBounds"],
+            {"x": 52, "y": 175, "width": 152, "height": 15},
         )
+        self.assertEqual(scene["items"][-1]["visibleCount"], 6)
+        self.assertEqual(scene["items"][-1]["totalCount"], 22)
         scene = router.consume(
             'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
             '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
@@ -419,14 +429,32 @@ class ReadAnalysisTests(unittest.TestCase):
             '"visibleCount":6}]}'
         )
         assert scene is not None
-        self.assertEqual(scene["subtitles"], ["先在那裡備齊武器和防具。"])
+        self.assertEqual(scene["items"][-1]["text"], "先在那裡備齊武器和防具。")
         reset = router.consume(
             'DQGLYPH {"type":"reset","recordId":"chr-fc-38a7"}'
         )
         assert reset is not None
         self.assertTrue(reset["visible"])
-        self.assertEqual(len(reset["labels"]), 8)
-        self.assertEqual(reset["subtitles"], [])
+        self.assertEqual(len(reset["items"]), 8)
+        self.assertTrue(all("#label-" in item["unitId"] for item in reset["items"]))
+
+    def test_snapshot_stacks_visible_dialogue_units_without_overlap(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+        )
+        scene = router.consume(
+            'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
+            '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
+            '"visibleCount":22},{"sourceStart":22,"sourceEndExclusive":46,'
+            '"visibleCount":24}]}'
+        )
+        assert scene is not None
+        first, second = scene["items"]
+        self.assertEqual(first["ppuBounds"]["y"], 168)
+        self.assertEqual(first["ppuBounds"]["height"], 15)
+        self.assertEqual(second["ppuBounds"]["y"], 183)
+        self.assertEqual(second["ppuBounds"]["height"], 15)
 
     def test_glyph_provenance_script_contains_catalog_positions(self) -> None:
         catalog = json.loads((

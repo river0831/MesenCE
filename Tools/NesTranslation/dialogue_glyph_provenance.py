@@ -144,17 +144,26 @@ class SubtitleEventRouter:
             for record in (database.records if database else ())
             if record.presentation is not None
         }
-        self._visible_layouts: dict[str, set[int]] = {}
-        self._visible_dialogue: dict[str, list[str]] = {}
+        self._visible_layouts: dict[str, dict[int, int]] = {}
+        self._visible_dialogue: dict[str, list[dict[str, Any]]] = {}
+        self._frame = 0
 
     def _scene_state(self) -> dict[str, Any]:
-        labels = []
+        items = []
         for record_id in sorted(self._visible_layouts):
             record = self._layouts[record_id]
             assert record.presentation is not None
             visible_labels = self._visible_layouts[record_id]
-            labels.extend(
-                {
+            for index, label in enumerate(record.presentation.labels, 1):
+                if index not in visible_labels:
+                    continue
+                total = (
+                    ((label.clear.width + 7) // 8)
+                    * ((label.clear.height + 7) // 8)
+                )
+                visible = visible_labels[index]
+                items.append({
+                    "unitId": f"{record_id}#label-{index}",
                     "recordId": record_id,
                     "text": label.text,
                     "ppuBounds": {
@@ -163,33 +172,46 @@ class SubtitleEventRouter:
                         "width": label.clear.width,
                         "height": label.clear.height,
                     },
-                }
-                for index, label in enumerate(record.presentation.labels, 1)
-                if index in visible_labels
-            )
-        subtitles = [
-            line
-            for record_id in sorted(self._visible_dialogue)
-            for line in self._visible_dialogue[record_id]
-        ]
-        subtitle_items = [
-            {
-                "recordId": record_id,
-                "text": "\n".join(self._visible_dialogue[record_id]),
-                "ppuBounds": {
-                    key: self._records[record_id]["box"][key]
-                    for key in ("x", "y", "width", "height")
-                },
-                "lineHeight": self._records[record_id]["box"]["lineHeight"],
-            }
-            for record_id in sorted(self._visible_dialogue)
-        ]
+                    "visibleCount": visible,
+                    "totalCount": total,
+                    "visibleRatio": min(visible / total, 1.0),
+                    "fontSize": 7.5,
+                })
+        for record_id in sorted(self._visible_dialogue):
+            record = self._records[record_id]
+            box = record["box"]
+            segments = self._visible_dialogue[record_id]
+            total_lines = sum(len(segment["lines"]) for segment in segments)
+            content_height = total_lines * box["lineHeight"]
+            next_y = box["y"] + max((box["height"] - content_height) // 2, 0)
+            for segment in segments:
+                item_height = len(segment["lines"]) * box["lineHeight"]
+                items.append({
+                    "unitId": (
+                        f"{record_id}#glyph-{segment['sourceStart']}-"
+                        f"{segment['sourceEndExclusive']}"
+                    ),
+                    "recordId": record_id,
+                    "text": "\n".join(segment["lines"]),
+                    "ppuBounds": {
+                        "x": box["x"],
+                        "y": next_y,
+                        "width": box["width"],
+                        "height": item_height,
+                    },
+                    "sourceStart": segment["sourceStart"],
+                    "sourceEndExclusive": segment["sourceEndExclusive"],
+                    "visibleCount": segment["visibleCount"],
+                    "totalCount": segment["totalCount"],
+                    "visibleRatio": segment["visibleRatio"],
+                    "fontSize": 8.5,
+                })
+                next_y += item_height
         return {
-            "visible": bool(labels or subtitles),
-            "mode": "scene",
-            "labels": labels,
-            "subtitles": subtitles,
-            "subtitleItems": subtitle_items,
+            "frame": self._frame,
+            "visible": bool(items),
+            "mode": "visible-translation-snapshot",
+            "items": items,
         }
 
     def consume(self, line: str) -> dict[str, Any] | None:
@@ -206,6 +228,8 @@ class SubtitleEventRouter:
             event = json.loads(line[position + len(marker):])
         except json.JSONDecodeError:
             return None
+        if isinstance(event.get("frame"), int):
+            self._frame = event["frame"]
         if marker == menu_marker:
             if event.get("type") != "group" or event.get("recordId") not in self._layouts:
                 return None
@@ -213,16 +237,22 @@ class SubtitleEventRouter:
             label_counts = event.get("labels")
             if isinstance(label_counts, list):
                 visible = {
-                    int(item["index"])
+                    int(item["index"]): int(item.get("cellCount", 0))
                     for item in label_counts
                     if isinstance(item, dict)
                     and isinstance(item.get("index"), int)
                     and int(item.get("cellCount", 0)) > 0
                 }
             elif event.get("cellCount", 0) > 0:
-                visible = set(range(1, len(
-                    self._layouts[record_id].presentation.labels  # type: ignore[union-attr]
-                ) + 1))
+                presentation = self._layouts[record_id].presentation
+                assert presentation is not None
+                visible = {
+                    index: (
+                        ((label.clear.width + 7) // 8)
+                        * ((label.clear.height + 7) // 8)
+                    )
+                    for index, label in enumerate(presentation.labels, 1)
+                }
             else:
                 visible = set()
             if visible:
@@ -242,16 +272,21 @@ class SubtitleEventRouter:
                 for item in event.get("segments", [])
                 if isinstance(item, dict)
             }
-            lines = []
+            visible_segments = []
             for segment in record.get("segments", []):
                 key = (segment["sourceStart"], segment["sourceEndExclusive"])
                 item = coverage_by_range.get(key, {})
                 visible = int(item.get("visibleCount", 0))
                 total = segment["sourceEndExclusive"] - segment["sourceStart"]
                 if total > 0 and visible / total >= self._activation_coverage:
-                    lines.extend(segment["lines"])
-            if lines:
-                self._visible_dialogue[record["id"]] = lines
+                    visible_segments.append({
+                        **segment,
+                        "visibleCount": visible,
+                        "totalCount": total,
+                        "visibleRatio": visible / total,
+                    })
+            if visible_segments:
+                self._visible_dialogue[record["id"]] = visible_segments
             else:
                 self._visible_dialogue.pop(record["id"], None)
             return self._scene_state()

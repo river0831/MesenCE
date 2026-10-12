@@ -110,10 +110,8 @@ class SubtitleController(NSObject):
         command = self.latestCommand
         if not command.get("visible"):
             return
-        for item in command.get("labels", []):
-            self._field(item["text"], item["ppuBounds"], 7.5)
-        for item in command.get("subtitleItems", []):
-            self._field(item["text"], item["ppuBounds"], 8.5)
+        for item in command.get("items", []):
+            self._field(item["text"], item["ppuBounds"], item["fontSize"])
         self.window.orderFrontRegardless()
 
     def finish_(self, value):

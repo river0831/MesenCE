@@ -367,3 +367,10 @@ scaled with the window. Label ownership is resolved in screen space by
 combining each logical Nametable address with the current NES temporary VRAM
 address and fine-X scroll, rather than confusing physical Nametable offsets
 with visible coordinates.
+
+The renderer receives a `visible-translation-snapshot` rather than separate
+menu and subtitle commands. Every current unit has the same fields: stable
+unit/record IDs, translated text, PPU bounds, visible and total cell/glyph
+counts, coverage ratio, and presentation font size. This snapshot is a direct
+projection of tracked PPU state; it does not identify a game scene or retain a
+previous subtitle.

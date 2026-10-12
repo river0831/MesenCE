@@ -528,3 +528,18 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - A visual run confirmed all eight main-command translations and correct
   higher-window coverage after the viewport correction. Confidence:
   `runtime-confirmed` for this Dragon Quest scene.
+
+### Visible translation snapshot
+
+- The Python projection now emits one renderer-independent
+  `visible-translation-snapshot`. Short labels and dialogue intervals share a
+  single item representation containing PPU bounds and current coverage.
+- The AppKit mirror has no menu/dialogue rendering branches; it scales and
+  draws the snapshot items uniformly. Runtime provenance remains responsible
+  for deciding which items exist.
+- When several dialogue units share one container, the snapshot assigns them
+  ordered, non-overlapping PPU sub-rectangles before rendering. This keeps the
+  mirror generic while preventing independent text fields from occupying the
+  same full dialogue box.
+- Confidence: `runtime-confirmed` for the reviewed combined menu/dialogue run;
+  47 automated tests cover snapshot composition and non-overlapping placement.
