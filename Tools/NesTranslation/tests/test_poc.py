@@ -17,6 +17,12 @@ from Tools.NesTranslation.dictionary_codec import (
     ines_prg,
     read_dictionary,
 )
+from Tools.NesTranslation.dictionary_catalog import (
+    build_dictionary_catalog,
+    normalize_japanese,
+    validate_vocabulary,
+    VocabularyError,
+)
 from Tools.NesTranslation.display import DebugRenderer
 from Tools.NesTranslation.dialogue_overlay import (
     build_dialogue_overlay,
@@ -363,6 +369,48 @@ class ReviewWorklistTests(unittest.TestCase):
         rendered = render_review_worklist(worklist)
         self.assertIn("Catalog records preserved: 1", rendered)
         self.assertNotIn("### low", rendered)
+
+
+class DictionaryCatalogTests(unittest.TestCase):
+    def test_dictionary_catalog_preserves_offsets_and_empty_entries(self) -> None:
+        rom = bytearray(16 + 0x4000 + 0x2000)
+        rom[:4] = b"NES\x1a"
+        rom[4] = 1
+        rom[5] = 1
+        rom[16:21] = bytes([0x0F, 0xF8, 0xFA, 0xFA, 0x0B])
+        rom[21] = 0xFA
+        character_map = {
+            0x0F: {"display": "か", "type": "glyph"},
+            0x0B: {"display": "い", "type": "glyph"},
+            0xF8: {"display": "゛", "type": "modifier"},
+        }
+        catalog = build_dictionary_catalog(
+            bytes(rom), start=0, end_exclusive=6, terminator=0xFA,
+            token_base=0x6D, character_map=character_map,
+        )
+        self.assertEqual([item["id"] for item in catalog["entries"]], [
+            "dict-6d", "dict-6e", "dict-6f",
+        ])
+        self.assertEqual(catalog["entries"][0]["normalized"], "が")
+        self.assertEqual(catalog["entries"][1]["rawHex"], "")
+        self.assertEqual(catalog["entries"][2]["prgStart"], 4)
+
+    def test_japanese_modifier_normalization(self) -> None:
+        self.assertEqual(normalize_japanese("か゛き゛"), "がぎ")
+
+    def test_vocabulary_must_reference_matching_dictionary_token(self) -> None:
+        catalog = {"entries": [{
+            "id": "dict-a1", "token": 0xA1, "normalized": "かぎ", "unknownBytes": [],
+        }]}
+        vocabulary = {"records": [{
+            "id": "dict-a1", "token": 0xA1, "category": "item",
+            "sourceText": "かぎ", "translation": "钥匙", "display": "鑰匙",
+            "confidence": "semantic-probable",
+        }]}
+        validate_vocabulary(catalog, vocabulary)
+        vocabulary["records"][0]["token"] = 0xA2
+        with self.assertRaisesRegex(VocabularyError, "source mismatch"):
+            validate_vocabulary(catalog, vocabulary)
 
 
 class ReadAnalysisTests(unittest.TestCase):

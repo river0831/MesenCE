@@ -1,0 +1,50 @@
+{
+  "formatVersion": 1,
+  "language": "zh-Hans",
+  "source": "prg-dictionary",
+  "records": [
+    { "id": "dict-8b", "token": 139, "category": "weapon", "sourceText": "たけざお", "translation": "竹竿", "display": "竹竿", "confidence": "semantic-probable" },
+    { "id": "dict-8c", "token": 140, "category": "weapon", "sourceText": "こんぼう", "translation": "木棒", "display": "木棒", "confidence": "semantic-probable" },
+    { "id": "dict-8d", "token": 141, "category": "weapon", "sourceText": "どうのつるぎ", "translation": "铜剑", "display": "銅劍", "confidence": "semantic-probable" },
+    { "id": "dict-8e", "token": 142, "category": "weapon", "sourceText": "てつのおの", "translation": "铁斧", "display": "鐵斧", "confidence": "semantic-probable" },
+    { "id": "dict-8f", "token": 143, "category": "weapon", "sourceText": "はがねのつるぎ", "translation": "钢剑", "display": "鋼劍", "confidence": "semantic-probable" },
+    { "id": "dict-90", "token": 144, "category": "weapon", "sourceText": "ほのおのつるぎ", "translation": "火焰剑", "display": "火焰劍", "confidence": "semantic-probable" },
+    { "id": "dict-91", "token": 145, "category": "weapon", "sourceText": "ロトのつるぎ", "translation": "洛特之剑", "display": "洛特之劍", "confidence": "semantic-probable" },
+
+    { "id": "dict-92", "token": 146, "category": "armor", "sourceText": "ぬののふく", "translation": "布衣", "display": "布衣", "confidence": "semantic-probable" },
+    { "id": "dict-93", "token": 147, "category": "armor", "sourceText": "かわのふく", "translation": "皮衣", "display": "皮衣", "confidence": "semantic-probable" },
+    { "id": "dict-94", "token": 148, "category": "armor", "sourceText": "くさりかたびら", "translation": "锁子甲", "display": "鎖子甲", "confidence": "semantic-probable" },
+    { "id": "dict-95", "token": 149, "category": "armor", "sourceText": "てつのよろい", "translation": "铁甲", "display": "鐵甲", "confidence": "semantic-probable" },
+    { "id": "dict-96", "token": 150, "category": "armor", "sourceText": "はがねのよろい", "translation": "钢甲", "display": "鋼甲", "confidence": "semantic-probable" },
+    { "id": "dict-97", "token": 151, "category": "armor", "sourceText": "まほうのよろい", "translation": "魔法铠甲", "display": "魔法鎧甲", "confidence": "semantic-probable" },
+    { "id": "dict-98", "token": 152, "category": "armor", "sourceText": "ロトのよろい", "translation": "洛特铠甲", "display": "洛特鎧甲", "confidence": "semantic-probable" },
+
+    { "id": "dict-99", "token": 153, "category": "shield", "sourceText": "かわのたて", "translation": "皮盾", "display": "皮盾", "confidence": "semantic-probable" },
+    { "id": "dict-9a", "token": 154, "category": "shield", "sourceText": "てつのたて", "translation": "铁盾", "display": "鐵盾", "confidence": "semantic-probable" },
+    { "id": "dict-9b", "token": 155, "category": "shield", "sourceText": "みかがみのたて", "translation": "水镜盾", "display": "水鏡盾", "confidence": "semantic-probable" },
+
+    { "id": "dict-a0", "token": 160, "category": "item", "sourceText": "やくそう", "translation": "药草", "display": "藥草", "confidence": "semantic-probable" },
+    { "id": "dict-a1", "token": 161, "category": "item", "sourceText": "かぎ", "translation": "钥匙", "display": "鑰匙", "confidence": "semantic-probable" },
+    { "id": "dict-a2", "token": 162, "category": "item", "sourceText": "たいまつ", "translation": "火把", "display": "火把", "confidence": "semantic-probable" },
+    { "id": "dict-a3", "token": 163, "category": "item", "sourceText": "せいすい", "translation": "圣水", "display": "聖水", "confidence": "semantic-probable" },
+    { "id": "dict-a4", "token": 164, "category": "item", "sourceText": "キメラのつばさ", "translation": "奇美拉之翼", "display": "奇美拉之翼", "confidence": "semantic-probable" },
+    { "id": "dict-a5", "token": 165, "category": "item", "sourceText": "りゅうのうろこ", "translation": "龙鳞", "display": "龍鱗", "confidence": "semantic-probable" },
+    { "id": "dict-a6", "token": 166, "category": "item", "sourceText": "ようせいのふえ", "translation": "妖精之笛", "display": "妖精之笛", "confidence": "semantic-probable" },
+    { "id": "dict-a7", "token": 167, "category": "item", "sourceText": "せんしのゆびわ", "translation": "战士戒指", "display": "戰士戒指", "confidence": "semantic-probable" },
+    { "id": "dict-a8", "token": 168, "category": "item", "sourceText": "ロトのしるし", "translation": "洛特印记", "display": "洛特印記", "confidence": "semantic-probable" },
+    { "id": "dict-a9", "token": 169, "category": "item", "sourceText": "おうじょのあい", "translation": "公主之爱", "display": "公主之愛", "confidence": "semantic-probable" },
+    { "id": "dict-aa", "token": 170, "category": "item", "sourceText": "のろいのベルト", "translation": "诅咒腰带", "display": "詛咒腰帶", "confidence": "semantic-probable" },
+    { "id": "dict-ab", "token": 171, "category": "item", "sourceText": "ぎんのたてごと", "translation": "银竖琴", "display": "銀豎琴", "confidence": "semantic-probable" },
+    { "id": "dict-ac", "token": 172, "category": "item", "sourceText": "しのくびかざり", "translation": "死亡项链", "display": "死亡項鏈", "confidence": "semantic-probable" },
+    { "id": "dict-ad", "token": 173, "category": "item", "sourceText": "たいようのいし", "translation": "太阳石", "display": "太陽石", "confidence": "semantic-probable" },
+    { "id": "dict-ae", "token": 174, "category": "item", "sourceText": "あまぐものつえ", "translation": "雨云杖", "display": "雨雲杖", "confidence": "semantic-probable" },
+    { "id": "dict-af", "token": 175, "category": "item", "sourceText": "にじのしずく", "translation": "彩虹水滴", "display": "彩虹水滴", "confidence": "semantic-probable" },
+
+    { "id": "dict-b5", "token": 181, "category": "system-template", "sourceText": "もてませんが", "translation": "已经拿不下了", "display": "已經拿不下了", "confidence": "semantic-probable" },
+    { "id": "dict-b6", "token": 182, "category": "system-template", "sourceText": "おかねが たりませんが", "translation": "金钱不够", "display": "金錢不夠", "confidence": "semantic-probable" },
+    { "id": "dict-b8", "token": 184, "category": "system-template", "sourceText": "どれを", "translation": "选择哪一个", "display": "選擇哪一個", "confidence": "semantic-probable" },
+    { "id": "dict-b9", "token": 185, "category": "system-template", "sourceText": "なにを", "translation": "要选择什么", "display": "要選擇什麼", "confidence": "semantic-probable" },
+    { "id": "dict-ba", "token": 186, "category": "system-template", "sourceText": "てにいれた", "translation": "获得了", "display": "獲得了", "confidence": "semantic-probable" },
+    { "id": "dict-bb", "token": 187, "category": "system-template", "sourceText": "みつけた", "translation": "发现了", "display": "發現了", "confidence": "semantic-probable" }
+  ]
+}

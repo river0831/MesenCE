@@ -268,6 +268,27 @@ unknown bytes. The Markdown view omits low-priority bodies to keep the first
 review pass manageable. Suggested categories are only routing hints; neither a
 keyword match nor Japanese semantics promotes a candidate to confirmed text.
 
+Export the PRG dictionary used by those records, preserving every token and its
+physical PRG offsets, and validate the reviewed vocabulary layer:
+
+```sh
+python3 -m Tools.NesTranslation.dictionary_catalog \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --character-map Research/dragon-quest-jp/database/character-map.json \
+  --dictionary-start 0x858 \
+  --dictionary-end 0xb21 \
+  --dictionary-terminator fa \
+  --token-base 6d \
+  --vocabulary Research/dragon-quest-jp/database/vocabulary-translations.json \
+  --json-output Research/dragon-quest-jp/generated/prg-dictionary-catalog.json \
+  --markdown-output Research/dragon-quest-jp/generated/prg-dictionary-review.md
+```
+
+The reviewed vocabulary covers the contiguous weapon, armor, shield, inventory,
+key-item, and common system-template entries. Its translations remain
+`semantic-probable` until their runtime use is observed; the token identity and
+PRG offsets are static evidence only.
+
 Match captured overlapping CHR staging windows back to stable catalog IDs:
 
 ```sh

@@ -683,3 +683,18 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   static record without a translation. Dynamic player/item substitution still
   requires a separate template matcher. Confidence: `code-confirmed`; the full
   suite contains 59 passing tests.
+
+### PRG dictionary and reviewed vocabulary
+
+- The complete PRG dictionary at `$0858-$0B21` contains 123 stable entries
+  mapped to tokens `$6D-$E7`. The catalog preserves raw bytes, exact PRG
+  offsets, decoded and normalized Japanese, unknown bytes, and suggested
+  categories; 87 entries contain no unknown bytes.
+- A separate reviewed vocabulary layer covers the contiguous weapon, armor,
+  shield, inventory/key-item blocks and the common acquire/find/capacity
+  message fragments. It references catalog IDs and token values rather than
+  duplicating ROM bytes as runtime identity.
+- Vocabulary translations remain `semantic-probable`. Token identity and
+  offsets are static facts, but actual inventory placement and dynamic-template
+  substitution still require runtime validation. Confidence for catalog
+  generation and cross-file validation: `code-confirmed`; 62 tests pass.
