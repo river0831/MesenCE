@@ -160,6 +160,13 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   bytes to stable catalog IDs. Replaying the existing validation trace produces
   exactly one hit, `chr-fc-3397`, from 42 runtime bytes. This confirms the
   catalog identity without comparing rendered pixels or Japanese semantics.
+- A later lightweight capture produced 78 runtime source bytes. Exact catalog
+  matching accounts for all of them: one `chr-fc-3397` hit and two
+  `chr-fc-215b` hits. The latter decodes as
+  `そのほうこうには だれも いない<4F><END>` and is now runtime-confirmed
+  text despite having ranked only `medium` statically. The duplicate means the
+  player attempted to speak twice in a direction without an NPC; it is two
+  occurrences but only one distinct record.
 
 ## Shared compressed-text dictionary
 

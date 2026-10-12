@@ -78,6 +78,8 @@ def match_catalog(
                 continue
             hits.append({
                 "recordId": record["id"],
+                "runtimeStartIndex": index,
+                "runtimeEndExclusive": index + len(needle),
                 "frameStart": window[0].frame,
                 "frameEnd": window[-1].frame,
                 "selector": window[0].selector,
@@ -101,11 +103,19 @@ def main() -> None:
     runtime_bytes = extract_runtime_bytes(load_jsonl(args.trace))
     catalog = json.loads(args.catalog.read_text(encoding="utf-8"))
     hits = match_catalog(runtime_bytes, catalog)
+    covered_indices = {
+        index
+        for hit in hits
+        for index in range(hit["runtimeStartIndex"], hit["runtimeEndExclusive"])
+    }
     payload = {
         "trace": str(args.trace),
         "catalog": str(args.catalog),
         "runtimeByteCount": len(runtime_bytes),
         "hitCount": len(hits),
+        "uniqueRecordCount": len({hit["recordId"] for hit in hits}),
+        "matchedRuntimeByteCount": len(covered_indices),
+        "unmatchedRuntimeByteCount": len(runtime_bytes) - len(covered_indices),
         "hits": hits,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)

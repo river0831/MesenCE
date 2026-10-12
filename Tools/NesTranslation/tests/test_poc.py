@@ -318,6 +318,8 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(len(hits), 1)
         self.assertEqual(hits[0]["ppuStart"], 0x1397)
         self.assertEqual(hits[0]["confidence"], "runtime-confirmed")
+        self.assertEqual(hits[0]["runtimeStartIndex"], 0)
+        self.assertEqual(hits[0]["runtimeEndExclusive"], 3)
 
         broken = list(events)
         broken[6]["ppuAddress"] = 0x1400
