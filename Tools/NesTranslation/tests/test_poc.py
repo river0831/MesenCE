@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -41,6 +42,7 @@ from Tools.NesTranslation.runtime_catalog_match import (
     extract_runtime_bytes,
     match_catalog,
 )
+from Tools.NesTranslation.snapshot_replay import load_snapshots, replay_snapshots
 from Tools.NesTranslation.text_review import load_character_map, render_bytes
 
 
@@ -502,6 +504,50 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(first["ppuBounds"]["height"], 15)
         self.assertEqual(second["ppuBounds"]["y"], 183)
         self.assertEqual(second["ppuBounds"]["height"], 15)
+
+    def test_snapshot_trace_load_and_timed_replay(self) -> None:
+        snapshots = [
+            {
+                "frame": 100,
+                "visible": True,
+                "mode": "visible-translation-snapshot",
+                "items": [{"unitId": "one", "text": "交談"}],
+                "delta": {"appeared": ["one"], "updated": [],
+                          "disappeared": []},
+            },
+            {
+                "frame": 106,
+                "visible": False,
+                "mode": "visible-translation-snapshot",
+                "items": [],
+                "delta": {"appeared": [], "updated": [],
+                          "disappeared": ["one"]},
+            },
+        ]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "snapshots.jsonl"
+            path.write_text(
+                "\n".join(json.dumps(item, ensure_ascii=False) for item in snapshots),
+                encoding="utf-8",
+            )
+            loaded = load_snapshots(path)
+        output = io.StringIO()
+        delays = []
+        replay_snapshots(
+            loaded, output, fps=60.0, speed=2.0, sleep=delays.append
+        )
+        self.assertEqual(delays, [0.05])
+        self.assertEqual(
+            [json.loads(line) for line in output.getvalue().splitlines()],
+            snapshots,
+        )
+
+    def test_snapshot_trace_rejects_non_snapshot_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "snapshots.jsonl"
+            path.write_text('{"frame":1,"items":[]}\n', encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "line 1"):
+                load_snapshots(path)
 
     def test_glyph_provenance_script_contains_catalog_positions(self) -> None:
         catalog = json.loads((

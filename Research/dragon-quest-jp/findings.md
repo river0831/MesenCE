@@ -555,3 +555,15 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - Snapshots now report `appeared`, `updated`, and `disappeared` unit IDs as a
   renderer-optional delta. Tests cover all three transitions; this is
   diagnostic metadata and does not alter current PPU-derived visibility.
+
+### Snapshot capture and replay
+
+- Runtime snapshots can optionally be written as UTF-8 JSONL while Mesen is
+  running. Capture works with or without the external mirror and stores no ROM
+  bytes.
+- A standalone replay command validates the trace and feeds it back to the
+  same companion using recorded frame gaps, with configurable FPS and speed.
+  This makes rendering and lifecycle regressions repeatable without replaying
+  the game interaction.
+- Confidence: `code-confirmed`; 50 automated tests now include trace
+  validation, serialization fidelity, and frame-timed replay.

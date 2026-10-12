@@ -329,8 +329,26 @@ python3 -m Tools.NesTranslation.dialogue_glyph_provenance \
   --translations Research/dragon-quest-jp/database/dialogue-translations.json \
   --character-map Research/dragon-quest-jp/database/character-map.json \
   --external-subtitles \
-  --subtitle-companion Tools/NesTranslation/subtitle_companion_macos.py
+  --subtitle-companion Tools/NesTranslation/subtitle_companion_macos.py \
+  --snapshot-trace Research/dragon-quest-jp/generated/visible-snapshots.jsonl
 ```
+
+`--snapshot-trace` is optional. It records exactly the renderer-independent
+snapshots sent to the companion, including frame numbers and unit deltas. It
+does not contain ROM bytes. The trace can also be recorded without
+`--external-subtitles` when only a diagnostic capture is needed.
+
+Replay a capture without starting Mesen or loading the ROM:
+
+```sh
+python3 -m Tools.NesTranslation.snapshot_replay \
+  --trace Research/dragon-quest-jp/generated/visible-snapshots.jsonl \
+  --subtitle-companion Tools/NesTranslation/subtitle_companion_macos.py \
+  --speed 1
+```
+
+`--speed 2` replays at twice the recorded frame rate. `--fps` defaults to 60
+and can be adjusted for another system or capture convention.
 
 The runtime event router is renderer-independent. The current companion is a
 small AppKit prototype which accepts ordinary JSON subtitle state over stdin;

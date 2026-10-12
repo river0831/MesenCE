@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import ExitStack
 import json
 import subprocess
 import sys
@@ -536,6 +537,7 @@ def run(
     font_source_path: Path | None,
     external_subtitles: bool,
     subtitle_companion_path: Path | None,
+    snapshot_trace_path: Path | None = None,
 ) -> int:
     if display_segments and external_subtitles:
         raise ValueError("choose either in-game or external segment display")
@@ -565,34 +567,51 @@ def run(
             str(mesen), "--enableStdout", "--doNotSaveSettings",
             str(generated), str(rom_path),
         ]
-        if not external_subtitles:
+        if not external_subtitles and snapshot_trace_path is None:
             with subprocess.Popen(command) as process:
                 return process.wait()
 
-        if subtitle_companion_path is None:
+        if external_subtitles and subtitle_companion_path is None:
             raise ValueError("external subtitles require a companion path")
         router = SubtitleEventRouter(translations, database)
-        with subprocess.Popen(
-            ["/usr/bin/python3", str(subtitle_companion_path)],
-            stdin=subprocess.PIPE,
-            text=True,
-        ) as companion, subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        ) as process:
+        if snapshot_trace_path is not None:
+            snapshot_trace_path.parent.mkdir(parents=True, exist_ok=True)
+        with ExitStack() as stack:
+            companion = None
+            if external_subtitles:
+                companion = stack.enter_context(subprocess.Popen(
+                    ["/usr/bin/python3", str(subtitle_companion_path)],
+                    stdin=subprocess.PIPE,
+                    text=True,
+                ))
+            trace_file = (
+                stack.enter_context(snapshot_trace_path.open("w", encoding="utf-8"))
+                if snapshot_trace_path is not None else None
+            )
+            process = stack.enter_context(subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            ))
             assert process.stdout is not None
-            assert companion.stdin is not None
             for line in process.stdout:
                 sys.stdout.write(line)
                 sys.stdout.flush()
                 state = router.consume(line)
-                if state is not None and companion.poll() is None:
-                    companion.stdin.write(json.dumps(state, ensure_ascii=False) + "\n")
+                if state is None:
+                    continue
+                serialized = json.dumps(state, ensure_ascii=False)
+                if trace_file is not None:
+                    trace_file.write(serialized + "\n")
+                    trace_file.flush()
+                if companion is not None and companion.poll() is None:
+                    assert companion.stdin is not None
+                    companion.stdin.write(serialized + "\n")
                     companion.stdin.flush()
-            companion.stdin.close()
+            if companion is not None and companion.stdin is not None:
+                companion.stdin.close()
             return process.wait()
 
 
@@ -609,12 +628,17 @@ def main() -> None:
     parser.add_argument("--font-source", type=Path)
     parser.add_argument("--external-subtitles", action="store_true")
     parser.add_argument("--subtitle-companion", type=Path)
+    parser.add_argument(
+        "--snapshot-trace", type=Path,
+        help="write renderer-independent translation snapshots as JSONL",
+    )
     args = parser.parse_args()
     raise SystemExit(run(
         args.mesen, args.template, args.rom, args.game_database, args.catalog,
         args.translations, args.character_map,
         args.display_segments, args.font_source,
         args.external_subtitles, args.subtitle_companion,
+        args.snapshot_trace,
     ))
 
 
