@@ -16,6 +16,10 @@ from Tools.NesTranslation.dictionary_codec import (
     read_dictionary,
 )
 from Tools.NesTranslation.display import DebugRenderer
+from Tools.NesTranslation.dialogue_overlay import (
+    build_dialogue_overlay,
+    load_translation_spec,
+)
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
 from Tools.NesTranslation.overlay import build_overlay_script
@@ -34,6 +38,9 @@ DATABASE = ROOT / "Research/dragon-quest-jp/database/game-database.json"
 ROM = ROOT / "test_roms/Dragon Quest (Japan).nes"
 TRACE = ROOT / "Research/dragon-quest-jp/traces/main-menu-synthetic.jsonl"
 CHARACTER_MAP = ROOT / "Research/dragon-quest-jp/database/character-map.json"
+DIALOGUE_TRANSLATIONS = (
+    ROOT / "Research/dragon-quest-jp/database/dialogue-translations.json"
+)
 
 
 def prg_byte(cpu_address: int) -> int:
@@ -183,6 +190,43 @@ class DatabaseTests(unittest.TestCase):
         self.assertIn("restoreRatio = 0.80", script)
         self.assertIn("bulkClearThreshold = 8", script)
         self.assertIn("clearWidth = 58", script)
+
+    def test_dialogue_overlay_uses_confirmed_catalog_bytes_and_translation(self) -> None:
+        spec = load_translation_spec(DIALOGUE_TRANSLATIONS)
+        catalog = {
+            "records": [
+                {
+                    "id": item["id"],
+                    "rawHex": "55 62 fc" if index == 0 else "6d fe fc",
+                    "runtime": {"status": "runtime-confirmed"},
+                }
+                for index, item in enumerate(spec["records"])
+            ]
+        }
+        template = (
+            ROOT / "Research/dragon-quest-jp/runtime/dialogue-overlay.lua"
+        ).read_text(encoding="utf-8")
+        script = build_dialogue_overlay(catalog, spec, template)
+        self.assertNotIn("__NES_TRANSLATION_DIALOGUE_CONFIG__", script)
+        self.assertIn('id = "chr-fc-35c8"', script)
+        self.assertIn("raw = { 85, 98, 252 }", script)
+        self.assertIn("这里什么也拿不到。", script)
+        self.assertIn("local visibilityStart = 576", script)
+
+    def test_dialogue_overlay_rejects_unverified_catalog_record(self) -> None:
+        spec = load_translation_spec(DIALOGUE_TRANSLATIONS)
+        catalog = {
+            "records": [
+                {
+                    "id": item["id"],
+                    "rawHex": "fc",
+                    "runtime": {"status": "unverified"},
+                }
+                for item in spec["records"]
+            ]
+        }
+        with self.assertRaisesRegex(DatabaseError, "not runtime-confirmed"):
+            build_dialogue_overlay(catalog, spec, "-- __NES_TRANSLATION_DIALOGUE_CONFIG__")
 
 
 class ReadAnalysisTests(unittest.TestCase):

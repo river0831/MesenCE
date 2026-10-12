@@ -177,6 +177,22 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   unmatched bytes in this capture. This validation does not yet assign meaning
   to the remaining unknown controls in their decoded review text.
 
+### First translated dialogue presentation
+
+- `chr-fc-35c8` and `chr-fc-38a7` form the initial short/long presentation
+  pair. Both must be runtime-confirmed in the generated catalog before the
+  overlay generator accepts them.
+- The runtime adapter recognizes exact raw CHR record suffixes from the same
+  overlapping staging windows used during validation. Japanese text and its
+  translation are presentation data, never identity keys.
+- The tracked translation file stores stable IDs and layout but not raw record
+  bytes. The exact-ROM bytes are injected from the ignored, locally generated
+  validated catalog into a temporary Mesen script.
+- Dialogue visibility is independent of controller input. After a match, the
+  adapter draws while the dialogue Nametable region remains stable and hides
+  after a bulk rewrite of that region. This is provisional until visually
+  tested against opening and dismissing both selected records.
+
 ## Shared compressed-text dictionary
 
 - Entering the empty item path caused a sequential read of physical PRG

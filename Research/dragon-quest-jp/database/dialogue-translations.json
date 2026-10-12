@@ -1,0 +1,35 @@
+{
+  "formatVersion": 1,
+  "language": "zh-Hans",
+  "runtime": {
+    "chrStreamSelectorPc": 50227,
+    "chrWindowSetupPc": 50328,
+    "chrWindowWriterPc": 50363,
+    "scratchFirstAddress": 944,
+    "visibilityStart": 576,
+    "visibilityEndExclusive": 928,
+    "clearWriteThreshold": 8,
+    "hideGraceFrames": 2
+  },
+  "records": [
+    {
+      "id": "chr-fc-35c8",
+      "sourceText": "ここでは なにも とれない",
+      "translation": "这里什么也拿不到。",
+      "lines": ["这里什么也拿不到。"],
+      "box": { "x": 52, "y": 158, "width": 152, "height": 18, "lineHeight": 14 }
+    },
+    {
+      "id": "chr-fc-38a7",
+      "sourceText": "このおしろをでると となりに まちがある。そこでまず武器と防具を買いそろえることだ。たたかいで傷ついたときは、町に戻り宿屋に泊まると傷が回復するだろう。",
+      "translation": "离开这座城堡后，旁边有一座城镇。先在那里备齐武器和防具。战斗中受伤时，回城镇住进旅店，伤势就会恢复。",
+      "lines": [
+        "离开城堡后，旁边有座城镇。",
+        "先在那里备齐武器和防具。",
+        "受伤时回城镇住进旅店，",
+        "伤势就会恢复。"
+      ],
+      "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
+    }
+  ]
+}

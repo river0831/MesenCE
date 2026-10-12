@@ -263,3 +263,20 @@ python3 -m Tools.NesTranslation.catalog_validation \
 This preserves the static ranking while promoting exact runtime hits, recording
 each observation and keeping occurrence count separate from distinct record
 count.
+
+Run the first CHR-source-driven translated dialogue overlay with:
+
+```sh
+python3 -m Tools.NesTranslation.dialogue_overlay \
+  --mesen bin/osx-arm64/Release/osx-arm64/publish/Mesen.app/Contents/MacOS/Mesen \
+  --template Research/dragon-quest-jp/runtime/dialogue-overlay.lua \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --game-database Research/dragon-quest-jp/database/game-database.json \
+  --catalog Research/dragon-quest-jp/generated/dialogue-catalog-validated.json \
+  --translations Research/dragon-quest-jp/database/dialogue-translations.json
+```
+
+The committed translation specification contains only stable IDs, reviewed
+source/translation text, layout, and exact-ROM runtime configuration. Raw CHR
+record bytes are injected from the locally generated catalog into a temporary
+Lua script and are not duplicated in the tracked translation database.
