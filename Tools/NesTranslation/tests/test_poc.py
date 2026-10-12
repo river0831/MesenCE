@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from Tools.NesTranslation.database import DatabaseError, load_database, validate_rom
+from Tools.NesTranslation.dialogue_catalog import build_catalog, render_catalog_review
 from Tools.NesTranslation.analyze_reads import cluster_reads
 from Tools.NesTranslation.chr_records import ines_chr_layout, split_chr_records
 from Tools.NesTranslation.dictionary_codec import (
@@ -250,6 +251,32 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(record.chr_end_exclusive, 0x33C1)
         self.assertTrue(record.raw_hex.startswith("6d 19 e7 22 15 19 11 d7"))
         self.assertTrue(record.raw_hex.endswith("fc"))
+
+    def test_dialogue_catalog_ranks_confirmed_record_without_dropping_bytes(self) -> None:
+        catalog = build_catalog(
+            ROM.read_bytes(),
+            dictionary_start=0x0858,
+            dictionary_end=0x0B21,
+            dictionary_terminator=0xFA,
+            token_base=0x6D,
+            record_terminator=0xFC,
+            character_map=load_character_map(CHARACTER_MAP),
+            modifier_values=frozenset((0xF8,)),
+        )
+        record = next(
+            item for item in catalog["records"] if item["id"] == "chr-fc-3397"
+        )
+        self.assertEqual(record["source"]["chrEndExclusive"], 0x33C1)
+        self.assertEqual(record["evidence"]["likelihood"], "high")
+        self.assertEqual(record["unknownBytes"], [])
+        self.assertEqual(record["decoded"].splitlines()[0], "＊「たびのしたくが できたなら")
+        self.assertEqual(
+            len(bytes.fromhex(record["rawHex"])),
+            record["metrics"]["sourceByteCount"],
+        )
+        review = render_catalog_review(catalog, {"high"})
+        self.assertIn("chr-fc-3397 — high", review)
+        self.assertNotIn("chr-fc-0000", review)
 
     def test_dialogue_decoder_instruction_addresses_match_rom(self) -> None:
         self.assertEqual(

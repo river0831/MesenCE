@@ -201,3 +201,31 @@ python3 -m Tools.NesTranslation.text_review \
   --confidence runtime-confirmed \
   --output Research/dragon-quest-jp/output/dialogue-3397-review.md
 ```
+
+Build a lossless catalog for every bounded `$FC`-terminated CHR record, expand
+dictionary tokens, rank candidates, and emit a combined review:
+
+```sh
+python3 -m Tools.NesTranslation.dialogue_catalog \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --character-map Research/dragon-quest-jp/database/character-map.json \
+  --dictionary-start 0x858 \
+  --dictionary-end 0xb21 \
+  --dictionary-terminator fa \
+  --token-base 6d \
+  --record-terminator fc \
+  --modifier f8 \
+  --control-minimum f0 \
+  --minimum-length 2 \
+  --maximum-length 256 \
+  --catalog-output Research/dragon-quest-jp/generated/dialogue-catalog.json \
+  --review-output Research/dragon-quest-jp/generated/dialogue-candidate-review.md \
+  --review-likelihood high \
+  --review-likelihood medium
+```
+
+The JSON catalog includes low-likelihood records as well: classification never
+discards source or expanded bytes. Scores are review ordering only. CHR bitmap
+data can coincidentally resemble dictionary tokens, so even a `high` record has
+confidence `static-candidate` until runtime reads or another independent source
+cross-validates it.

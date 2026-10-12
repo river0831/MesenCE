@@ -141,6 +141,21 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   `runtime-confirmed` for interpreting RAM `$00B5` as the player name and for
   the complete three-line transcription.
 
+### Batch CHR dialogue catalog
+
+- The reproducible catalog pass analyzes all 547 bounded `$FC`-terminated CHR
+  records instead of selecting only known dialogue ranges.
+- Every entry has a stable offset-derived ID, physical CHR/file range, raw and
+  expanded bytes, decoded review text, unknown-byte list, translation slot,
+  and runtime-validation fields.
+- The current heuristic ranks 174 records `high`, 130 `medium`, and 243 `low`.
+  These labels order review work; they are not assertions that a record is text.
+- The confirmed first-NPC record remains `chr-fc-3397`, has no unknown bytes,
+  and ranks `high` without a special-case address rule.
+- Graphical CHR data can share byte values with dictionary tokens. Therefore
+  the catalog assigns every unobserved result `static-candidate` confidence and
+  requires runtime source reads to measure false positives.
+
 ## Shared compressed-text dictionary
 
 - Entering the empty item path caused a sequential read of physical PRG
