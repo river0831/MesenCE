@@ -31,7 +31,7 @@ from Tools.NesTranslation.dialogue_glyph_provenance import (
     SubtitleEventRouter,
     validate_segments,
 )
-from Tools.NesTranslation.text_units import build_text_units
+from Tools.NesTranslation.text_units import VisibilityUpdate, build_text_units
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
 from Tools.NesTranslation.overlay import build_overlay_script
@@ -389,6 +389,24 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(dialogue.source_start, 0)
         self.assertEqual(dialogue.source_end_exclusive, 22)
         self.assertEqual(dialogue.line_height, 15)
+
+    def test_router_accepts_generic_visibility_updates(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+        )
+        shown = router.apply_visibility(VisibilityUpdate(
+            "label:dq.menu.main", (("dq.menu.main#label-4", 10),)
+        ))
+        self.assertEqual([item["text"] for item in shown["items"]], ["道具"])
+        hidden = router.apply_visibility(VisibilityUpdate(
+            "label:dq.menu.main", ()
+        ))
+        self.assertFalse(hidden["visible"])
+        with self.assertRaisesRegex(ValueError, "outside scope"):
+            router.apply_visibility(VisibilityUpdate(
+                "label:dq.menu.main", (("dq.menu.strength#label-1", 1),)
+            ))
 
     def test_subtitle_router_maps_menu_groups_to_layout_labels(self) -> None:
         router = SubtitleEventRouter(

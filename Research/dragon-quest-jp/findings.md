@@ -607,3 +607,14 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   parses unit ID strings to recover source type or index.
 - This is a database/runtime boundary, not scene recognition. Confidence:
   `code-confirmed`; all 53 tests pass with unchanged snapshot output.
+
+### Unified visibility update contract
+
+- Both current runtime adapters now resolve their native events to a complete
+  scoped `VisibilityUpdate` containing normalized unit IDs and visible counts.
+- The state machine atomically replaces only that scope and rejects unknown
+  scopes or units belonging to another scope. It no longer understands menu
+  label indices or dialogue source ranges.
+- Confidence: `code-confirmed`; 54 tests include direct generic visibility
+  updates, scope isolation, the lifecycle fixture, and existing runtime event
+  adapters.

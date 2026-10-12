@@ -58,6 +58,23 @@ class TextUnit:
         return item
 
 
+@dataclass(frozen=True)
+class VisibilityUpdate:
+    """Complete current visibility for one independently updated source scope."""
+
+    scope_id: str
+    unit_counts: tuple[tuple[str, int], ...]
+
+    def __post_init__(self) -> None:
+        ids = [unit_id for unit_id, _ in self.unit_counts]
+        if not self.scope_id:
+            raise ValueError("visibility scope must not be empty")
+        if len(ids) != len(set(ids)):
+            raise ValueError("visibility update contains duplicate unit IDs")
+        if any(not unit_id or count <= 0 for unit_id, count in self.unit_counts):
+            raise ValueError("visible unit IDs and counts must be positive")
+
+
 def build_text_units(
     translations: dict[str, Any], database: GameDatabase | None = None
 ) -> tuple[TextUnit, ...]:

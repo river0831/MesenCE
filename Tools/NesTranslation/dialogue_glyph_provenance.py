@@ -19,7 +19,7 @@ from .dialogue_overlay import (
     validate_presentation_characters,
 )
 from .text_review import load_character_map
-from .text_units import PpuBounds, TextUnit, build_text_units
+from .text_units import PpuBounds, TextUnit, VisibilityUpdate, build_text_units
 
 
 CONFIG_MARKER = "-- __NES_TRANSLATION_GLYPH_PROVENANCE_CONFIG__"
@@ -157,16 +157,32 @@ class SubtitleEventRouter:
             for unit in units if unit.kind == "dialogue"
         }
         self._visible_units: dict[str, int] = {}
+        self._scope_units = {
+            f"{unit.kind}:{unit.record_id}": {
+                candidate.id for candidate in units
+                if candidate.kind == unit.kind
+                and candidate.record_id == unit.record_id
+            }
+            for unit in units
+        }
         self._last_snapshot_items: dict[str, dict[str, Any]] = {}
         self._frame = 0
 
-    def _clear_record_units(self, record_id: str, dialogue: bool) -> None:
-        for unit_id in tuple(self._visible_units):
-            unit = self._units_by_id[unit_id]
-            if unit.record_id == record_id and (
-                (unit.kind == "dialogue") == dialogue
-            ):
-                del self._visible_units[unit_id]
+    def apply_visibility(self, update: VisibilityUpdate) -> dict[str, Any]:
+        """Replace one source scope with its complete current visible state."""
+        scope_units = self._scope_units.get(update.scope_id)
+        if scope_units is None:
+            raise ValueError(f"unknown visibility scope: {update.scope_id}")
+        counts = dict(update.unit_counts)
+        unknown = counts.keys() - scope_units
+        if unknown:
+            raise ValueError(
+                f"visibility update contains units outside scope: {sorted(unknown)}"
+            )
+        for unit_id in scope_units:
+            self._visible_units.pop(unit_id, None)
+        self._visible_units.update(counts)
+        return self._scene_state()
 
     def _scene_state(self) -> dict[str, Any]:
         items = []
@@ -263,15 +279,21 @@ class SubtitleEventRouter:
                 }
             else:
                 visible = {}
-            self._clear_record_units(record_id, dialogue=False)
+            unit_counts = []
             for index, count in visible.items():
                 unit = self._layout_units.get((record_id, index))
                 if unit is not None:
-                    self._visible_units[unit.id] = count
-            return self._scene_state()
+                    unit_counts.append((unit.id, count))
+            return self.apply_visibility(VisibilityUpdate(
+                scope_id=f"label:{record_id}",
+                unit_counts=tuple(unit_counts),
+            ))
         if event.get("type") == "reset":
-            self._clear_record_units(str(event.get("recordId")), dialogue=True)
-            return self._scene_state()
+            record_id = str(event.get("recordId"))
+            scope_id = f"dialogue:{record_id}"
+            if scope_id not in self._scope_units:
+                return None
+            return self.apply_visibility(VisibilityUpdate(scope_id, ()))
         if event.get("type") == "coverage":
             record = self._records.get(event.get("recordId"))
             if record is None:
@@ -281,7 +303,7 @@ class SubtitleEventRouter:
                 for item in event.get("segments", [])
                 if isinstance(item, dict)
             }
-            self._clear_record_units(record["id"], dialogue=True)
+            unit_counts = []
             for segment in record.get("segments", []):
                 key = (segment["sourceStart"], segment["sourceEndExclusive"])
                 item = coverage_by_range.get(key, {})
@@ -289,8 +311,11 @@ class SubtitleEventRouter:
                 total = segment["sourceEndExclusive"] - segment["sourceStart"]
                 if total > 0 and visible / total >= self._activation_coverage:
                     unit = self._dialogue_units[(record["id"], *key)]
-                    self._visible_units[unit.id] = visible
-            return self._scene_state()
+                    unit_counts.append((unit.id, visible))
+            return self.apply_visibility(VisibilityUpdate(
+                scope_id=f"dialogue:{record['id']}",
+                unit_counts=tuple(unit_counts),
+            ))
         if event.get("type") != "segment":
             return None
         # Retained in the Lua trace for in-frame diagnostics. External

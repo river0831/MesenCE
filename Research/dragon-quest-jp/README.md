@@ -432,6 +432,12 @@ units absent from that snapshot are removed. Menu and dialogue lifetimes are
 therefore derived from current PPU provenance, not controller actions or a
 remembered presentation mode.
 
+Adapters submit this state through one `VisibilityUpdate` contract: a source
+scope plus its complete current `unitId -> visibleCount` set. The generic
+state machine rejects units outside that scope. `DQMENU` indices and
+`DQGLYPH` source ranges are resolved before this boundary and are not part of
+the state machine API.
+
 Every emitted snapshot also includes a diagnostic `delta` with stable unit IDs
 that appeared, changed, or disappeared since the previous snapshot. Renderers
 do not need this field; it exists so visibility and overlap bugs can be traced
