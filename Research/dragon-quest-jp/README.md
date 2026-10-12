@@ -285,3 +285,22 @@ Lua script and are not duplicated in the tracked translation database.
 HUD glyph table so unsupported Chinese characters fail generation instead of
 silently disappearing. Canonical translations remain simplified Chinese;
 `pages[].lines` may use font-compatible traditional presentation glyphs.
+
+Generate and run the diagnostic logical-glyph provenance adapter with:
+
+```sh
+python3 -m Tools.NesTranslation.dialogue_glyph_provenance \
+  --mesen bin/osx-arm64/Release/osx-arm64/publish/Mesen.app/Contents/MacOS/Mesen \
+  --template Research/dragon-quest-jp/runtime/dialogue-glyph-provenance.lua \
+  --rom "test_roms/Dragon Quest (Japan).nes" \
+  --game-database Research/dragon-quest-jp/database/game-database.json \
+  --catalog Research/dragon-quest-jp/generated/dialogue-catalog-validated.json \
+  --translations Research/dragon-quest-jp/database/dialogue-translations.json \
+  --character-map Research/dragon-quest-jp/database/character-map.json
+```
+
+`DQGLYPH visible-ranges` events report the logical source-glyph interval owned
+by each currently tagged Nametable row. Dakuten and other modifiers do not
+advance the logical index. Controls and unknown bytes remain in the catalog but
+are not guessed to be visible glyphs. This is a read-only diagnostic: it does
+not draw translations or modify ROM/emulated memory.

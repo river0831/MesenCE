@@ -389,3 +389,25 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   focus replacement, and strength hide in the tested flow. The threshold is a
   generic adapter policy but still needs validation on dialogue animation and
   other games before it can be considered a universal default.
+
+## Logical glyph provenance prototype
+
+- The next diagnostic layer assigns every catalog glyph a zero-based logical
+  index while preserving its expanded-byte index and original CHR source
+  offset. Modifiers such as `$F8` attach to the preceding glyph and do not
+  advance this index; controls and unknown bytes are retained in the catalog
+  but are not assumed to occupy a visible cell.
+- After a record is identified by its unique CHR prefix, matching glyph values
+  written through the confirmed `$0300` PPU queue receive the record ID and
+  logical index. The tag is installed only when the queued destination/value
+  reaches Nametable RAM. Any unrelated write to that cell clears the old tag.
+- Prefix bytes may reach the Nametable before the full unique prefix is known.
+  The adapter retains those early queue entries and applies their tags
+  retroactively when identity becomes unambiguous.
+- Changed shadow state is summarized as logical `[start, endExclusive)` ranges
+  for each visible Nametable row. This is the input needed to test translation
+  segment selection during dialogue scrolling; it does not yet choose or draw
+  a translated segment.
+- Confidence: `code-confirmed` for logical-index construction and row grouping
+  through automated tests; runtime behavior remains `semantic-probable` until
+  a long scrolling dialogue is captured in Mesen.

@@ -22,6 +22,11 @@ from Tools.NesTranslation.dialogue_overlay import (
     load_translation_spec,
     validate_presentation_characters,
 )
+from Tools.NesTranslation.dialogue_glyph_provenance import (
+    build_script as build_glyph_provenance_script,
+    group_visible_cells,
+    logical_glyphs,
+)
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
 from Tools.NesTranslation.overlay import build_overlay_script
@@ -246,6 +251,47 @@ class DatabaseTests(unittest.TestCase):
 
 
 class ReadAnalysisTests(unittest.TestCase):
+    def test_logical_glyphs_skip_controls_and_collapse_modifier(self) -> None:
+        character_map = load_character_map(CHARACTER_MAP)
+        record = {
+            "tokens": [
+                {"source_offset": 10, "expanded": [0x24, 0xF8]},
+                {"source_offset": 11, "expanded": [0xFE]},
+                {"source_offset": 12, "expanded": [0x19]},
+            ]
+        }
+        glyphs = logical_glyphs(record, character_map)
+        self.assertEqual([glyph.value for glyph in glyphs], [0x24, 0x19])
+        self.assertEqual([glyph.index for glyph in glyphs], [0, 1])
+        self.assertEqual(glyphs[0].source_offset, 10)
+        self.assertEqual(glyphs[1].expanded_index, 3)
+
+    def test_visible_cells_group_into_source_ranges(self) -> None:
+        rows = group_visible_cells([
+            (0x287, "record-a", 20),
+            (0x288, "record-a", 21),
+            (0x2A7, "record-a", 30),
+        ])
+        self.assertEqual(rows[0]["row"], 20)
+        self.assertEqual(rows[0]["start"], 20)
+        self.assertEqual(rows[0]["endExclusive"], 22)
+        self.assertEqual(rows[1]["start"], 30)
+
+    def test_glyph_provenance_script_contains_catalog_positions(self) -> None:
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/dialogue-catalog-validated.json"
+        ).read_text(encoding="utf-8"))
+        translations = json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8"))
+        template = (
+            ROOT / "Research/dragon-quest-jp/runtime/dialogue-glyph-provenance.lua"
+        ).read_text(encoding="utf-8")
+        script = build_glyph_provenance_script(
+            catalog, translations, load_character_map(CHARACTER_MAP), template
+        )
+        self.assertNotIn("__NES_TRANSLATION_GLYPH_PROVENANCE_CONFIG__", script)
+        self.assertIn('id = "chr-fc-38a7"', script)
+        self.assertIn("expandedIndex = 0", script)
+
     def test_character_map_renders_dialogue_and_combines_dakuten(self) -> None:
         character_map = load_character_map(CHARACTER_MAP)
         self.assertEqual(character_map[0xF2]["confidence"], "runtime-confirmed")
