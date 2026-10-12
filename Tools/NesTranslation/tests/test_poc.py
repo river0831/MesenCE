@@ -24,7 +24,6 @@ from Tools.NesTranslation.dialogue_overlay import (
     validate_presentation_characters,
 )
 from Tools.NesTranslation.dialogue_glyph_provenance import (
-    build_text_units,
     build_script as build_glyph_provenance_script,
     group_visible_cells,
     logical_glyphs,
@@ -32,6 +31,7 @@ from Tools.NesTranslation.dialogue_glyph_provenance import (
     SubtitleEventRouter,
     validate_segments,
 )
+from Tools.NesTranslation.text_units import build_text_units
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
 from Tools.NesTranslation.overlay import build_overlay_script
@@ -378,11 +378,14 @@ class ReadAnalysisTests(unittest.TestCase):
             "x": 174, "y": 48, "width": 40, "height": 12,
         })
         self.assertEqual(menu.total_count, 10)
+        self.assertEqual(menu.kind, "label")
+        self.assertEqual(menu.source_index, 4)
         self.assertIsNone(menu.source_start)
 
         dialogue = by_id["chr-fc-38a7#glyph-0-22"]
         self.assertEqual(dialogue.text, "離開城堡後，旁邊有座城鎮。")
         self.assertEqual(dialogue.total_count, 22)
+        self.assertEqual(dialogue.kind, "dialogue")
         self.assertEqual(dialogue.source_start, 0)
         self.assertEqual(dialogue.source_end_exclusive, 22)
         self.assertEqual(dialogue.line_height, 15)

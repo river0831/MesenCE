@@ -8,7 +8,7 @@ import json
 import subprocess
 import sys
 import tempfile
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -19,6 +19,7 @@ from .dialogue_overlay import (
     validate_presentation_characters,
 )
 from .text_review import load_character_map
+from .text_units import PpuBounds, TextUnit, build_text_units
 
 
 CONFIG_MARKER = "-- __NES_TRANSLATION_GLYPH_PROVENANCE_CONFIG__"
@@ -31,104 +32,6 @@ class LogicalGlyph:
     display: str
     expanded_index: int
     source_offset: int
-
-
-@dataclass(frozen=True)
-class PpuBounds:
-    """A renderer-independent rectangle in the NES 256x240 viewport."""
-
-    x: int
-    y: int
-    width: int
-    height: int
-
-    def as_dict(self) -> dict[str, int]:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class TextUnit:
-    """One independently visible translation, regardless of its source kind."""
-
-    id: str
-    record_id: str
-    text: str
-    ppu_bounds: PpuBounds
-    total_count: int
-    font_size: float
-    source_start: int | None = None
-    source_end_exclusive: int | None = None
-    line_count: int = 1
-    line_height: int | None = None
-
-    def snapshot_item(
-        self, visible_count: int, ppu_bounds: PpuBounds | None = None
-    ) -> dict[str, Any]:
-        item: dict[str, Any] = {
-            "unitId": self.id,
-            "recordId": self.record_id,
-            "text": self.text,
-            "ppuBounds": (ppu_bounds or self.ppu_bounds).as_dict(),
-            "visibleCount": visible_count,
-            "totalCount": self.total_count,
-            "visibleRatio": min(visible_count / self.total_count, 1.0),
-            "fontSize": self.font_size,
-        }
-        if self.source_start is not None:
-            item["sourceStart"] = self.source_start
-        if self.source_end_exclusive is not None:
-            item["sourceEndExclusive"] = self.source_end_exclusive
-        return item
-
-
-def build_text_units(
-    translations: dict[str, Any], database: GameDatabase | None = None
-) -> tuple[TextUnit, ...]:
-    """Normalize menu labels and dialogue segments into one read model."""
-    units: list[TextUnit] = []
-    for record in database.records if database else ():
-        if record.presentation is None:
-            continue
-        for index, label in enumerate(record.presentation.labels, 1):
-            total = (
-                ((label.clear.width + 7) // 8)
-                * ((label.clear.height + 7) // 8)
-            )
-            units.append(TextUnit(
-                id=f"{record.id}#label-{index}",
-                record_id=record.id,
-                text=label.text,
-                ppu_bounds=PpuBounds(
-                    label.clear.x, label.clear.y,
-                    label.clear.width, label.clear.height,
-                ),
-                total_count=total,
-                font_size=7.5,
-            ))
-    for record in translations.get("records", []):
-        box = record["box"]
-        for segment in record.get("segments", []):
-            start = segment["sourceStart"]
-            end = segment["sourceEndExclusive"]
-            lines = segment["lines"]
-            units.append(TextUnit(
-                id=f"{record['id']}#glyph-{start}-{end}",
-                record_id=record["id"],
-                text="\n".join(lines),
-                ppu_bounds=PpuBounds(
-                    box["x"], box["y"], box["width"], box["height"]
-                ),
-                total_count=end - start,
-                font_size=8.5,
-                source_start=start,
-                source_end_exclusive=end,
-                line_count=len(lines),
-                line_height=box["lineHeight"],
-            ))
-    ids = [unit.id for unit in units]
-    if len(ids) != len(set(ids)):
-        raise DatabaseError("duplicate normalized text unit id")
-    return tuple(units)
 
 
 def logical_glyphs(
@@ -246,12 +149,12 @@ class SubtitleEventRouter:
         units = build_text_units(translations, database)
         self._units_by_id = {unit.id: unit for unit in units}
         self._layout_units = {
-            (unit.record_id, int(unit.id.rsplit("-", 1)[1])): unit
-            for unit in units if "#label-" in unit.id
+            (unit.record_id, unit.source_index): unit
+            for unit in units if unit.kind == "label"
         }
         self._dialogue_units = {
             (unit.record_id, unit.source_start, unit.source_end_exclusive): unit
-            for unit in units if unit.source_start is not None
+            for unit in units if unit.kind == "dialogue"
         }
         self._visible_units: dict[str, int] = {}
         self._last_snapshot_items: dict[str, dict[str, Any]] = {}
@@ -261,7 +164,7 @@ class SubtitleEventRouter:
         for unit_id in tuple(self._visible_units):
             unit = self._units_by_id[unit_id]
             if unit.record_id == record_id and (
-                (unit.source_start is not None) == dialogue
+                (unit.kind == "dialogue") == dialogue
             ):
                 del self._visible_units[unit_id]
 
@@ -271,7 +174,7 @@ class SubtitleEventRouter:
             (
                 self._units_by_id[unit_id]
                 for unit_id in self._visible_units
-                if self._units_by_id[unit_id].source_start is None
+                if self._units_by_id[unit_id].kind == "label"
             ),
             key=lambda unit: unit.id,
         )
@@ -281,7 +184,7 @@ class SubtitleEventRouter:
         dialogue_by_record: dict[str, list[TextUnit]] = {}
         for unit_id in self._visible_units:
             unit = self._units_by_id[unit_id]
-            if unit.source_start is not None:
+            if unit.kind == "dialogue":
                 dialogue_by_record.setdefault(unit.record_id, []).append(unit)
         for record_id in sorted(dialogue_by_record):
             units = sorted(

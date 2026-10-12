@@ -421,6 +421,11 @@ scene semantics: a unit only describes translated text, PPU-space bounds,
 coverage size, and an optional source interval. The proven Lua collectors
 remain separate input adapters.
 
+The normalized contract lives in `Tools/NesTranslation/text_units.py`, outside
+the Dragon Quest runtime adapter. A unit explicitly declares `kind` (`label`
+or `dialogue`) plus a label source index or dialogue source interval; routing
+does not infer these properties from ID naming conventions.
+
 The router's live state is a single `unitId -> visibleCount` map. Each input
 adapter replaces only the units supported by its latest Nametable snapshot;
 units absent from that snapshot are removed. Menu and dialogue lifetimes are

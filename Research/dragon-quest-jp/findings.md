@@ -597,3 +597,13 @@ resolver. It must not be assumed to mean “hide” for another record or game.
 - The fixture is loaded through the production trace parser and must pass the
   production auditor with zero errors and zero warnings. Confidence:
   `code-confirmed`; the full suite now contains 53 tests.
+
+### Normalized TextUnit contract
+
+- `PpuBounds`, `TextUnit`, and database normalization now live in a standalone
+  module rather than the Dragon Quest glyph-provenance command.
+- Each unit explicitly records whether it is a short label or dialogue unit,
+  with a label source index or dialogue source interval. The router no longer
+  parses unit ID strings to recover source type or index.
+- This is a database/runtime boundary, not scene recognition. Confidence:
+  `code-confirmed`; all 53 tests pass with unchanged snapshot output.
