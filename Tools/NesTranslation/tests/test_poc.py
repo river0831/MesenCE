@@ -419,6 +419,32 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(
             [item["text"] for item in scene["items"]], ["交談", "咒文"]
         )
+        self.assertEqual(scene["delta"], {
+            "appeared": ["dq.menu.main#label-1", "dq.menu.main#label-2"],
+            "updated": [],
+            "disappeared": [],
+        })
+        changed = router.consume(
+            'DQMENU {"type":"group","recordId":"dq.menu.main",'
+            '"cellCount":11,"labels":[{"index":1,"cellCount":5},'
+            '{"index":2,"cellCount":6}]}'
+        )
+        assert changed is not None
+        self.assertEqual(changed["delta"], {
+            "appeared": [],
+            "updated": ["dq.menu.main#label-1"],
+            "disappeared": [],
+        })
+        removed = router.consume(
+            'DQMENU {"type":"group","recordId":"dq.menu.main",'
+            '"cellCount":6,"labels":[{"index":2,"cellCount":6}]}'
+        )
+        assert removed is not None
+        self.assertEqual(removed["delta"], {
+            "appeared": [],
+            "updated": [],
+            "disappeared": ["dq.menu.main#label-1"],
+        })
 
     def test_subtitle_router_composes_menu_and_dialogue_from_current_state(self) -> None:
         router = SubtitleEventRouter(

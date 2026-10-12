@@ -386,3 +386,8 @@ adapter replaces only the units supported by its latest Nametable snapshot;
 units absent from that snapshot are removed. Menu and dialogue lifetimes are
 therefore derived from current PPU provenance, not controller actions or a
 remembered presentation mode.
+
+Every emitted snapshot also includes a diagnostic `delta` with stable unit IDs
+that appeared, changed, or disappeared since the previous snapshot. Renderers
+do not need this field; it exists so visibility and overlap bugs can be traced
+without inferring lifecycle changes from screenshots.

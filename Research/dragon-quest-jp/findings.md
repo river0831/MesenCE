@@ -552,3 +552,6 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   dialogue adapters replace their matching entries from each complete coverage
   event, so the snapshot retains no separate mode or stale subtitle fallback.
   Confidence: `code-confirmed` by the 48 routing tests.
+- Snapshots now report `appeared`, `updated`, and `disappeared` unit IDs as a
+  renderer-optional delta. Tests cover all three transitions; this is
+  diagnostic metadata and does not alter current PPU-derived visibility.

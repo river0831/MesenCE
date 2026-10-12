@@ -253,6 +253,7 @@ class SubtitleEventRouter:
             for unit in units if unit.source_start is not None
         }
         self._visible_units: dict[str, int] = {}
+        self._last_snapshot_items: dict[str, dict[str, Any]] = {}
         self._frame = 0
 
     def _clear_record_units(self, record_id: str, dialogue: bool) -> None:
@@ -296,11 +297,25 @@ class SubtitleEventRouter:
                 bounds = PpuBounds(box.x, next_y, box.width, item_height)
                 items.append(unit.snapshot_item(self._visible_units[unit.id], bounds))
                 next_y += item_height
+        current_items = {item["unitId"]: item for item in items}
+        appeared = sorted(current_items.keys() - self._last_snapshot_items.keys())
+        disappeared = sorted(self._last_snapshot_items.keys() - current_items.keys())
+        updated = sorted(
+            unit_id
+            for unit_id in current_items.keys() & self._last_snapshot_items.keys()
+            if current_items[unit_id] != self._last_snapshot_items[unit_id]
+        )
+        self._last_snapshot_items = current_items
         return {
             "frame": self._frame,
             "visible": bool(items),
             "mode": "visible-translation-snapshot",
             "items": items,
+            "delta": {
+                "appeared": appeared,
+                "updated": updated,
+                "disappeared": disappeared,
+            },
         }
 
     def consume(self, line: str) -> dict[str, Any] | None:
