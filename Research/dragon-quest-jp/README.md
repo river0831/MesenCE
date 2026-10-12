@@ -337,20 +337,19 @@ small AppKit prototype which accepts ordinary JSON subtitle state over stdin;
 it neither embeds game-specific logic nor changes the emulator frame. This
 also removes the Mesen HUD bitmap-font restriction from translated text.
 
-The same external window also accepts `layout` state for short UI text. Known
+The same external window also accepts short UI text. Known
 menu records travel through the existing exact `$0300` PPU-buffer-to-Nametable
 path. Their database labels are normalized from the 256x240 NES coordinate
-space and drawn at corresponding positions in the companion. Dialogue subtitle
-state has priority; when it ends, any still-visible menu layout is restored.
+space and drawn at corresponding positions in the companion. The router emits
+one composed `scene`: every currently sourced menu record and every qualifying
+dialogue interval can be rendered at the same time.
 
 External dialogue selection uses visible coverage rather than the greatest
 glyph index alone. Each runtime snapshot counts sourced Nametable cells inside
-every reviewed alignment interval. An interval activates at 80% coverage and
-remains active while at least one of its cells is visible; intervals with zero
-visible cells are removed from the active set. If scrolling creates a gap in
-which no interval has yet reached the activation threshold, the last committed
-subtitle remains on screen until the next interval replaces it atomically.
-Only the dialogue reset returns presentation to menu layout. Multiple genuinely
-visible source sentences can produce multiple translated lines without
-exposing a later sentence merely because both previously shared one coarse
-record range.
+every reviewed alignment interval. A translation is present exactly while at
+least 25% of that source interval is currently tagged in the shadow Nametable;
+there is no controller-triggered lifetime or remembered subtitle fallback.
+Multiple genuinely visible source sentences can produce multiple translated
+lines without exposing a later sentence merely because both previously shared
+one coarse record range. Rewriting the same tile value to the same cell keeps
+its provenance, since such a redraw does not change the visible state.

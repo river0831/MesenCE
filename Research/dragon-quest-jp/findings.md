@@ -474,13 +474,12 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   `$0300` update buffer -> Nametable path alongside dialogue glyph provenance.
   It emits only record ID and sourced-cell count; presentation text and layout
   continue to come from the database rather than Lua constants.
-- The external router maps visible menu records to all of their translated
-  labels, normalizing the existing 256x240 presentation coordinates for the
-  companion window. It keeps menu and subtitle state separately so dialogue
-  can take priority and the prior visible menu can return afterward.
-- The AppKit companion supports mutually exclusive centered subtitle and
-  position-preserving layout modes. This is `code-confirmed` through event-
-  routing tests and remains `visual-provisional` pending a main-menu run.
+- The external router maps all visible menu records to their translated labels
+  and composes them with current dialogue translations in one scene. Menu and
+  dialogue are no longer mutually exclusive presentation modes.
+- The AppKit companion renders position-preserving labels and a dialogue area
+  concurrently. This is `code-confirmed` through event-routing tests and
+  remains `visual-provisional` pending a combined menu/dialogue run.
 
 ## Visible-coverage dialogue alignment
 
@@ -488,16 +487,15 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   two independently presented Japanese sentences. It has been split into
   `[0, 22)` and `[22, 46)`, with one reviewed Chinese sentence per interval.
 - Runtime coverage snapshots count current sourced Nametable cells for every
-  alignment interval. The external router activates an interval at 80%
-  coverage, keeps it while any of its cells remain visible, and removes it at
-  zero. A visual run exposed a handoff gap when the old interval reached zero
-  before the new interval reached 80%; falling back to menu layout was visibly
-  wrong even though both coverage measurements were accurate. The router now
-  holds the last committed subtitle through that gap and replaces it atomically
-  when the next interval qualifies. Only record reset exits subtitle mode.
+  alignment interval. The external router now derives each scene only from the
+  current snapshot: an interval is included at 25% coverage and omitted below
+  it. It does not retain a previously displayed interval through a handoff.
+- Same-value rewrites at the same Nametable address now preserve both menu and
+  dialogue provenance. This prevents ordinary window redraws from erasing the
+  source identity even though the visible tile did not change.
 - Multiple active intervals are rendered in source order. This implements the
   proposed Nametable-visible-position -> original interval -> translated unit
   mapping without proportionally truncating Chinese characters.
-- Confidence: `code-confirmed` for interval validation, coverage routing,
-  hysteresis, and multi-interval composition; visual result remains
+- Confidence: `code-confirmed` for interval validation, current-state coverage
+  routing, and menu/dialogue composition; visual result remains
   `visual-provisional` pending another long-dialogue run.

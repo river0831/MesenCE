@@ -44,7 +44,7 @@ class SubtitleController(NSObject):
         self.window.setLevel_(3)
         self.window.setBackgroundColor_(NSColor.blackColor())
         self.label = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(20, 12, width - 40, height - 42)
+            NSMakeRect(20, 12, width - 40, 92)
         )
         self.label.setEditable_(False)
         self.label.setSelectable_(False)
@@ -82,11 +82,7 @@ class SubtitleController(NSObject):
         if not command.get("visible"):
             self.label.setStringValue_("")
             return
-        if command.get("mode") == "subtitle":
-            self.label.setStringValue_(command.get("text", ""))
-            self.window.orderFrontRegardless()
-            return
-        self.label.setStringValue_("")
+        self.label.setStringValue_("\n".join(command.get("subtitles", [])))
         bounds = self.window.contentView().bounds()
         for item in command.get("labels", []):
             field = NSTextField.alloc().initWithFrame_(NSMakeRect(

@@ -133,13 +133,17 @@ local function onNametableWrite(address, value)
   local oldLayout = layoutCells[address]
   local newLayout = layoutPending[address]
   if newLayout and newLayout.value == value then
-    layoutCells[address] = newLayout.recordId
+    layoutCells[address] = newLayout
     layoutPending[address] = nil
     layoutDirty[newLayout.recordId] = true
-    if oldLayout and oldLayout ~= newLayout.recordId then layoutDirty[oldLayout] = true end
+    if oldLayout and oldLayout.recordId ~= newLayout.recordId then
+      layoutDirty[oldLayout.recordId] = true
+    end
+  elseif oldLayout and oldLayout.value == value then
+    -- A redraw of the same tile does not change what the Nametable cell means.
   elseif oldLayout then
     layoutCells[address] = nil
-    layoutDirty[oldLayout] = true
+    layoutDirty[oldLayout.recordId] = true
   end
   layoutPending[address] = nil
   -- A later game write owns the cell. Only the exact queued destination/value
@@ -149,17 +153,21 @@ local function onNametableWrite(address, value)
     cells[address] = pending
     pendingUploads[address] = nil
     changed = true
+  elseif cells[address] and cells[address].value == value then
+    -- Preserve provenance when the game redraws an unchanged tile. Window
+    -- refreshes frequently do this without reading the script byte again.
   elseif cells[address] then
     cells[address] = nil
     changed = true
   end
+  pendingUploads[address] = nil
 end
 
 local function emitLayoutGroups()
   for recordId, _ in pairs(layoutDirty) do
     local count = 0
     for _, owner in pairs(layoutCells) do
-      if owner == recordId then count = count + 1 end
+      if owner.recordId == recordId then count = count + 1 end
     end
     print(string.format(
       "DQMENU {\"type\":\"group\",\"frame\":%d,\"recordId\":%s," ..

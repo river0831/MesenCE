@@ -311,9 +311,10 @@ class ReadAnalysisTests(unittest.TestCase):
         partial = router.consume(
             'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
             '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
-            '"visibleCount":10}]}'
+            '"visibleCount":4}]}'
         )
-        self.assertIsNone(partial)
+        assert partial is not None
+        self.assertFalse(partial["visible"])
         shown = router.consume(
             'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
             '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
@@ -322,7 +323,7 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         assert shown is not None
         self.assertTrue(shown["visible"])
-        self.assertEqual(shown["text"], "離開城堡後，旁邊有座城鎮。")
+        self.assertEqual(shown["subtitles"], ["離開城堡後，旁邊有座城鎮。"])
         both = router.consume(
             'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
             '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
@@ -330,21 +331,22 @@ class ReadAnalysisTests(unittest.TestCase):
             '"visibleCount":20}]}'
         )
         assert both is not None
-        self.assertIn("先在那裡備齊武器和防具。", both["text"])
+        self.assertIn("先在那裡備齊武器和防具。", both["subtitles"])
         cleared = router.consume(
             'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
             '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
             '"visibleCount":0},{"sourceStart":22,"sourceEndExclusive":46,'
             '"visibleCount":0}]}'
         )
-        self.assertIsNone(cleared)
+        assert cleared is not None
+        self.assertFalse(cleared["visible"])
         replacement = router.consume(
             'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
             '"segments":[{"sourceStart":46,"sourceEndExclusive":64,'
             '"visibleCount":15}]}'
         )
         assert replacement is not None
-        self.assertEqual(replacement["text"], "戰鬥中受傷時，")
+        self.assertEqual(replacement["subtitles"], ["戰鬥中受傷時，"])
         hidden = router.consume(
             'DQGLYPH {"type":"reset","recordId":"chr-fc-38a7"}'
         )
@@ -361,7 +363,7 @@ class ReadAnalysisTests(unittest.TestCase):
             'DQMENU {"type":"group","recordId":"dq.menu.main","cellCount":113}'
         )
         assert shown is not None
-        self.assertEqual(shown["mode"], "layout")
+        self.assertEqual(shown["mode"], "scene")
         self.assertEqual(len(shown["labels"]), 8)
         self.assertEqual(shown["labels"][3]["text"], "道具")
         hidden = router.consume(
@@ -369,6 +371,39 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         assert hidden is not None
         self.assertFalse(hidden["visible"])
+
+    def test_subtitle_router_composes_menu_and_dialogue_from_current_state(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+        )
+        router.consume(
+            'DQMENU {"type":"group","recordId":"dq.menu.main","cellCount":113}'
+        )
+        scene = router.consume(
+            'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
+            '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
+            '"visibleCount":6},{"sourceStart":22,"sourceEndExclusive":46,'
+            '"visibleCount":0}]}'
+        )
+        assert scene is not None
+        self.assertEqual(len(scene["labels"]), 8)
+        self.assertEqual(scene["subtitles"], ["離開城堡後，旁邊有座城鎮。"])
+        scene = router.consume(
+            'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
+            '"segments":[{"sourceStart":0,"sourceEndExclusive":22,'
+            '"visibleCount":0},{"sourceStart":22,"sourceEndExclusive":46,'
+            '"visibleCount":6}]}'
+        )
+        assert scene is not None
+        self.assertEqual(scene["subtitles"], ["先在那裡備齊武器和防具。"])
+        reset = router.consume(
+            'DQGLYPH {"type":"reset","recordId":"chr-fc-38a7"}'
+        )
+        assert reset is not None
+        self.assertTrue(reset["visible"])
+        self.assertEqual(len(reset["labels"]), 8)
+        self.assertEqual(reset["subtitles"], [])
 
     def test_glyph_provenance_script_contains_catalog_positions(self) -> None:
         catalog = json.loads((
