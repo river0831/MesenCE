@@ -39,7 +39,11 @@ from Tools.NesTranslation.dialogue_glyph_provenance import (
     validate_segments,
 )
 from Tools.NesTranslation.text_units import VisibilityUpdate, build_text_units
-from Tools.NesTranslation.text_run_state import NametableTextRunState, TextRun
+from Tools.NesTranslation.text_run_state import (
+    NametableTextMatcher,
+    NametableTextRunState,
+    TextRun,
+)
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
 from Tools.NesTranslation.overlay import build_overlay_script
@@ -446,6 +450,49 @@ class ReadAnalysisTests(unittest.TestCase):
                 "type": "writes",
                 "runs": [{"row": 20, "startColumn": 31, "hex": "0f10"}],
             })
+
+    def test_incremental_matcher_reconstructs_captured_gold_message(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
+        matcher = NametableTextMatcher(vocabulary, catalog)
+        events = [
+            {"type": "writes", "runs": [{
+                "row": 20, "startColumn": 15, "hex": "010200454e4342",
+            }]},
+            {"type": "writes", "runs": [{
+                "row": 22, "startColumn": 9, "hex": "1c1f0b3319",
+            }]},
+        ]
+        self.assertIsNone(matcher.apply(events[0]))
+        match = matcher.apply(events[1])
+        assert match is not None
+        self.assertEqual(match.text, "獲得了120金幣。")
+        self.assertEqual((match.left, match.top, match.right, match.bottom), (
+            9, 20, 22, 23,
+        ))
+
+    def test_incremental_matcher_waits_for_complete_item_action(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
+        matcher = NametableTextMatcher(vocabulary, catalog)
+        self.assertIsNone(matcher.apply({
+            "type": "writes",
+            "runs": [{"row": 20, "startColumn": 17, "hex": "190b281b"}],
+        }))
+        self.assertIsNone(matcher.apply({
+            "type": "writes",
+            "runs": [{"row": 22, "startColumn": 11, "hex": "291b12"}],
+        }))
+        match = matcher.apply({
+            "type": "writes",
+            "runs": [{"row": 22, "startColumn": 14, "hex": "19"}],
+        })
+        assert match is not None
+        self.assertEqual(match.text, "發現了火把。")
 
     def test_logical_glyphs_skip_controls_and_collapse_modifier(self) -> None:
         character_map = load_character_map(CHARACTER_MAP)
