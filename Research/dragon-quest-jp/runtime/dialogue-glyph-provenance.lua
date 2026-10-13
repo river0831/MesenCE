@@ -130,7 +130,7 @@ local function onChrWindowWrite(address, value)
   consumeSourceByte(value)
 end
 
-local function screenTilePixel(ppuAddress)
+local function screenTilePixel(ppuAddress, currentState)
   local offset = (ppuAddress - 0x2000) % 0x1000
   local within = offset % 0x400
   if within >= 0x3C0 then return nil, nil end
@@ -138,7 +138,7 @@ local function screenTilePixel(ppuAddress)
   local worldX = (nameTable % 2) * 256 + (within % 32) * 8
   local worldY = math.floor(nameTable / 2) * 240 +
     math.floor(within / 32) * 8
-  local state = emu.getState()
+  local state = currentState or emu.getState()
   local temporary = state["ppu.tmpVideoRamAddr"] or 0
   local fineX = state["ppu.xScroll"] or 0
   local scrollX = (temporary & 0x1F) * 8 + fineX
@@ -237,10 +237,13 @@ local function emitPpuRows()
   if not ppuDirty then return end
   if frame - lastPpuEmitFrame < ppuEmitIntervalFrames then return end
   local rows = {}
+  -- Reading emulator state crosses the Lua/core boundary. Reuse one snapshot
+  -- for the entire grid instead of doing that once per Nametable cell.
+  local currentState = emu.getState()
   for row = 0, 29 do rows[row] = {} end
   for address = 0, 0x7BF do
     if address % 0x400 < 0x3C0 then
-      local x, y = screenTilePixel(0x2000 + address)
+      local x, y = screenTilePixel(0x2000 + address, currentState)
       if x and y and x % 8 == 0 and y % 8 == 0 then
         rows[math.floor(y / 8)][math.floor(x / 8)] =
           emu.read(address, emu.memType.nesNametableRam)

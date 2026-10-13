@@ -945,6 +945,7 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("emitPpuRows()", script)
         self.assertIn("ppuEmitIntervalFrames = 6", script)
         self.assertIn("payload ~= lastPpuPayload", script)
+        self.assertIn("screenTilePixel(0x2000 + address, currentState)", script)
         self.assertIn('"DQPPU ', script)
         self.assertNotIn("DQTOKEN", script)
         self.assertNotIn("templateOnly", script)

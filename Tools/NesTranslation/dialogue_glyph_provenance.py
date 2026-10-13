@@ -475,7 +475,10 @@ class SubtitleEventRouter:
             rows = event.get("rows")
             if not isinstance(rows, list):
                 return None
-            self._composed_item = self._nametable_composer.compose(rows)
+            composed_item = self._nametable_composer.compose(rows)
+            if composed_item == self._composed_item:
+                return None
+            self._composed_item = composed_item
             return self._scene_state()
         if marker == menu_marker:
             if event.get("type") != "group":
@@ -812,8 +815,9 @@ def run(
             ))
             assert process.stdout is not None
             for line in process.stdout:
-                sys.stdout.write(line)
-                sys.stdout.flush()
+                if "DQPPU " not in line:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
                 state = router.consume(line)
                 if state is None:
                     continue
