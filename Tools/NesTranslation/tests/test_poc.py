@@ -864,7 +864,15 @@ class ReadAnalysisTests(unittest.TestCase):
             load_database(DATABASE), vocabulary, catalog,
         )
         self.assertIsNone(router.consume(
-            'DQTERM {"type":"source-term","frame":9,"recordId":"dict-a1"}'
+            'DQTERM {"type":"source-term","frame":8,"recordId":"dict-a0"}'
+        ))
+        self.assertIsNone(router.consume(
+            'DQTERM {"type":"source-term","frame":8,"recordId":"dict-a1"}'
+        ))
+        # A later dictionary scan for the action passes another item. It must
+        # not replace the object selected by the earlier scan.
+        self.assertIsNone(router.consume(
+            'DQTERM {"type":"source-term","frame":9,"recordId":"dict-af"}'
         ))
         shown = router.consume(
             'DQGLYPH {"type":"record","frame":10,'

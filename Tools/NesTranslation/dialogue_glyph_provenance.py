@@ -356,7 +356,10 @@ class SubtitleEventRouter:
             if term_id not in self._vocabulary_records:
                 return None
             self._source_terms.append((self._frame, str(term_id)))
-            self._source_terms = self._source_terms[-16:]
+            self._source_terms = [
+                item for item in self._source_terms
+                if self._frame - item[0] <= 120
+            ][-256:]
             if self._active_source_record is None:
                 return None
             changed = self._compose_source_dialogue(self._active_source_record)
@@ -522,17 +525,24 @@ class SubtitleEventRouter:
         max_age = int(runtime.get("objectMaxAgeFrames", 60))
         categories = set(spec.get("objectCategories", []))
         candidates = [
-            self._vocabulary_records[term_id]
-            for term_frame, term_id in reversed(self._source_terms)
+            (term_frame, self._vocabulary_records[term_id])
+            for term_frame, term_id in self._source_terms
             if 0 <= self._frame - term_frame <= max_age
             and self._vocabulary_records[term_id].get("category") in categories
         ]
         if not candidates:
             return False
+        # Dictionary lookup scans entries in order until it reaches the
+        # selected token. A later scan commonly expands the action template
+        # and passes other object words. The object precedes the action in
+        # these compositions, so use the final eligible term from the earliest
+        # scan frame rather than the globally most recent dictionary read.
+        object_frame = min(item[0] for item in candidates)
+        selected = [item[1] for item in candidates if item[0] == object_frame][-1]
         segment = record["segments"][0]
         key = (segment["sourceStart"], segment["sourceEndExclusive"])
         unit = self._dialogue_units[(record_id, *key)]
-        text = str(spec["format"]).replace("{object}", candidates[0]["display"])
+        text = str(spec["format"]).replace("{object}", selected["display"])
         previous = self._dialogue_text_overrides.get(unit.id)
         self._dialogue_text_overrides[unit.id] = text
         return previous != text
