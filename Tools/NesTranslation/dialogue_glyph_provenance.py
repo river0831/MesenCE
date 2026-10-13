@@ -163,6 +163,7 @@ class SubtitleEventRouter:
             vocabulary or {}, dictionary_catalog or {}
         )
         self._dynamic_item: dict[str, Any] | None = None
+        self._source_fallback_records: set[str] = set()
         self._dialogue_units = {
             (unit.record_id, unit.source_start, unit.source_end_exclusive): unit
             for unit in units if unit.kind == "dialogue"
@@ -416,8 +417,26 @@ class SubtitleEventRouter:
                 unit_counts=tuple(unit_counts),
                 unit_bounds=tuple(unit_bounds),
             ))
+        if event.get("type") == "record":
+            record = self._records.get(event.get("recordId"))
+            if record is None:
+                return None
+            # A unique source-byte prefix is already strong evidence that this
+            # dialogue is being rendered. Runtime substitutions (player name,
+            # item name, amounts, etc.) can prevent the fixed glyph sequence
+            # from reaching the coverage threshold, so show the first segment
+            # immediately and let later coverage snapshots refine it.
+            segment = record["segments"][0]
+            key = (segment["sourceStart"], segment["sourceEndExclusive"])
+            unit = self._dialogue_units[(record["id"], *key)]
+            self._source_fallback_records.add(record["id"])
+            return self.apply_visibility(VisibilityUpdate(
+                scope_id=f"dialogue:{record['id']}",
+                unit_counts=((unit.id, unit.total_count),),
+            ))
         if event.get("type") == "reset":
             record_id = str(event.get("recordId"))
+            self._source_fallback_records.discard(record_id)
             scope_id = f"dialogue:{record_id}"
             if scope_id not in self._scope_units:
                 return None
@@ -440,6 +459,13 @@ class SubtitleEventRouter:
                 if total > 0 and visible / total >= self._activation_coverage:
                     unit = self._dialogue_units[(record["id"], *key)]
                     unit_counts.append((unit.id, visible))
+            if not unit_counts and record["id"] in self._source_fallback_records:
+                # Keep the source-record fallback until the Lua lifecycle
+                # emits reset. Partial or variable glyphs must not blank an
+                # otherwise positively identified dialogue.
+                return None
+            if unit_counts:
+                self._source_fallback_records.discard(record["id"])
             return self.apply_visibility(VisibilityUpdate(
                 scope_id=f"dialogue:{record['id']}",
                 unit_counts=tuple(unit_counts),

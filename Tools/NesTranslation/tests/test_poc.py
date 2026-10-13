@@ -854,6 +854,33 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(len(reset["items"]), 8)
         self.assertTrue(all("#label-" in item["unitId"] for item in reset["items"]))
 
+    def test_source_record_fallback_shows_variable_chest_message(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+        )
+        shown = router.consume(
+            'DQGLYPH {"type":"record","frame":10,'
+            '"recordId":"chr-fc-35e7"}'
+        )
+        assert shown is not None
+        self.assertEqual([item["text"] for item in shown["items"]], [
+            "發現了物品。"
+        ])
+        # A variable field can leave exact coverage below threshold. The
+        # positive source match remains authoritative until reset.
+        self.assertIsNone(router.consume(
+            'DQGLYPH {"type":"coverage","frame":11,'
+            '"recordId":"chr-fc-35e7","segments":['
+            '{"sourceStart":0,"sourceEndExclusive":7,"visibleCount":0}]}'
+        ))
+        hidden = router.consume(
+            'DQGLYPH {"type":"reset","frame":30,'
+            '"recordId":"chr-fc-35e7"}'
+        )
+        assert hidden is not None
+        self.assertFalse(hidden["visible"])
+
     def test_snapshot_stacks_visible_dialogue_units_without_overlap(self) -> None:
         router = SubtitleEventRouter(
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
