@@ -29,7 +29,7 @@ local layoutPending = {}
 local layoutCells = {}
 local layoutDirty = {}
 local layoutSourceTtlFrames = 3
-local tokenFrame = {}
+local ppuDirty = false
 
 local function jsonString(value) return string.format("%q", value) end
 
@@ -39,14 +39,6 @@ end
 
 for _, record in ipairs(layoutRecords) do
   emu.addMemoryCallback(function(address, value)
-    if record.emitToken and tokenFrame[record.id] ~= frame then
-      tokenFrame[record.id] = frame
-      print(string.format(
-        "DQTOKEN {\"type\":\"dictionary-token\",\"frame\":%d," ..
-        "\"recordId\":%s}", frame, jsonString(record.id)
-      ))
-    end
-    if record.tokenOnly then return end
     layoutSource = record
     layoutSourceValue = value
     layoutSourceExpires = record.dynamic and frame or
@@ -200,6 +192,7 @@ local function onBufferWrite(address, value)
 end
 
 local function onNametableWrite(address, value)
+  ppuDirty = true
   local oldLayout = layoutCells[address]
   local newLayout = layoutPending[address]
   if newLayout and newLayout.value == value then
@@ -235,6 +228,37 @@ local function onNametableWrite(address, value)
     untaggedWrites[address] = value
   end
   pendingUploads[address] = nil
+end
+
+local function emitPpuRows()
+  if not ppuDirty then return end
+  local rows = {}
+  for row = 0, 29 do rows[row] = {} end
+  for address = 0, 0x7BF do
+    if address % 0x400 < 0x3C0 then
+      local x, y = screenTilePixel(0x2000 + address)
+      if x and y and x % 8 == 0 and y % 8 == 0 then
+        rows[math.floor(y / 8)][math.floor(x / 8)] =
+          emu.read(address, emu.memType.nesNametableRam)
+      end
+    end
+  end
+  local parts = {}
+  for row = 0, 29 do
+    local bytes = {}
+    for column = 0, 31 do
+      table.insert(bytes, string.format("%02x", rows[row][column] or 0))
+    end
+    table.insert(parts, string.format(
+      "{\"row\":%d,\"hex\":%s}", row,
+      jsonString(table.concat(bytes))
+    ))
+  end
+  print(string.format(
+    "DQPPU {\"type\":\"nametable\",\"frame\":%d,\"rows\":[%s]}",
+    frame, table.concat(parts, ",")
+  ))
+  ppuDirty = false
 end
 
 local function propagateCopiedCells()
@@ -422,6 +446,7 @@ end
 local function onEndFrame()
   propagateCopiedCells()
   emitLayoutGroups()
+  emitPpuRows()
   if changed then
     emitVisibleRanges()
     emitSegmentCoverage()

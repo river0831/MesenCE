@@ -127,6 +127,139 @@ def select_segment(
     return None
 
 
+@dataclass(frozen=True)
+class VisibleLexeme:
+    id: str
+    pattern: tuple[int, ...]
+    display: str
+    category: str
+    row: int
+    column: int
+
+
+class NametableTextComposer:
+    """Compose messages solely from text that is currently visible in PPU RAM."""
+
+    _MODIFIERS = frozenset((0xF8, 0xF9))
+
+    def __init__(self, vocabulary: dict[str, Any], catalog: dict[str, Any]):
+        entries = {entry["id"]: entry for entry in catalog.get("entries", [])}
+        self._lexemes: list[dict[str, Any]] = []
+        self._actions: list[dict[str, Any]] = []
+        for record in vocabulary.get("records", []):
+            entry = entries.get(record.get("id"))
+            if entry is None:
+                continue
+            candidate = dict(record)
+            candidate["pattern"] = self._normalize(bytes.fromhex(entry["rawHex"]))
+            self._lexemes.append(candidate)
+            if isinstance(candidate.get("composition"), dict):
+                self._actions.append(candidate)
+        for record in vocabulary.get("ppuLexemes", []):
+            candidate = dict(record)
+            candidate["pattern"] = self._normalize(
+                bytes.fromhex(candidate["sourceHex"])
+            )
+            self._lexemes.append(candidate)
+
+    @classmethod
+    def _normalize(cls, values: Iterable[int]) -> tuple[int, ...]:
+        return tuple(value for value in values if value not in cls._MODIFIERS)
+
+    @staticmethod
+    def _find(row: tuple[int, ...], pattern: tuple[int, ...]) -> list[int]:
+        if not pattern:
+            return []
+        return [
+            column for column in range(len(row) - len(pattern) + 1)
+            if row[column:column + len(pattern)] == pattern
+        ]
+
+    def _visible(self, rows: list[tuple[int, ...]]) -> list[VisibleLexeme]:
+        result = []
+        for record in self._lexemes:
+            pattern = record["pattern"]
+            for row_index, row in enumerate(rows):
+                for column in self._find(row, pattern):
+                    result.append(VisibleLexeme(
+                        id=record["id"], pattern=pattern,
+                        display=record["display"], category=record["category"],
+                        row=row_index, column=column,
+                    ))
+        return result
+
+    @staticmethod
+    def _amount_before(rows: list[tuple[int, ...]], lexeme: VisibleLexeme) -> str:
+        digits = []
+        column = lexeme.column - 1
+        while column >= 0 and 0 <= rows[lexeme.row][column] <= 9:
+            digits.append(str(rows[lexeme.row][column]))
+            column -= 1
+        amount = "".join(reversed(digits)).lstrip("0")
+        return amount or ("0" if digits else "")
+
+    def compose(self, encoded_rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+        rows_by_index: dict[int, tuple[int, ...]] = {}
+        for item in encoded_rows:
+            if not isinstance(item, dict) or not isinstance(item.get("row"), int):
+                continue
+            try:
+                row = tuple(bytes.fromhex(str(item.get("hex", ""))))
+            except ValueError:
+                continue
+            if len(row) == 32:
+                rows_by_index[item["row"]] = row
+        if len(rows_by_index) != 30:
+            return None
+        rows = [rows_by_index[index] for index in range(30)]
+        visible = self._visible(rows)
+        by_id = {record["id"]: record for record in self._actions}
+        actions = [item for item in visible if item.id in by_id]
+        for action in sorted(actions, key=lambda item: (item.row, item.column), reverse=True):
+            spec = by_id[action.id]["composition"]
+            categories = set(spec.get("objectCategories", []))
+            objects = [
+                item for item in visible
+                if item.category in categories
+                and 0 <= action.row - item.row <= int(spec.get("maxRowDistance", 3))
+            ]
+            if categories and not objects:
+                continue
+            object_lexeme = min(
+                objects,
+                key=lambda item: (action.row - item.row, abs(action.column - item.column)),
+                default=None,
+            )
+            amount = (
+                self._amount_before(rows, object_lexeme)
+                if object_lexeme is not None and spec.get("captureAmount") else ""
+            )
+            if spec.get("captureAmount") and not amount:
+                continue
+            text = str(spec["format"])
+            text = text.replace("{object}", object_lexeme.display if object_lexeme else "")
+            text = text.replace("{amount}", amount)
+            matches = [action] + ([object_lexeme] if object_lexeme else [])
+            left = min(item.column for item in matches)
+            right = max(item.column + len(item.pattern) for item in matches)
+            top = min(item.row for item in matches)
+            bottom = max(item.row for item in matches) + 1
+            return {
+                "unitId": "ppu-message:" + action.id,
+                "recordId": action.id,
+                "text": text,
+                "ppuBounds": {
+                    "x": left * 8, "y": top * 8,
+                    "width": (right - left) * 8, "height": (bottom - top) * 8,
+                },
+                "visibleCount": sum(len(item.pattern) for item in matches),
+                "totalCount": sum(len(item.pattern) for item in matches),
+                "visibleRatio": 1.0,
+                "fontSize": 8.5,
+            }
+        return None
+
+
 class SubtitleEventRouter:
     """Project current Nametable provenance into a renderer-agnostic scene."""
 
@@ -135,6 +268,7 @@ class SubtitleEventRouter:
         translations: dict[str, Any],
         database: GameDatabase | None = None,
         vocabulary: dict[str, Any] | None = None,
+        dictionary_catalog: dict[str, Any] | None = None,
         activation_coverage: float = 0.25,
     ):
         if not 0 < activation_coverage <= 1:
@@ -157,15 +291,9 @@ class SubtitleEventRouter:
         self._vocabulary_units = {
             unit.record_id: unit for unit in units if unit.kind == "vocabulary"
         }
-        self._vocabulary_records = {
-            record["id"]: record for record in (vocabulary or {}).get("records", [])
-        }
-        self._template_specs = {
-            record["recordId"]: record
-            for record in translations.get("templates", [])
-        }
-        self._active_template_record: str | None = None
-        self._template_tokens: list[str] = []
+        self._nametable_composer = NametableTextComposer(
+            vocabulary or {}, dictionary_catalog or {}
+        )
         self._composed_item: dict[str, Any] | None = None
         self._dialogue_units = {
             (unit.record_id, unit.source_start, unit.source_end_exclusive): unit
@@ -276,16 +404,18 @@ class SubtitleEventRouter:
             if unit.kind == "dialogue":
                 dialogue_by_record.setdefault(unit.record_id, []).append(unit)
         for record_id in sorted(dialogue_by_record):
-            if (
-                self._composed_item is not None
-                and self._composed_item["recordId"] == record_id
-            ):
-                continue
             units = sorted(
                 dialogue_by_record[record_id],
                 key=lambda unit: unit.source_start or 0,
             )
             box = units[0].ppu_bounds
+            if self._composed_item is not None:
+                bounds = self._composed_item["ppuBounds"]
+                composed_box = PpuBounds(
+                    bounds["x"], bounds["y"], bounds["width"], bounds["height"]
+                )
+                if self._bounds_overlap(box, composed_box):
+                    continue
             units = self._fit_dialogue_units(units, box.height)
             total_height = sum(
                 unit.line_count * (unit.line_height or 0) for unit in units
@@ -322,15 +452,15 @@ class SubtitleEventRouter:
     def consume(self, line: str) -> dict[str, Any] | None:
         glyph_marker = "DQGLYPH "
         menu_marker = "DQMENU "
-        token_marker = "DQTOKEN "
+        ppu_marker = "DQPPU "
         position = line.find(glyph_marker)
         marker = glyph_marker
         if position < 0:
             position = line.find(menu_marker)
             marker = menu_marker
         if position < 0:
-            position = line.find(token_marker)
-            marker = token_marker
+            position = line.find(ppu_marker)
+            marker = ppu_marker
         if position < 0:
             return None
         try:
@@ -339,14 +469,13 @@ class SubtitleEventRouter:
             return None
         if isinstance(event.get("frame"), int):
             self._frame = event["frame"]
-        if marker == token_marker:
-            if event.get("type") != "dictionary-token":
+        if marker == ppu_marker:
+            if event.get("type") != "nametable":
                 return None
-            token_id = str(event.get("recordId"))
-            if token_id not in self._vocabulary_records:
+            rows = event.get("rows")
+            if not isinstance(rows, list):
                 return None
-            self._template_tokens.append(token_id)
-            self._compose_template()
+            self._composed_item = self._nametable_composer.compose(rows)
             return self._scene_state()
         if marker == menu_marker:
             if event.get("type") != "group":
@@ -406,22 +535,11 @@ class SubtitleEventRouter:
             ))
         if event.get("type") == "reset":
             record_id = str(event.get("recordId"))
-            cleared_template = record_id == self._active_template_record
-            if record_id == self._active_template_record:
-                self._active_template_record = None
-                self._template_tokens = []
-                self._composed_item = None
             scope_id = f"dialogue:{record_id}"
             if scope_id not in self._scope_units:
-                return self._scene_state() if cleared_template else None
+                return None
             return self.apply_visibility(VisibilityUpdate(scope_id, ()))
         if event.get("type") == "record":
-            record_id = str(event.get("recordId"))
-            if record_id in self._template_specs:
-                self._active_template_record = record_id
-                self._template_tokens = []
-                self._composed_item = None
-                return self._scene_state()
             return None
         if event.get("type") == "coverage":
             record = self._records.get(event.get("recordId"))
@@ -445,40 +563,6 @@ class SubtitleEventRouter:
                 scope_id=f"dialogue:{record['id']}",
                 unit_counts=tuple(unit_counts),
             ))
-
-    def _compose_template(self) -> None:
-        if self._active_template_record is None:
-            return
-        spec = self._template_specs[self._active_template_record]
-        action_id = spec["actionId"]
-        if action_id not in self._template_tokens:
-            return
-        object_record = next((
-            self._vocabulary_records[token_id]
-            for token_id in reversed(self._template_tokens)
-            if self._vocabulary_records[token_id].get("category")
-            in spec.get("objectCategories", [])
-        ), None)
-        if spec.get("objectCategories") and object_record is None:
-            return
-        text = spec["format"].replace(
-            "{object}", object_record["display"] if object_record else ""
-        )
-        box = spec["box"]
-        self._composed_item = {
-            "unitId": f"template:{self._active_template_record}",
-            "recordId": self._active_template_record,
-            "text": text,
-            "ppuBounds": {
-                "x": box["x"], "y": box["y"],
-                "width": box["width"], "height": box["height"],
-            },
-            "visibleCount": len(self._template_tokens),
-            "totalCount": len(self._template_tokens),
-            "visibleRatio": 1.0,
-            "fontSize": 8.5,
-        }
-
 
 def _lua_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
@@ -552,14 +636,12 @@ def build_config(
                     continue
                 lines.append(
                     "  { id = %s, startAddress = %d, endAddress = %d, "
-                    "dynamic = true, emitToken = true, tokenOnly = %s, "
+                    "dynamic = true, "
                     "labels = {} },"
                     % (
                         _lua_string(word["id"]),
                         database.cpu_address_base + entry["prgStart"],
                         database.cpu_address_base + entry["prgEndExclusive"] - 1,
-                        "true" if word.get("category") == "system-template"
-                        else "false",
                     )
                 )
     lines.extend([
@@ -606,28 +688,6 @@ def build_config(
                 % (glyph.index, glyph.value, glyph.source_offset, glyph.expanded_index)
             )
         lines.extend(["    },", "  },"])
-    translated_ids = {
-        translation.get("id") for translation in translations.get("records", [])
-    }
-    for template_spec in translations.get("templates", []):
-        record_id = template_spec["recordId"]
-        if record_id in translated_ids:
-            continue
-        record = records_by_id.get(record_id)
-        if record is None:
-            raise DatabaseError(f"template references unknown catalog record: {record_id}")
-        raw = bytes.fromhex(record["rawHex"])
-        prefix = shortest_unique_prefix(raw, all_raw)
-        box = template_spec["box"]
-        lines.extend([
-            "  {",
-            f"    id = {_lua_string(record_id)},",
-            "    matchPrefix = { " + ", ".join(map(str, prefix)) + " },",
-            f"    x = {box['x']}, y = {box['y']}, width = {box['width']},",
-            f"    height = {box['height']}, lineHeight = {box['lineHeight']},",
-            "    segments = {}, glyphs = {}, templateOnly = true,",
-            "  },",
-        ])
     lines.append("}")
     return "\n".join(lines)
 
@@ -726,7 +786,9 @@ def run(
 
         if external_subtitles and subtitle_companion_path is None:
             raise ValueError("external subtitles require a companion path")
-        router = SubtitleEventRouter(translations, database, vocabulary)
+        router = SubtitleEventRouter(
+            translations, database, vocabulary, dictionary_catalog=dictionary_catalog
+        )
         if snapshot_trace_path is not None:
             snapshot_trace_path.parent.mkdir(parents=True, exist_ok=True)
         with ExitStack() as stack:

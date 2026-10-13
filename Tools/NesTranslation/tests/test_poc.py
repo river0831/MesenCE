@@ -34,6 +34,7 @@ from Tools.NesTranslation.dialogue_glyph_provenance import (
     build_script as build_glyph_provenance_script,
     group_visible_cells,
     logical_glyphs,
+    NametableTextComposer,
     select_segment,
     SubtitleEventRouter,
     validate_segments,
@@ -600,48 +601,39 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertNotIn("dict-ba#vocabulary", ids)
         self.assertNotIn("dict-bb#vocabulary", ids)
 
-    def test_dynamic_message_composes_item_and_action_tokens(self) -> None:
+    def test_visible_nametable_composes_item_and_action(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
-        router = SubtitleEventRouter(
-            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
-            load_database(DATABASE), vocabulary,
-        )
-        router.consume(
-            'DQGLYPH {"type":"record","frame":1,"recordId":"chr-fc-35e7"}'
-        )
-        router.consume(
-            'DQTOKEN {"type":"dictionary-token","frame":2,"recordId":"dict-a1"}'
-        )
-        scene = router.consume(
-            'DQTOKEN {"type":"dictionary-token","frame":3,"recordId":"dict-bb"}'
-        )
-        assert scene is not None
-        self.assertEqual([item["text"] for item in scene["items"]], ["發現了鑰匙。"])
-        reset = router.consume(
-            'DQGLYPH {"type":"reset","frame":30,"recordId":"chr-fc-35e7"}'
-        )
-        assert reset is not None
-        self.assertFalse(reset["visible"])
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
+        composer = NametableTextComposer(vocabulary, catalog)
+        rows = [bytearray(32) for _ in range(30)]
+        rows[20][5:7] = bytes.fromhex("0f 10")
+        rows[22][7:11] = bytes.fromhex("29 1b 12 19")
+        encoded = [{"row": i, "hex": row.hex()} for i, row in enumerate(rows)]
+        item = composer.compose(encoded)
+        assert item is not None
+        self.assertEqual(item["text"], "發現了鑰匙。")
+        self.assertEqual(item["ppuBounds"], {
+            "x": 40, "y": 160, "width": 48, "height": 24,
+        })
+        empty = [{"row": i, "hex": bytes(32).hex()} for i in range(30)]
+        self.assertIsNone(composer.compose(empty))
 
-    def test_dynamic_gold_message_uses_template_lifecycle(self) -> None:
+    def test_visible_nametable_composes_numeric_currency(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
-        router = SubtitleEventRouter(
-            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
-            load_database(DATABASE), vocabulary,
-        )
-        router.consume(
-            'DQGLYPH {"type":"record","frame":1,"recordId":"chr-fc-35d7"}'
-        )
-        scene = router.consume(
-            'DQTOKEN {"type":"dictionary-token","frame":2,"recordId":"dict-ba"}'
-        )
-        assert scene is not None
-        self.assertEqual([item["text"] for item in scene["items"]], ["獲得了金幣。"])
-        reset = router.consume(
-            'DQGLYPH {"type":"reset","frame":30,"recordId":"chr-fc-35d7"}'
-        )
-        assert reset is not None
-        self.assertFalse(reset["visible"])
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
+        composer = NametableTextComposer(vocabulary, catalog)
+        rows = [bytearray(32) for _ in range(30)]
+        rows[19][4:11] = bytes.fromhex("01 02 00 45 4e 43 42")
+        rows[21][6:11] = bytes.fromhex("1c 1f 0b 33 19")
+        item = composer.compose([
+            {"row": i, "hex": row.hex()} for i, row in enumerate(rows)
+        ])
+        assert item is not None
+        self.assertEqual(item["text"], "獲得了120金幣。")
 
     def test_subtitle_router_maps_menu_groups_to_layout_labels(self) -> None:
         router = SubtitleEventRouter(
@@ -950,10 +942,10 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn('state["ppu.xScroll"]', script)
         self.assertIn('id = "dict-a1"', script)
         self.assertIn("dynamic = true", script)
-        self.assertIn('id = "dict-bb"', script)
-        self.assertIn("emitToken = true, tokenOnly = true", script)
-        self.assertIn('id = "chr-fc-35d7"', script)
-        self.assertIn("templateOnly = true", script)
+        self.assertIn("emitPpuRows()", script)
+        self.assertIn('"DQPPU ', script)
+        self.assertNotIn("DQTOKEN", script)
+        self.assertNotIn("templateOnly", script)
 
     def test_character_map_renders_dialogue_and_combines_dakuten(self) -> None:
         character_map = load_character_map(CHARACTER_MAP)

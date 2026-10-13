@@ -44,7 +44,10 @@
     { "id": "dict-b6", "token": 182, "category": "system-template", "sourceText": "おかねが たりませんが", "translation": "金钱不够", "display": "金錢不夠", "confidence": "semantic-probable" },
     { "id": "dict-b8", "token": 184, "category": "system-template", "sourceText": "どれを", "translation": "选择哪一个", "display": "選擇哪一個", "confidence": "semantic-probable" },
     { "id": "dict-b9", "token": 185, "category": "system-template", "sourceText": "なにを", "translation": "要选择什么", "display": "要選擇什麼", "confidence": "semantic-probable" },
-    { "id": "dict-ba", "token": 186, "category": "system-template", "sourceText": "てにいれた", "translation": "获得了", "display": "獲得了", "confidence": "semantic-probable" },
-    { "id": "dict-bb", "token": 187, "category": "system-template", "sourceText": "みつけた", "translation": "发现了", "display": "發現了", "confidence": "semantic-probable" }
+    { "id": "dict-ba", "token": 186, "category": "system-template", "sourceText": "てにいれた", "translation": "获得了", "display": "獲得了", "confidence": "semantic-probable", "composition": { "objectCategories": ["currency"], "captureAmount": true, "maxRowDistance": 3, "format": "獲得了{amount}{object}。" } },
+    { "id": "dict-bb", "token": 187, "category": "system-template", "sourceText": "みつけた", "translation": "发现了", "display": "發現了", "confidence": "semantic-probable", "composition": { "objectCategories": ["item", "weapon", "armor", "shield"], "maxRowDistance": 3, "format": "發現了{object}。" } }
+  ],
+  "ppuLexemes": [
+    { "id": "currency-gold", "category": "currency", "sourceHex": "45 f8 4e 43 42", "display": "金幣", "confidence": "runtime-visible" }
   ]
 }

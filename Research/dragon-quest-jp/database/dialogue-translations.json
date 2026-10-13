@@ -11,22 +11,6 @@
     "clearWriteThreshold": 8,
     "hideGraceFrames": 2
   },
-  "templates": [
-    {
-      "recordId": "chr-fc-35e7",
-      "actionId": "dict-bb",
-      "objectCategories": ["item"],
-      "format": "發現了{object}。",
-      "box": { "x": 52, "y": 158, "width": 152, "height": 18, "lineHeight": 14 }
-    },
-    {
-      "recordId": "chr-fc-35d7",
-      "actionId": "dict-ba",
-      "objectCategories": [],
-      "format": "獲得了金幣。",
-      "box": { "x": 52, "y": 158, "width": 152, "height": 18, "lineHeight": 14 }
-    }
-  ],
   "records": [
     {
       "id": "chr-fc-35c8",
