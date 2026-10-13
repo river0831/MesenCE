@@ -494,6 +494,41 @@ class ReadAnalysisTests(unittest.TestCase):
         assert match is not None
         self.assertEqual(match.text, "發現了火把。")
 
+    def test_incremental_matcher_allows_reviewed_voicing_tile_variation(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
+        matcher = NametableTextMatcher(vocabulary, catalog)
+        # かぎ is encoded as 0f 10 f8 in source. The modifier marks only the
+        # second visible glyph as variable when the PPU uses a composed tile.
+        self.assertIsNone(matcher.apply({
+            "type": "writes",
+            "runs": [{"row": 20, "startColumn": 17, "hex": "0f9936"}],
+        }))
+        match = matcher.apply({
+            "type": "writes",
+            "runs": [{"row": 22, "startColumn": 11, "hex": "291b1219"}],
+        })
+        assert match is not None
+        self.assertEqual(match.text, "發現了鑰匙。")
+
+    def test_incremental_matcher_does_not_fuzz_unmodified_glyphs(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
+        matcher = NametableTextMatcher(vocabulary, catalog)
+        matcher.apply({
+            "type": "writes",
+            "runs": [{"row": 20, "startColumn": 17, "hex": "990b281b"}],
+        })
+        match = matcher.apply({
+            "type": "writes",
+            "runs": [{"row": 22, "startColumn": 11, "hex": "291b1219"}],
+        })
+        self.assertIsNone(match)
+
     def test_router_projects_and_clears_incremental_message(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
         catalog = json.loads((

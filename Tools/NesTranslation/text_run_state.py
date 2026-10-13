@@ -93,28 +93,50 @@ class NametableTextMatcher:
             if entry is None:
                 continue
             candidate = dict(record)
-            candidate["pattern"] = self._normalize(bytes.fromhex(entry["rawHex"]))
+            pattern, variable_positions = self._pattern(
+                bytes.fromhex(entry["rawHex"])
+            )
+            candidate["pattern"] = pattern
+            candidate["variablePositions"] = variable_positions
             self._lexemes.append(candidate)
             if isinstance(candidate.get("composition"), dict):
                 self._actions[candidate["id"]] = candidate
         for record in vocabulary.get("ppuLexemes", []):
             candidate = dict(record)
-            candidate["pattern"] = self._normalize(
+            pattern, variable_positions = self._pattern(
                 bytes.fromhex(candidate["sourceHex"])
             )
+            candidate["pattern"] = pattern
+            candidate["variablePositions"] = variable_positions
             self._lexemes.append(candidate)
 
     @classmethod
-    def _normalize(cls, values: bytes) -> tuple[int, ...]:
-        return tuple(value for value in values if value not in cls._MODIFIERS)
+    def _pattern(cls, values: bytes) -> tuple[tuple[int, ...], frozenset[int]]:
+        pattern = []
+        variable_positions = set()
+        for value in values:
+            if value in cls._MODIFIERS:
+                if pattern:
+                    variable_positions.add(len(pattern) - 1)
+            else:
+                pattern.append(value)
+        return tuple(pattern), frozenset(variable_positions)
 
     @staticmethod
     def _locations(
-        row: tuple[int | None, ...], pattern: tuple[int, ...]
+        row: tuple[int | None, ...], pattern: tuple[int, ...],
+        variable_positions: frozenset[int] = frozenset(),
     ) -> tuple[int, ...]:
         return tuple(
             column for column in range(len(row) - len(pattern) + 1)
-            if row[column:column + len(pattern)] == pattern
+            if all(
+                row[column + offset] is not None
+                and (
+                    offset in variable_positions
+                    or row[column + offset] == expected
+                )
+                for offset, expected in enumerate(pattern)
+            )
         )
 
     def _visible_lexemes(self, rows: range) -> list[tuple[dict[str, Any], int, int]]:
@@ -122,9 +144,28 @@ class NametableTextMatcher:
         for row_index in rows:
             row = self.state.row(row_index)
             for lexeme in self._lexemes:
-                for column in self._locations(row, lexeme["pattern"]):
+                for column in self._locations(
+                    row, lexeme["pattern"], lexeme["variablePositions"]
+                ):
                     visible.append((lexeme, row_index, column))
         return visible
+
+    def _object_rank(
+        self, item: tuple[dict[str, Any], int, int], action_row: int,
+        action_column: int,
+    ) -> tuple[int, int, int, int]:
+        lexeme, row_index, column = item
+        row = self.state.row(row_index)
+        mismatches = sum(
+            row[column + offset] != expected
+            for offset, expected in enumerate(lexeme["pattern"])
+        )
+        return (
+            mismatches,
+            action_row - row_index,
+            abs(action_column - column),
+            -len(lexeme["pattern"]),
+        )
 
     def apply(self, event: dict[str, Any]) -> VisibleTextMatch | None:
         changed = self.state.apply(event)
@@ -147,13 +188,20 @@ class NametableTextMatcher:
             ]
             if categories and not objects:
                 continue
-            selected = min(
+            ranked = sorted(
                 objects,
-                key=lambda item: (
-                    action_row - item[1], abs(action_column - item[2])
+                key=lambda item: self._object_rank(
+                    item, action_row, action_column
                 ),
-                default=None,
             )
+            selected = ranked[0] if ranked else None
+            if selected is not None and len(ranked) > 1:
+                best_rank = self._object_rank(selected, action_row, action_column)
+                next_rank = self._object_rank(
+                    ranked[1], action_row, action_column
+                )
+                if best_rank == next_rank and selected[0]["id"] != ranked[1][0]["id"]:
+                    continue
             amount = ""
             if selected is not None and spec.get("captureAmount"):
                 _, object_row, object_column = selected
