@@ -600,6 +600,49 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertNotIn("dict-ba#vocabulary", ids)
         self.assertNotIn("dict-bb#vocabulary", ids)
 
+    def test_dynamic_message_composes_item_and_action_tokens(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE), vocabulary,
+        )
+        router.consume(
+            'DQGLYPH {"type":"record","frame":1,"recordId":"chr-fc-35e7"}'
+        )
+        router.consume(
+            'DQTOKEN {"type":"dictionary-token","frame":2,"recordId":"dict-a1"}'
+        )
+        scene = router.consume(
+            'DQTOKEN {"type":"dictionary-token","frame":3,"recordId":"dict-bb"}'
+        )
+        assert scene is not None
+        self.assertEqual([item["text"] for item in scene["items"]], ["發現了鑰匙。"])
+        reset = router.consume(
+            'DQGLYPH {"type":"reset","frame":30,"recordId":"chr-fc-35e7"}'
+        )
+        assert reset is not None
+        self.assertFalse(reset["visible"])
+
+    def test_dynamic_gold_message_uses_template_lifecycle(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE), vocabulary,
+        )
+        router.consume(
+            'DQGLYPH {"type":"record","frame":1,"recordId":"chr-fc-35d7"}'
+        )
+        scene = router.consume(
+            'DQTOKEN {"type":"dictionary-token","frame":2,"recordId":"dict-ba"}'
+        )
+        assert scene is not None
+        self.assertEqual([item["text"] for item in scene["items"]], ["獲得了金幣。"])
+        reset = router.consume(
+            'DQGLYPH {"type":"reset","frame":30,"recordId":"chr-fc-35d7"}'
+        )
+        assert reset is not None
+        self.assertFalse(reset["visible"])
+
     def test_subtitle_router_maps_menu_groups_to_layout_labels(self) -> None:
         router = SubtitleEventRouter(
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
@@ -907,7 +950,10 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn('state["ppu.xScroll"]', script)
         self.assertIn('id = "dict-a1"', script)
         self.assertIn("dynamic = true", script)
-        self.assertNotIn('id = "dict-bb"', script)
+        self.assertIn('id = "dict-bb"', script)
+        self.assertIn("emitToken = true, tokenOnly = true", script)
+        self.assertIn('id = "chr-fc-35d7"', script)
+        self.assertIn("templateOnly = true", script)
 
     def test_character_map_renders_dialogue_and_combines_dakuten(self) -> None:
         character_map = load_character_map(CHARACTER_MAP)

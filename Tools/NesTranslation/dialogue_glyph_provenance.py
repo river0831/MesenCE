@@ -157,6 +157,16 @@ class SubtitleEventRouter:
         self._vocabulary_units = {
             unit.record_id: unit for unit in units if unit.kind == "vocabulary"
         }
+        self._vocabulary_records = {
+            record["id"]: record for record in (vocabulary or {}).get("records", [])
+        }
+        self._template_specs = {
+            record["recordId"]: record
+            for record in translations.get("templates", [])
+        }
+        self._active_template_record: str | None = None
+        self._template_tokens: list[str] = []
+        self._composed_item: dict[str, Any] | None = None
         self._dialogue_units = {
             (unit.record_id, unit.source_start, unit.source_end_exclusive): unit
             for unit in units if unit.kind == "dialogue"
@@ -239,7 +249,7 @@ class SubtitleEventRouter:
 
     def _scene_state(self) -> dict[str, Any]:
         items = []
-        dialogue_visible = any(
+        dialogue_visible = self._composed_item is not None or any(
             self._units_by_id[unit_id].kind == "dialogue"
             for unit_id in self._visible_units
         )
@@ -266,6 +276,11 @@ class SubtitleEventRouter:
             if unit.kind == "dialogue":
                 dialogue_by_record.setdefault(unit.record_id, []).append(unit)
         for record_id in sorted(dialogue_by_record):
+            if (
+                self._composed_item is not None
+                and self._composed_item["recordId"] == record_id
+            ):
+                continue
             units = sorted(
                 dialogue_by_record[record_id],
                 key=lambda unit: unit.source_start or 0,
@@ -281,6 +296,8 @@ class SubtitleEventRouter:
                 bounds = PpuBounds(box.x, next_y, box.width, item_height)
                 items.append(unit.snapshot_item(self._visible_units[unit.id], bounds))
                 next_y += item_height
+        if self._composed_item is not None:
+            items.append(self._composed_item)
         current_items = {item["unitId"]: item for item in items}
         appeared = sorted(current_items.keys() - self._last_snapshot_items.keys())
         disappeared = sorted(self._last_snapshot_items.keys() - current_items.keys())
@@ -305,11 +322,15 @@ class SubtitleEventRouter:
     def consume(self, line: str) -> dict[str, Any] | None:
         glyph_marker = "DQGLYPH "
         menu_marker = "DQMENU "
+        token_marker = "DQTOKEN "
         position = line.find(glyph_marker)
         marker = glyph_marker
         if position < 0:
             position = line.find(menu_marker)
             marker = menu_marker
+        if position < 0:
+            position = line.find(token_marker)
+            marker = token_marker
         if position < 0:
             return None
         try:
@@ -318,6 +339,15 @@ class SubtitleEventRouter:
             return None
         if isinstance(event.get("frame"), int):
             self._frame = event["frame"]
+        if marker == token_marker:
+            if event.get("type") != "dictionary-token":
+                return None
+            token_id = str(event.get("recordId"))
+            if token_id not in self._vocabulary_records:
+                return None
+            self._template_tokens.append(token_id)
+            self._compose_template()
+            return self._scene_state()
         if marker == menu_marker:
             if event.get("type") != "group":
                 return None
@@ -376,10 +406,23 @@ class SubtitleEventRouter:
             ))
         if event.get("type") == "reset":
             record_id = str(event.get("recordId"))
+            cleared_template = record_id == self._active_template_record
+            if record_id == self._active_template_record:
+                self._active_template_record = None
+                self._template_tokens = []
+                self._composed_item = None
             scope_id = f"dialogue:{record_id}"
             if scope_id not in self._scope_units:
-                return None
+                return self._scene_state() if cleared_template else None
             return self.apply_visibility(VisibilityUpdate(scope_id, ()))
+        if event.get("type") == "record":
+            record_id = str(event.get("recordId"))
+            if record_id in self._template_specs:
+                self._active_template_record = record_id
+                self._template_tokens = []
+                self._composed_item = None
+                return self._scene_state()
+            return None
         if event.get("type") == "coverage":
             record = self._records.get(event.get("recordId"))
             if record is None:
@@ -402,11 +445,39 @@ class SubtitleEventRouter:
                 scope_id=f"dialogue:{record['id']}",
                 unit_counts=tuple(unit_counts),
             ))
-        if event.get("type") != "segment":
-            return None
-        # Retained in the Lua trace for in-frame diagnostics. External
-        # presentation is driven by complete visible-coverage snapshots.
-        return None
+
+    def _compose_template(self) -> None:
+        if self._active_template_record is None:
+            return
+        spec = self._template_specs[self._active_template_record]
+        action_id = spec["actionId"]
+        if action_id not in self._template_tokens:
+            return
+        object_record = next((
+            self._vocabulary_records[token_id]
+            for token_id in reversed(self._template_tokens)
+            if self._vocabulary_records[token_id].get("category")
+            in spec.get("objectCategories", [])
+        ), None)
+        if spec.get("objectCategories") and object_record is None:
+            return
+        text = spec["format"].replace(
+            "{object}", object_record["display"] if object_record else ""
+        )
+        box = spec["box"]
+        self._composed_item = {
+            "unitId": f"template:{self._active_template_record}",
+            "recordId": self._active_template_record,
+            "text": text,
+            "ppuBounds": {
+                "x": box["x"], "y": box["y"],
+                "width": box["width"], "height": box["height"],
+            },
+            "visibleCount": len(self._template_tokens),
+            "totalCount": len(self._template_tokens),
+            "visibleRatio": 1.0,
+            "fontSize": 8.5,
+        }
 
 
 def _lua_string(value: str) -> str:
@@ -476,18 +547,19 @@ def build_config(
                 entry["id"]: entry for entry in dictionary_catalog.get("entries", [])
             }
             for word in vocabulary.get("records", []):
-                if word.get("category") == "system-template":
-                    continue
                 entry = entries[word["id"]]
                 if entry["prgEndExclusive"] <= entry["prgStart"]:
                     continue
                 lines.append(
                     "  { id = %s, startAddress = %d, endAddress = %d, "
-                    "dynamic = true, labels = {} },"
+                    "dynamic = true, emitToken = true, tokenOnly = %s, "
+                    "labels = {} },"
                     % (
                         _lua_string(word["id"]),
                         database.cpu_address_base + entry["prgStart"],
                         database.cpu_address_base + entry["prgEndExclusive"] - 1,
+                        "true" if word.get("category") == "system-template"
+                        else "false",
                     )
                 )
     lines.extend([
@@ -534,6 +606,28 @@ def build_config(
                 % (glyph.index, glyph.value, glyph.source_offset, glyph.expanded_index)
             )
         lines.extend(["    },", "  },"])
+    translated_ids = {
+        translation.get("id") for translation in translations.get("records", [])
+    }
+    for template_spec in translations.get("templates", []):
+        record_id = template_spec["recordId"]
+        if record_id in translated_ids:
+            continue
+        record = records_by_id.get(record_id)
+        if record is None:
+            raise DatabaseError(f"template references unknown catalog record: {record_id}")
+        raw = bytes.fromhex(record["rawHex"])
+        prefix = shortest_unique_prefix(raw, all_raw)
+        box = template_spec["box"]
+        lines.extend([
+            "  {",
+            f"    id = {_lua_string(record_id)},",
+            "    matchPrefix = { " + ", ".join(map(str, prefix)) + " },",
+            f"    x = {box['x']}, y = {box['y']}, width = {box['width']},",
+            f"    height = {box['height']}, lineHeight = {box['lineHeight']},",
+            "    segments = {}, glyphs = {}, templateOnly = true,",
+            "  },",
+        ])
     lines.append("}")
     return "\n".join(lines)
 

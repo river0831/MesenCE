@@ -721,3 +721,19 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   configuration, routing, bounds, clearing, overlap replacement, and box
   fitting behavior in 66 tests; corrected runtime behavior remains pending a
   populated-inventory visual run.
+
+### Dynamic message composition prototype
+
+- Dynamic dialogue records now declare data-driven templates that reference a
+  source record, an action dictionary token, optional object categories, and a
+  translated format. Dictionary reads emit semantic token events, but those
+  tokens are ignored unless their matching dialogue source is active.
+- This composes the two treasure variants as `發現了火把。` and `發現了鑰匙。`
+  without rendering `みつけた` as a standalone label. The gold-source prefix
+  is also tracked as a template-only record and currently renders the safe
+  fallback `獲得了金幣。`.
+- The numeric gold amount is not guessed: it is inserted by a separate runtime
+  field rather than a dictionary token, so exact amount recovery remains the
+  next provenance step. Template state is cleared with the dialogue record and
+  cannot persist into menus. Confidence: `code-confirmed` in 68 tests; runtime
+  validation of token ordering remains pending.

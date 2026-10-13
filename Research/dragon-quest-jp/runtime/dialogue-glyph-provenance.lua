@@ -29,6 +29,9 @@ local layoutPending = {}
 local layoutCells = {}
 local layoutDirty = {}
 local layoutSourceTtlFrames = 3
+local tokenFrame = {}
+
+local function jsonString(value) return string.format("%q", value) end
 
 for _, record in ipairs(records) do
   maxPrefixLength = math.max(maxPrefixLength, #record.matchPrefix)
@@ -36,6 +39,14 @@ end
 
 for _, record in ipairs(layoutRecords) do
   emu.addMemoryCallback(function(address, value)
+    if record.emitToken and tokenFrame[record.id] ~= frame then
+      tokenFrame[record.id] = frame
+      print(string.format(
+        "DQTOKEN {\"type\":\"dictionary-token\",\"frame\":%d," ..
+        "\"recordId\":%s}", frame, jsonString(record.id)
+      ))
+    end
+    if record.tokenOnly then return end
     layoutSource = record
     layoutSourceValue = value
     layoutSourceExpires = record.dynamic and frame or
@@ -48,8 +59,6 @@ local function cpuPc()
   local state = emu.getCpuState(emu.cpuType.nes)
   return state.pc or state.PC or 0
 end
-
-local function jsonString(value) return string.format("%q", value) end
 
 local function prefixMatches(prefix)
   if #stream < #prefix then return false end
