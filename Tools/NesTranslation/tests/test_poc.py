@@ -874,8 +874,12 @@ class ReadAnalysisTests(unittest.TestCase):
             '"recordId":"chr-fc-35e7","segments":['
             '{"sourceStart":0,"sourceEndExclusive":7,"visibleCount":0}]}'
         ))
-        hidden = router.consume(
+        self.assertIsNone(router.consume(
             'DQGLYPH {"type":"reset","frame":30,'
+            '"recordId":"chr-fc-35e7","reason":"coverage-timeout"}'
+        ))
+        hidden = router.consume(
+            'DQGLYPH {"type":"reset","frame":31,'
             '"recordId":"chr-fc-35e7"}'
         )
         assert hidden is not None
@@ -1093,6 +1097,8 @@ class ReadAnalysisTests(unittest.TestCase):
             "layoutPending[physicalNametableAddress(candidate.ppuAddress)]",
             script,
         )
+        self.assertIn("candidate.value == layoutSourceValue", script)
+        self.assertIn('\\"reason\\":\\"coverage-timeout\\"', script)
         self.assertIn('id = "dict-a1"', script)
         self.assertIn("dynamic = true", script)
         self.assertNotIn('id = "dict-bb"', script)

@@ -180,7 +180,8 @@ local function onBufferWrite(address, value)
     table.insert(pendingBeforeMatch, candidate)
   end
   local layoutMatches = layoutSource and frame <= layoutSourceExpires and
-    (not layoutSource.dynamic or candidate.value == layoutSourceValue)
+    ((not layoutSource.dynamic and not layoutSourceLabelIndex)
+      or candidate.value == layoutSourceValue)
   if layoutMatches then
     local x, y = screenTilePixel(candidate.ppuAddress)
     local labelIndex = layoutSource.dynamic and 1 or layoutSourceLabelIndex
@@ -495,7 +496,8 @@ local function onEndFrame()
     if not emptySinceFrame then emptySinceFrame = frame end
     if frame - emptySinceFrame >= emptyGraceFrames then
       print(string.format(
-        "DQGLYPH {\"type\":\"reset\",\"frame\":%d,\"recordId\":%s}",
+        "DQGLYPH {\"type\":\"reset\",\"frame\":%d,\"recordId\":%s," ..
+        "\"reason\":\"coverage-timeout\"}",
         frame, jsonString(activeRecord.id)
       ))
       activeRecord = nil

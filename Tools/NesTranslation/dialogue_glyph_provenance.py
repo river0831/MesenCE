@@ -429,13 +429,18 @@ class SubtitleEventRouter:
             segment = record["segments"][0]
             key = (segment["sourceStart"], segment["sourceEndExclusive"])
             unit = self._dialogue_units[(record["id"], *key)]
-            self._source_fallback_records.add(record["id"])
+            self._source_fallback_records = {record["id"]}
             return self.apply_visibility(VisibilityUpdate(
                 scope_id=f"dialogue:{record['id']}",
                 unit_counts=((unit.id, unit.total_count),),
             ))
         if event.get("type") == "reset":
             record_id = str(event.get("recordId"))
+            if (
+                event.get("reason") == "coverage-timeout"
+                and record_id in self._source_fallback_records
+            ):
+                return None
             self._source_fallback_records.discard(record_id)
             scope_id = f"dialogue:{record_id}"
             if scope_id not in self._scope_units:
