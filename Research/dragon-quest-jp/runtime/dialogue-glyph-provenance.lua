@@ -29,6 +29,7 @@ local layoutPending = {}
 local layoutCells = {}
 local layoutDirty = {}
 local layoutSourceTtlFrames = 3
+local textRunWrites = {}
 
 for _, record in ipairs(records) do
   maxPrefixLength = math.max(maxPrefixLength, #record.matchPrefix)
@@ -191,6 +192,10 @@ local function onBufferWrite(address, value)
 end
 
 local function onNametableWrite(address, value)
+  local textAddress = address % 0x400
+  if textAddress >= visibilityStart and textAddress < visibilityEndExclusive then
+    textRunWrites[textAddress] = value
+  end
   local oldLayout = layoutCells[address]
   local newLayout = layoutPending[address]
   if newLayout and newLayout.value == value then
@@ -226,6 +231,41 @@ local function onNametableWrite(address, value)
     untaggedWrites[address] = value
   end
   pendingUploads[address] = nil
+end
+
+local function emitTextRuns()
+  if next(textRunWrites) == nil then return end
+  local addresses = {}
+  for address, _ in pairs(textRunWrites) do table.insert(addresses, address) end
+  table.sort(addresses)
+  local runs = {}
+  local current = nil
+  for _, address in ipairs(addresses) do
+    local row = math.floor(address / 32)
+    local column = address % 32
+    if not current or current.row ~= row
+        or column ~= current.startColumn + #current.values then
+      current = { row = row, startColumn = column, values = {} }
+      table.insert(runs, current)
+    end
+    table.insert(current.values, textRunWrites[address])
+  end
+  local parts = {}
+  for _, run in ipairs(runs) do
+    local bytes = {}
+    for _, value in ipairs(run.values) do
+      table.insert(bytes, string.format("%02x", value))
+    end
+    table.insert(parts, string.format(
+      "{\"row\":%d,\"startColumn\":%d,\"hex\":%s}",
+      run.row, run.startColumn, jsonString(table.concat(bytes))
+    ))
+  end
+  print(string.format(
+    "DQRUN {\"type\":\"writes\",\"frame\":%d,\"runs\":[%s]}",
+    frame, table.concat(parts, ",")
+  ))
+  textRunWrites = {}
 end
 
 local function propagateCopiedCells()
@@ -413,6 +453,7 @@ end
 local function onEndFrame()
   propagateCopiedCells()
   emitLayoutGroups()
+  emitTextRuns()
   if changed then
     emitVisibleRanges()
     emitSegmentCoverage()

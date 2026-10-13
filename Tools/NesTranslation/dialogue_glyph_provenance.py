@@ -578,6 +578,7 @@ def run(
     external_subtitles: bool,
     subtitle_companion_path: Path | None,
     snapshot_trace_path: Path | None = None,
+    text_run_trace_path: Path | None = None,
     dictionary_catalog_path: Path | None = None,
     vocabulary_path: Path | None = None,
 ) -> int:
@@ -626,7 +627,8 @@ def run(
             str(mesen), "--enableStdout", "--doNotSaveSettings",
             str(generated), str(rom_path),
         ]
-        if not external_subtitles and snapshot_trace_path is None:
+        if (not external_subtitles and snapshot_trace_path is None
+                and text_run_trace_path is None):
             with subprocess.Popen(command) as process:
                 return process.wait()
 
@@ -635,6 +637,8 @@ def run(
         router = SubtitleEventRouter(translations, database, vocabulary)
         if snapshot_trace_path is not None:
             snapshot_trace_path.parent.mkdir(parents=True, exist_ok=True)
+        if text_run_trace_path is not None:
+            text_run_trace_path.parent.mkdir(parents=True, exist_ok=True)
         with ExitStack() as stack:
             companion = None
             if external_subtitles:
@@ -647,6 +651,10 @@ def run(
                 stack.enter_context(snapshot_trace_path.open("w", encoding="utf-8"))
                 if snapshot_trace_path is not None else None
             )
+            text_run_file = (
+                stack.enter_context(text_run_trace_path.open("w", encoding="utf-8"))
+                if text_run_trace_path is not None else None
+            )
             process = stack.enter_context(subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
@@ -656,8 +664,13 @@ def run(
             ))
             assert process.stdout is not None
             for line in process.stdout:
-                sys.stdout.write(line)
-                sys.stdout.flush()
+                if line.startswith("DQRUN "):
+                    if text_run_file is not None:
+                        text_run_file.write(line[len("DQRUN "):])
+                        text_run_file.flush()
+                else:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
                 state = router.consume(line)
                 if state is None:
                     continue
@@ -693,13 +706,17 @@ def main() -> None:
         "--snapshot-trace", type=Path,
         help="write renderer-independent translation snapshots as JSONL",
     )
+    parser.add_argument(
+        "--text-run-trace", type=Path,
+        help="write incremental Nametable text-row updates as JSONL",
+    )
     args = parser.parse_args()
     raise SystemExit(run(
         args.mesen, args.template, args.rom, args.game_database, args.catalog,
         args.translations, args.character_map,
         args.display_segments, args.font_source,
         args.external_subtitles, args.subtitle_companion,
-        args.snapshot_trace,
+        args.snapshot_trace, args.text_run_trace,
         args.dictionary_catalog, args.vocabulary,
     ))
 

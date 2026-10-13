@@ -898,6 +898,8 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("emptyGraceFrames = 20", script)
         self.assertNotIn("stableFrames", script)
         self.assertIn("propagateCopiedCells()", script)
+        self.assertIn("emitTextRuns()", script)
+        self.assertIn('DQRUN {\\"type\\":\\"writes\\"', script)
         self.assertIn('\\"type\\":\\"copy\\"', script)
         self.assertIn("delta % 32 == 0", script)
         self.assertIn("assignCell(destination, cell)", script)
