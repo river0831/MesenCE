@@ -30,6 +30,9 @@ local layoutCells = {}
 local layoutDirty = {}
 local layoutSourceTtlFrames = 3
 local ppuDirty = false
+local lastPpuPayload = nil
+local lastPpuEmitFrame = -100
+local ppuEmitIntervalFrames = 6
 
 local function jsonString(value) return string.format("%q", value) end
 
@@ -232,6 +235,7 @@ end
 
 local function emitPpuRows()
   if not ppuDirty then return end
+  if frame - lastPpuEmitFrame < ppuEmitIntervalFrames then return end
   local rows = {}
   for row = 0, 29 do rows[row] = {} end
   for address = 0, 0x7BF do
@@ -254,10 +258,15 @@ local function emitPpuRows()
       jsonString(table.concat(bytes))
     ))
   end
-  print(string.format(
-    "DQPPU {\"type\":\"nametable\",\"frame\":%d,\"rows\":[%s]}",
-    frame, table.concat(parts, ",")
-  ))
+  local payload = table.concat(parts, ",")
+  if payload ~= lastPpuPayload then
+    print(string.format(
+      "DQPPU {\"type\":\"nametable\",\"frame\":%d,\"rows\":[%s]}",
+      frame, payload
+    ))
+    lastPpuPayload = payload
+    lastPpuEmitFrame = frame
+  end
   ppuDirty = false
 end
 

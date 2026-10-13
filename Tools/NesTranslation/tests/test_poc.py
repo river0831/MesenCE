@@ -943,6 +943,8 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn('id = "dict-a1"', script)
         self.assertIn("dynamic = true", script)
         self.assertIn("emitPpuRows()", script)
+        self.assertIn("ppuEmitIntervalFrames = 6", script)
+        self.assertIn("payload ~= lastPpuPayload", script)
         self.assertIn('"DQPPU ', script)
         self.assertNotIn("DQTOKEN", script)
         self.assertNotIn("templateOnly", script)
