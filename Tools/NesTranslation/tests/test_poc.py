@@ -1060,6 +1060,12 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         self.assertIn('state["ppu.tmpVideoRamAddr"]', script)
         self.assertIn('state["ppu.xScroll"]', script)
+        self.assertIn("local function physicalNametableAddress", script)
+        self.assertIn("return ppuAddress % 0x800", script)
+        self.assertIn(
+            "layoutPending[physicalNametableAddress(candidate.ppuAddress)]",
+            script,
+        )
         self.assertIn('id = "dict-a1"', script)
         self.assertIn("dynamic = true", script)
         self.assertNotIn('id = "dict-bb"', script)

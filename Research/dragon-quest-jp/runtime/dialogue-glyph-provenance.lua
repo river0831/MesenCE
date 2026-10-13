@@ -81,12 +81,21 @@ local function assignCell(address, tag)
   cells[address] = tag
 end
 
+local function physicalNametableAddress(ppuAddress)
+  -- Dragon Quest uses vertical mirroring, so CIRAM retains two distinct
+  -- 0x400-byte Nametable pages.  Collapsing this to one page makes buffered
+  -- writes for the second page impossible to pair with the subsequent
+  -- nesNametableRam callback (whose address is in the 0x000-0x7FF domain).
+  return ppuAddress % 0x800
+end
+
 local function alignCandidate(candidate, alreadyUploaded)
   if not activeRecord then return end
   local glyph = activeRecord.glyphs[nextGlyph]
   if not glyph or candidate.value ~= glyph.value then return end
-  local address = candidate.ppuAddress % 0x400
-  if address < visibilityStart or address >= visibilityEndExclusive then return end
+  local address = physicalNametableAddress(candidate.ppuAddress)
+  local within = address % 0x400
+  if within < visibilityStart or within >= visibilityEndExclusive then return end
   local tag = {
     recordId = activeRecord.id,
     glyphIndex = glyph.index,
@@ -184,7 +193,7 @@ local function onBufferWrite(address, value)
         end
       end
     end
-    layoutPending[candidate.ppuAddress % 0x400] = {
+    layoutPending[physicalNametableAddress(candidate.ppuAddress)] = {
       recordId = layoutSource.id,
       labelIndex = labelIndex,
       value = value,
