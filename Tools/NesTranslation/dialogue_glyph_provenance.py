@@ -21,6 +21,7 @@ from .dialogue_overlay import (
 )
 from .text_review import load_character_map
 from .text_units import PpuBounds, TextUnit, VisibilityUpdate, build_text_units
+from .text_run_state import NametableTextMatcher
 
 
 CONFIG_MARKER = "-- __NES_TRANSLATION_GLYPH_PROVENANCE_CONFIG__"
@@ -135,6 +136,7 @@ class SubtitleEventRouter:
         translations: dict[str, Any],
         database: GameDatabase | None = None,
         vocabulary: dict[str, Any] | None = None,
+        dictionary_catalog: dict[str, Any] | None = None,
         activation_coverage: float = 0.25,
     ):
         if not 0 < activation_coverage <= 1:
@@ -157,6 +159,10 @@ class SubtitleEventRouter:
         self._vocabulary_units = {
             unit.record_id: unit for unit in units if unit.kind == "vocabulary"
         }
+        self._text_matcher = NametableTextMatcher(
+            vocabulary or {}, dictionary_catalog or {}
+        )
+        self._dynamic_item: dict[str, Any] | None = None
         self._dialogue_units = {
             (unit.record_id, unit.source_start, unit.source_end_exclusive): unit
             for unit in units if unit.kind == "dialogue"
@@ -239,7 +245,7 @@ class SubtitleEventRouter:
 
     def _scene_state(self) -> dict[str, Any]:
         items = []
-        dialogue_visible = any(
+        dialogue_visible = self._dynamic_item is not None or any(
             self._units_by_id[unit_id].kind == "dialogue"
             for unit_id in self._visible_units
         )
@@ -271,6 +277,13 @@ class SubtitleEventRouter:
                 key=lambda unit: unit.source_start or 0,
             )
             box = units[0].ppu_bounds
+            if self._dynamic_item is not None:
+                bounds = self._dynamic_item["ppuBounds"]
+                dynamic_box = PpuBounds(
+                    bounds["x"], bounds["y"], bounds["width"], bounds["height"]
+                )
+                if self._bounds_overlap(box, dynamic_box):
+                    continue
             units = self._fit_dialogue_units(units, box.height)
             total_height = sum(
                 unit.line_count * (unit.line_height or 0) for unit in units
@@ -281,6 +294,8 @@ class SubtitleEventRouter:
                 bounds = PpuBounds(box.x, next_y, box.width, item_height)
                 items.append(unit.snapshot_item(self._visible_units[unit.id], bounds))
                 next_y += item_height
+        if self._dynamic_item is not None:
+            items.append(self._dynamic_item)
         current_items = {item["unitId"]: item for item in items}
         appeared = sorted(current_items.keys() - self._last_snapshot_items.keys())
         disappeared = sorted(self._last_snapshot_items.keys() - current_items.keys())
@@ -305,11 +320,15 @@ class SubtitleEventRouter:
     def consume(self, line: str) -> dict[str, Any] | None:
         glyph_marker = "DQGLYPH "
         menu_marker = "DQMENU "
+        run_marker = "DQRUN "
         position = line.find(glyph_marker)
         marker = glyph_marker
         if position < 0:
             position = line.find(menu_marker)
             marker = menu_marker
+        if position < 0:
+            position = line.find(run_marker)
+            marker = run_marker
         if position < 0:
             return None
         try:
@@ -318,6 +337,29 @@ class SubtitleEventRouter:
             return None
         if isinstance(event.get("frame"), int):
             self._frame = event["frame"]
+        if marker == run_marker:
+            try:
+                match = self._text_matcher.apply(event)
+            except ValueError:
+                return None
+            dynamic_item = None
+            if match is not None:
+                dynamic_item = {
+                    "unitId": f"ppu-message:{match.action_id}",
+                    "recordId": match.action_id,
+                    "text": match.text,
+                    "ppuBounds": {
+                        "x": match.left * 8, "y": match.top * 8,
+                        "width": (match.right - match.left) * 8,
+                        "height": (match.bottom - match.top) * 8,
+                    },
+                    "visibleCount": 1, "totalCount": 1,
+                    "visibleRatio": 1.0, "fontSize": 8.5,
+                }
+            if dynamic_item == self._dynamic_item:
+                return None
+            self._dynamic_item = dynamic_item
+            return self._scene_state()
         if marker == menu_marker:
             if event.get("type") != "group":
                 return None
@@ -634,7 +676,9 @@ def run(
 
         if external_subtitles and subtitle_companion_path is None:
             raise ValueError("external subtitles require a companion path")
-        router = SubtitleEventRouter(translations, database, vocabulary)
+        router = SubtitleEventRouter(
+            translations, database, vocabulary, dictionary_catalog=dictionary_catalog
+        )
         if snapshot_trace_path is not None:
             snapshot_trace_path.parent.mkdir(parents=True, exist_ok=True)
         if text_run_trace_path is not None:

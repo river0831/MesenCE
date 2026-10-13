@@ -721,3 +721,23 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   configuration, routing, bounds, clearing, overlap replacement, and box
   fitting behavior in 66 tests; corrected runtime behavior remains pending a
   populated-inventory visual run.
+
+### Incremental dynamic-message reconstruction
+
+- Full-screen Nametable polling was rejected after runtime testing because it
+  noticeably slowed emulation. The replacement remains event-driven: actual
+  Nametable writes are grouped into adjacent per-row runs and accumulated in a
+  32-cell shadow row on the host. No PPU scan or periodic timer is involved.
+- A captured treasure sequence confirmed that characters arrive incrementally,
+  typically one tile every two frames. The completed visible rows contained
+  `120` + `ゴールド` above `てにいれた`, and `たいまつ` above `みつけた`.
+  Matching therefore runs against accumulated row state rather than individual
+  write callbacks.
+- Composition is declarative vocabulary data: action lexemes specify accepted
+  object categories, row distance, amount capture, and translated format. The
+  matching engine contains no chest, item, dialogue-record, or button IDs.
+  Clearing the same tile cells removes the match and its translation.
+- The real capture is stored only as ignored generated evidence. Equivalent
+  compact fixtures cover gradual completion, numeric currency, PPU-derived
+  bounds, and clearing behavior in 71 tests. Runtime display validation is the
+  remaining step.

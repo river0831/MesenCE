@@ -130,9 +130,10 @@ class NametableTextMatcher:
         changed = self.state.apply(event)
         if not changed:
             return None
-        first = max(min(changed) - 3, 0)
-        last = max(changed) + 3
-        visible = self._visible_lexemes(range(first, last + 1))
+        # The shadow grid is already in memory; scanning its 30 short rows is
+        # cheap and lets an unrelated write preserve the current match while a
+        # clearing write naturally removes it.
+        visible = self._visible_lexemes(range(30))
         actions = [item for item in visible if item[0]["id"] in self._actions]
         for action, action_row, action_column in sorted(
             actions, key=lambda item: (item[1], item[2]), reverse=True

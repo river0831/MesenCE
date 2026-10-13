@@ -494,6 +494,38 @@ class ReadAnalysisTests(unittest.TestCase):
         assert match is not None
         self.assertEqual(match.text, "發現了火把。")
 
+    def test_router_projects_and_clears_incremental_message(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE), vocabulary, dictionary_catalog=catalog,
+        )
+        self.assertIsNone(router.consume(
+            'DQRUN {"type":"writes","frame":1,"runs":['
+            '{"row":20,"startColumn":17,"hex":"190b281b"}]}'
+        ))
+        shown = router.consume(
+            'DQRUN {"type":"writes","frame":2,"runs":['
+            '{"row":22,"startColumn":11,"hex":"291b1219"}]}'
+        )
+        assert shown is not None
+        self.assertEqual([item["text"] for item in shown["items"]], [
+            "發現了火把。"
+        ])
+        self.assertEqual(shown["items"][0]["ppuBounds"], {
+            "x": 88, "y": 160, "width": 80, "height": 24,
+        })
+        cleared = router.consume(
+            'DQRUN {"type":"writes","frame":3,"runs":['
+            '{"row":20,"startColumn":17,"hex":"5f5f5f5f"},'
+            '{"row":22,"startColumn":11,"hex":"5f5f5f5f"}]}'
+        )
+        assert cleared is not None
+        self.assertFalse(cleared["visible"])
+
     def test_logical_glyphs_skip_controls_and_collapse_modifier(self) -> None:
         character_map = load_character_map(CHARACTER_MAP)
         record = {
