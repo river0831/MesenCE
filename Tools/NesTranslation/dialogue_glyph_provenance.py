@@ -127,139 +127,6 @@ def select_segment(
     return None
 
 
-@dataclass(frozen=True)
-class VisibleLexeme:
-    id: str
-    pattern: tuple[int, ...]
-    display: str
-    category: str
-    row: int
-    column: int
-
-
-class NametableTextComposer:
-    """Compose messages solely from text that is currently visible in PPU RAM."""
-
-    _MODIFIERS = frozenset((0xF8, 0xF9))
-
-    def __init__(self, vocabulary: dict[str, Any], catalog: dict[str, Any]):
-        entries = {entry["id"]: entry for entry in catalog.get("entries", [])}
-        self._lexemes: list[dict[str, Any]] = []
-        self._actions: list[dict[str, Any]] = []
-        for record in vocabulary.get("records", []):
-            entry = entries.get(record.get("id"))
-            if entry is None:
-                continue
-            candidate = dict(record)
-            candidate["pattern"] = self._normalize(bytes.fromhex(entry["rawHex"]))
-            self._lexemes.append(candidate)
-            if isinstance(candidate.get("composition"), dict):
-                self._actions.append(candidate)
-        for record in vocabulary.get("ppuLexemes", []):
-            candidate = dict(record)
-            candidate["pattern"] = self._normalize(
-                bytes.fromhex(candidate["sourceHex"])
-            )
-            self._lexemes.append(candidate)
-
-    @classmethod
-    def _normalize(cls, values: Iterable[int]) -> tuple[int, ...]:
-        return tuple(value for value in values if value not in cls._MODIFIERS)
-
-    @staticmethod
-    def _find(row: tuple[int, ...], pattern: tuple[int, ...]) -> list[int]:
-        if not pattern:
-            return []
-        return [
-            column for column in range(len(row) - len(pattern) + 1)
-            if row[column:column + len(pattern)] == pattern
-        ]
-
-    def _visible(self, rows: list[tuple[int, ...]]) -> list[VisibleLexeme]:
-        result = []
-        for record in self._lexemes:
-            pattern = record["pattern"]
-            for row_index, row in enumerate(rows):
-                for column in self._find(row, pattern):
-                    result.append(VisibleLexeme(
-                        id=record["id"], pattern=pattern,
-                        display=record["display"], category=record["category"],
-                        row=row_index, column=column,
-                    ))
-        return result
-
-    @staticmethod
-    def _amount_before(rows: list[tuple[int, ...]], lexeme: VisibleLexeme) -> str:
-        digits = []
-        column = lexeme.column - 1
-        while column >= 0 and 0 <= rows[lexeme.row][column] <= 9:
-            digits.append(str(rows[lexeme.row][column]))
-            column -= 1
-        amount = "".join(reversed(digits)).lstrip("0")
-        return amount or ("0" if digits else "")
-
-    def compose(self, encoded_rows: list[dict[str, Any]]) -> dict[str, Any] | None:
-        rows_by_index: dict[int, tuple[int, ...]] = {}
-        for item in encoded_rows:
-            if not isinstance(item, dict) or not isinstance(item.get("row"), int):
-                continue
-            try:
-                row = tuple(bytes.fromhex(str(item.get("hex", ""))))
-            except ValueError:
-                continue
-            if len(row) == 32:
-                rows_by_index[item["row"]] = row
-        if len(rows_by_index) != 30:
-            return None
-        rows = [rows_by_index[index] for index in range(30)]
-        visible = self._visible(rows)
-        by_id = {record["id"]: record for record in self._actions}
-        actions = [item for item in visible if item.id in by_id]
-        for action in sorted(actions, key=lambda item: (item.row, item.column), reverse=True):
-            spec = by_id[action.id]["composition"]
-            categories = set(spec.get("objectCategories", []))
-            objects = [
-                item for item in visible
-                if item.category in categories
-                and 0 <= action.row - item.row <= int(spec.get("maxRowDistance", 3))
-            ]
-            if categories and not objects:
-                continue
-            object_lexeme = min(
-                objects,
-                key=lambda item: (action.row - item.row, abs(action.column - item.column)),
-                default=None,
-            )
-            amount = (
-                self._amount_before(rows, object_lexeme)
-                if object_lexeme is not None and spec.get("captureAmount") else ""
-            )
-            if spec.get("captureAmount") and not amount:
-                continue
-            text = str(spec["format"])
-            text = text.replace("{object}", object_lexeme.display if object_lexeme else "")
-            text = text.replace("{amount}", amount)
-            matches = [action] + ([object_lexeme] if object_lexeme else [])
-            left = min(item.column for item in matches)
-            right = max(item.column + len(item.pattern) for item in matches)
-            top = min(item.row for item in matches)
-            bottom = max(item.row for item in matches) + 1
-            return {
-                "unitId": "ppu-message:" + action.id,
-                "recordId": action.id,
-                "text": text,
-                "ppuBounds": {
-                    "x": left * 8, "y": top * 8,
-                    "width": (right - left) * 8, "height": (bottom - top) * 8,
-                },
-                "visibleCount": sum(len(item.pattern) for item in matches),
-                "totalCount": sum(len(item.pattern) for item in matches),
-                "visibleRatio": 1.0,
-                "fontSize": 8.5,
-            }
-        return None
-
-
 class SubtitleEventRouter:
     """Project current Nametable provenance into a renderer-agnostic scene."""
 
@@ -268,7 +135,6 @@ class SubtitleEventRouter:
         translations: dict[str, Any],
         database: GameDatabase | None = None,
         vocabulary: dict[str, Any] | None = None,
-        dictionary_catalog: dict[str, Any] | None = None,
         activation_coverage: float = 0.25,
     ):
         if not 0 < activation_coverage <= 1:
@@ -291,10 +157,6 @@ class SubtitleEventRouter:
         self._vocabulary_units = {
             unit.record_id: unit for unit in units if unit.kind == "vocabulary"
         }
-        self._nametable_composer = NametableTextComposer(
-            vocabulary or {}, dictionary_catalog or {}
-        )
-        self._composed_item: dict[str, Any] | None = None
         self._dialogue_units = {
             (unit.record_id, unit.source_start, unit.source_end_exclusive): unit
             for unit in units if unit.kind == "dialogue"
@@ -377,7 +239,7 @@ class SubtitleEventRouter:
 
     def _scene_state(self) -> dict[str, Any]:
         items = []
-        dialogue_visible = self._composed_item is not None or any(
+        dialogue_visible = any(
             self._units_by_id[unit_id].kind == "dialogue"
             for unit_id in self._visible_units
         )
@@ -409,13 +271,6 @@ class SubtitleEventRouter:
                 key=lambda unit: unit.source_start or 0,
             )
             box = units[0].ppu_bounds
-            if self._composed_item is not None:
-                bounds = self._composed_item["ppuBounds"]
-                composed_box = PpuBounds(
-                    bounds["x"], bounds["y"], bounds["width"], bounds["height"]
-                )
-                if self._bounds_overlap(box, composed_box):
-                    continue
             units = self._fit_dialogue_units(units, box.height)
             total_height = sum(
                 unit.line_count * (unit.line_height or 0) for unit in units
@@ -426,8 +281,6 @@ class SubtitleEventRouter:
                 bounds = PpuBounds(box.x, next_y, box.width, item_height)
                 items.append(unit.snapshot_item(self._visible_units[unit.id], bounds))
                 next_y += item_height
-        if self._composed_item is not None:
-            items.append(self._composed_item)
         current_items = {item["unitId"]: item for item in items}
         appeared = sorted(current_items.keys() - self._last_snapshot_items.keys())
         disappeared = sorted(self._last_snapshot_items.keys() - current_items.keys())
@@ -452,15 +305,11 @@ class SubtitleEventRouter:
     def consume(self, line: str) -> dict[str, Any] | None:
         glyph_marker = "DQGLYPH "
         menu_marker = "DQMENU "
-        ppu_marker = "DQPPU "
         position = line.find(glyph_marker)
         marker = glyph_marker
         if position < 0:
             position = line.find(menu_marker)
             marker = menu_marker
-        if position < 0:
-            position = line.find(ppu_marker)
-            marker = ppu_marker
         if position < 0:
             return None
         try:
@@ -469,17 +318,6 @@ class SubtitleEventRouter:
             return None
         if isinstance(event.get("frame"), int):
             self._frame = event["frame"]
-        if marker == ppu_marker:
-            if event.get("type") != "nametable":
-                return None
-            rows = event.get("rows")
-            if not isinstance(rows, list):
-                return None
-            composed_item = self._nametable_composer.compose(rows)
-            if composed_item == self._composed_item:
-                return None
-            self._composed_item = composed_item
-            return self._scene_state()
         if marker == menu_marker:
             if event.get("type") != "group":
                 return None
@@ -542,8 +380,6 @@ class SubtitleEventRouter:
             if scope_id not in self._scope_units:
                 return None
             return self.apply_visibility(VisibilityUpdate(scope_id, ()))
-        if event.get("type") == "record":
-            return None
         if event.get("type") == "coverage":
             record = self._records.get(event.get("recordId"))
             if record is None:
@@ -566,6 +402,12 @@ class SubtitleEventRouter:
                 scope_id=f"dialogue:{record['id']}",
                 unit_counts=tuple(unit_counts),
             ))
+        if event.get("type") != "segment":
+            return None
+        # Retained in the Lua trace for in-frame diagnostics. External
+        # presentation is driven by complete visible-coverage snapshots.
+        return None
+
 
 def _lua_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
@@ -634,13 +476,14 @@ def build_config(
                 entry["id"]: entry for entry in dictionary_catalog.get("entries", [])
             }
             for word in vocabulary.get("records", []):
+                if word.get("category") == "system-template":
+                    continue
                 entry = entries[word["id"]]
                 if entry["prgEndExclusive"] <= entry["prgStart"]:
                     continue
                 lines.append(
                     "  { id = %s, startAddress = %d, endAddress = %d, "
-                    "dynamic = true, "
-                    "labels = {} },"
+                    "dynamic = true, labels = {} },"
                     % (
                         _lua_string(word["id"]),
                         database.cpu_address_base + entry["prgStart"],
@@ -789,9 +632,7 @@ def run(
 
         if external_subtitles and subtitle_companion_path is None:
             raise ValueError("external subtitles require a companion path")
-        router = SubtitleEventRouter(
-            translations, database, vocabulary, dictionary_catalog=dictionary_catalog
-        )
+        router = SubtitleEventRouter(translations, database, vocabulary)
         if snapshot_trace_path is not None:
             snapshot_trace_path.parent.mkdir(parents=True, exist_ok=True)
         with ExitStack() as stack:
@@ -815,9 +656,8 @@ def run(
             ))
             assert process.stdout is not None
             for line in process.stdout:
-                if "DQPPU " not in line:
-                    sys.stdout.write(line)
-                    sys.stdout.flush()
+                sys.stdout.write(line)
+                sys.stdout.flush()
                 state = router.consume(line)
                 if state is None:
                     continue

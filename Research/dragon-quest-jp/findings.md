@@ -721,22 +721,3 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   configuration, routing, bounds, clearing, overlap replacement, and box
   fitting behavior in 66 tests; corrected runtime behavior remains pending a
   populated-inventory visual run.
-
-### Visible Nametable message composition prototype
-
-- Runtime testing disproved dictionary reads as a reliable message signal. The
-  game scans many dictionary entries together, so a read callback reports words
-  that were never selected or drawn. Those callbacks and source-record-specific
-  treasure templates have been removed from message composition.
-- The runtime now publishes the current 32-by-30 visible Nametable tile grid
-  after PPU writes. A generic host-side matcher finds reviewed lexemes directly
-  in that grid, combines nearby object/action lexemes, and derives output bounds
-  from their tile coordinates. Clearing or overwriting the tiles removes the
-  composed translation without a button or timer rule.
-- Numbers are recovered from adjacent digit tiles. Thus `120` + `ゴールド` +
-  `てにいれた` can produce `獲得了120金幣。`; an item name + `みつけた` can
-  produce its corresponding discovery message. The engine contains no chest,
-  item ID, dialogue record ID, or fixed dialogue rectangle. Game-specific data
-  is limited to reviewed tile lexemes and declarative grammar metadata.
-- Confidence: `code-confirmed` by synthetic PPU-grid tests; runtime validation
-  of actual Dragon Quest tile rows remains pending.

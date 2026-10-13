@@ -29,12 +29,6 @@ local layoutPending = {}
 local layoutCells = {}
 local layoutDirty = {}
 local layoutSourceTtlFrames = 3
-local ppuDirty = false
-local lastPpuPayload = nil
-local lastPpuEmitFrame = -100
-local ppuEmitIntervalFrames = 6
-
-local function jsonString(value) return string.format("%q", value) end
 
 for _, record in ipairs(records) do
   maxPrefixLength = math.max(maxPrefixLength, #record.matchPrefix)
@@ -54,6 +48,8 @@ local function cpuPc()
   local state = emu.getCpuState(emu.cpuType.nes)
   return state.pc or state.PC or 0
 end
+
+local function jsonString(value) return string.format("%q", value) end
 
 local function prefixMatches(prefix)
   if #stream < #prefix then return false end
@@ -130,7 +126,7 @@ local function onChrWindowWrite(address, value)
   consumeSourceByte(value)
 end
 
-local function screenTilePixel(ppuAddress, currentState)
+local function screenTilePixel(ppuAddress)
   local offset = (ppuAddress - 0x2000) % 0x1000
   local within = offset % 0x400
   if within >= 0x3C0 then return nil, nil end
@@ -138,7 +134,7 @@ local function screenTilePixel(ppuAddress, currentState)
   local worldX = (nameTable % 2) * 256 + (within % 32) * 8
   local worldY = math.floor(nameTable / 2) * 240 +
     math.floor(within / 32) * 8
-  local state = currentState or emu.getState()
+  local state = emu.getState()
   local temporary = state["ppu.tmpVideoRamAddr"] or 0
   local fineX = state["ppu.xScroll"] or 0
   local scrollX = (temporary & 0x1F) * 8 + fineX
@@ -195,7 +191,6 @@ local function onBufferWrite(address, value)
 end
 
 local function onNametableWrite(address, value)
-  ppuDirty = true
   local oldLayout = layoutCells[address]
   local newLayout = layoutPending[address]
   if newLayout and newLayout.value == value then
@@ -231,46 +226,6 @@ local function onNametableWrite(address, value)
     untaggedWrites[address] = value
   end
   pendingUploads[address] = nil
-end
-
-local function emitPpuRows()
-  if not ppuDirty then return end
-  if frame - lastPpuEmitFrame < ppuEmitIntervalFrames then return end
-  local rows = {}
-  -- Reading emulator state crosses the Lua/core boundary. Reuse one snapshot
-  -- for the entire grid instead of doing that once per Nametable cell.
-  local currentState = emu.getState()
-  for row = 0, 29 do rows[row] = {} end
-  for address = 0, 0x7BF do
-    if address % 0x400 < 0x3C0 then
-      local x, y = screenTilePixel(0x2000 + address, currentState)
-      if x and y and x % 8 == 0 and y % 8 == 0 then
-        rows[math.floor(y / 8)][math.floor(x / 8)] =
-          emu.read(address, emu.memType.nesNametableRam)
-      end
-    end
-  end
-  local parts = {}
-  for row = 0, 29 do
-    local bytes = {}
-    for column = 0, 31 do
-      table.insert(bytes, string.format("%02x", rows[row][column] or 0))
-    end
-    table.insert(parts, string.format(
-      "{\"row\":%d,\"hex\":%s}", row,
-      jsonString(table.concat(bytes))
-    ))
-  end
-  local payload = table.concat(parts, ",")
-  if payload ~= lastPpuPayload then
-    print(string.format(
-      "DQPPU {\"type\":\"nametable\",\"frame\":%d,\"rows\":[%s]}",
-      frame, payload
-    ))
-    lastPpuPayload = payload
-    lastPpuEmitFrame = frame
-  end
-  ppuDirty = false
 end
 
 local function propagateCopiedCells()
@@ -458,7 +413,6 @@ end
 local function onEndFrame()
   propagateCopiedCells()
   emitLayoutGroups()
-  emitPpuRows()
   if changed then
     emitVisibleRanges()
     emitSegmentCoverage()
