@@ -164,6 +164,12 @@ class SubtitleEventRouter:
         )
         self._dynamic_item: dict[str, Any] | None = None
         self._source_fallback_records: set[str] = set()
+        self._active_source_record: str | None = None
+        self._source_terms: list[tuple[int, str]] = []
+        self._dialogue_text_overrides: dict[str, str] = {}
+        self._vocabulary_records = {
+            record["id"]: record for record in (vocabulary or {}).get("records", [])
+        }
         self._dialogue_units = {
             (unit.record_id, unit.source_start, unit.source_end_exclusive): unit
             for unit in units if unit.kind == "dialogue"
@@ -293,7 +299,10 @@ class SubtitleEventRouter:
             for unit in units:
                 item_height = unit.line_count * (unit.line_height or 0)
                 bounds = PpuBounds(box.x, next_y, box.width, item_height)
-                items.append(unit.snapshot_item(self._visible_units[unit.id], bounds))
+                item = unit.snapshot_item(self._visible_units[unit.id], bounds)
+                if unit.id in self._dialogue_text_overrides:
+                    item["text"] = self._dialogue_text_overrides[unit.id]
+                items.append(item)
                 next_y += item_height
         if self._dynamic_item is not None:
             items.append(self._dynamic_item)
@@ -322,6 +331,7 @@ class SubtitleEventRouter:
         glyph_marker = "DQGLYPH "
         menu_marker = "DQMENU "
         run_marker = "DQRUN "
+        term_marker = "DQTERM "
         position = line.find(glyph_marker)
         marker = glyph_marker
         if position < 0:
@@ -331,6 +341,9 @@ class SubtitleEventRouter:
             position = line.find(run_marker)
             marker = run_marker
         if position < 0:
+            position = line.find(term_marker)
+            marker = term_marker
+        if position < 0:
             return None
         try:
             event = json.loads(line[position + len(marker):])
@@ -338,6 +351,16 @@ class SubtitleEventRouter:
             return None
         if isinstance(event.get("frame"), int):
             self._frame = event["frame"]
+        if marker == term_marker:
+            term_id = event.get("recordId")
+            if term_id not in self._vocabulary_records:
+                return None
+            self._source_terms.append((self._frame, str(term_id)))
+            self._source_terms = self._source_terms[-16:]
+            if self._active_source_record is None:
+                return None
+            changed = self._compose_source_dialogue(self._active_source_record)
+            return self._scene_state() if changed else None
         if marker == run_marker:
             try:
                 match = self._text_matcher.apply(event)
@@ -430,6 +453,8 @@ class SubtitleEventRouter:
             key = (segment["sourceStart"], segment["sourceEndExclusive"])
             unit = self._dialogue_units[(record["id"], *key)]
             self._source_fallback_records = {record["id"]}
+            self._active_source_record = record["id"]
+            self._compose_source_dialogue(record["id"])
             return self.apply_visibility(VisibilityUpdate(
                 scope_id=f"dialogue:{record['id']}",
                 unit_counts=((unit.id, unit.total_count),),
@@ -442,6 +467,10 @@ class SubtitleEventRouter:
             ):
                 return None
             self._source_fallback_records.discard(record_id)
+            if self._active_source_record == record_id:
+                self._active_source_record = None
+            for unit_id in self._scope_units.get(f"dialogue:{record_id}", ()):
+                self._dialogue_text_overrides.pop(unit_id, None)
             scope_id = f"dialogue:{record_id}"
             if scope_id not in self._scope_units:
                 return None
@@ -480,6 +509,33 @@ class SubtitleEventRouter:
         # Retained in the Lua trace for in-frame diagnostics. External
         # presentation is driven by complete visible-coverage snapshots.
         return None
+
+    def _compose_source_dialogue(self, record_id: str) -> bool:
+        record = self._records.get(record_id, {})
+        runtime = record.get("runtimeComposition")
+        if not isinstance(runtime, dict):
+            return False
+        action = self._vocabulary_records.get(runtime.get("actionId"), {})
+        spec = action.get("composition")
+        if not isinstance(spec, dict):
+            return False
+        max_age = int(runtime.get("objectMaxAgeFrames", 60))
+        categories = set(spec.get("objectCategories", []))
+        candidates = [
+            self._vocabulary_records[term_id]
+            for term_frame, term_id in reversed(self._source_terms)
+            if 0 <= self._frame - term_frame <= max_age
+            and self._vocabulary_records[term_id].get("category") in categories
+        ]
+        if not candidates:
+            return False
+        segment = record["segments"][0]
+        key = (segment["sourceStart"], segment["sourceEndExclusive"])
+        unit = self._dialogue_units[(record_id, *key)]
+        text = str(spec["format"]).replace("{object}", candidates[0]["display"])
+        previous = self._dialogue_text_overrides.get(unit.id)
+        self._dialogue_text_overrides[unit.id] = text
+        return previous != text
 
 
 def _lua_string(value: str) -> str:

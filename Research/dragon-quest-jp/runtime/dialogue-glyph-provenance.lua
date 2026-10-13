@@ -38,6 +38,12 @@ end
 
 for _, record in ipairs(layoutRecords) do
   emu.addMemoryCallback(function(address, value)
+    if record.dynamic and address == record.startAddress then
+      print(string.format(
+        "DQTERM {\"type\":\"source-term\",\"frame\":%d,\"recordId\":%s}",
+        frame, string.format("%q", record.id)
+      ))
+    end
     layoutSource = record
     layoutSourceValue = value
     layoutSourceLabelIndex = nil

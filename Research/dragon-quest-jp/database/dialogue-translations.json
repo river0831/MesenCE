@@ -134,6 +134,10 @@
       "segments": [
         { "sourceStart": 0, "sourceEndExclusive": 7, "lines": ["發現了物品。"] }
       ],
+      "runtimeComposition": {
+        "actionId": "dict-bb",
+        "objectMaxAgeFrames": 60
+      },
       "box": { "x": 52, "y": 158, "width": 152, "height": 18, "lineHeight": 14 }
     },
     {

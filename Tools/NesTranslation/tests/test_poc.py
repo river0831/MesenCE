@@ -855,17 +855,24 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertTrue(all("#label-" in item["unitId"] for item in reset["items"]))
 
     def test_source_record_fallback_shows_variable_chest_message(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
         router = SubtitleEventRouter(
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
-            load_database(DATABASE),
+            load_database(DATABASE), vocabulary, catalog,
         )
+        self.assertIsNone(router.consume(
+            'DQTERM {"type":"source-term","frame":9,"recordId":"dict-a1"}'
+        ))
         shown = router.consume(
             'DQGLYPH {"type":"record","frame":10,'
             '"recordId":"chr-fc-35e7"}'
         )
         assert shown is not None
         self.assertEqual([item["text"] for item in shown["items"]], [
-            "發現了物品。"
+            "發現了鑰匙。"
         ])
         # A variable field can leave exact coverage below threshold. The
         # positive source match remains authoritative until reset.
@@ -1099,6 +1106,7 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         self.assertIn("candidate.value == layoutSourceValue", script)
         self.assertIn('\\"reason\\":\\"coverage-timeout\\"', script)
+        self.assertIn('DQTERM {\\"type\\":\\"source-term\\"', script)
         self.assertIn('id = "dict-a1"', script)
         self.assertIn("dynamic = true", script)
         self.assertNotIn('id = "dict-bb"', script)
