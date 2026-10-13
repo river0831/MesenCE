@@ -30,6 +30,8 @@ class OverlayLabel:
     x: int
     y: int
     clear: ClearRect
+    source_start: int | None = None
+    source_end_exclusive: int | None = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +122,19 @@ def _load_presentation(item: dict[str, Any], record_id: str) -> Presentation | N
         height = _non_negative_int(clear, "height", f"{context}.clear")
         if width == 0 or height == 0:
             raise DatabaseError(f"{context}.clear dimensions must be positive")
+        source_start = raw_label.get("sourceStart")
+        source_end = raw_label.get("sourceEndExclusive")
+        if (source_start is None) != (source_end is None):
+            raise DatabaseError(
+                f"{context} source range must provide both endpoints"
+            )
+        if source_start is not None and (
+            not isinstance(source_start, int)
+            or not isinstance(source_end, int)
+            or source_start < 0
+            or source_end <= source_start
+        ):
+            raise DatabaseError(f"{context} source range is invalid")
         labels.append(OverlayLabel(
             text=text,
             x=_non_negative_int(raw_label, "x", context),
@@ -130,6 +145,8 @@ def _load_presentation(item: dict[str, Any], record_id: str) -> Presentation | N
                 width=width,
                 height=height,
             ),
+            source_start=source_start,
+            source_end_exclusive=source_end,
         ))
     return Presentation(mode=mode, labels=tuple(labels))
 
@@ -238,6 +255,16 @@ def load_database(path: Path) -> GameDatabase:
                 )
             deactivation_confidence = _require(deactivation, "confidence", str)
 
+        presentation = _load_presentation(item, record_id)
+        if presentation is not None:
+            for label in presentation.labels:
+                if (
+                    label.source_end_exclusive is not None
+                    and label.source_end_exclusive > len(record_bytes)
+                ):
+                    raise DatabaseError(
+                        f"presentation label source range exceeds {record_id}"
+                    )
         records.append(TextRecord(
             id=record_id,
             kind=_require(item, "kind", str),
@@ -247,7 +274,7 @@ def load_database(path: Path) -> GameDatabase:
             source_text=_require(item, "sourceText", str),
             translation=_require(item, "translation", str),
             confidence=_require(item, "confidence", str),
-            presentation=_load_presentation(item, record_id),
+            presentation=presentation,
             dismiss_input_mask=dismiss_input_mask,
             return_to_record_id=return_to_record_id,
             deactivation_confidence=deactivation_confidence,

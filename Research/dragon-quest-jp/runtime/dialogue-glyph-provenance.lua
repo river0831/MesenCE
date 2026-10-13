@@ -24,6 +24,7 @@ local foreground = 0xFFFFFF
 local background = 0x000000
 local layoutSource = nil
 local layoutSourceValue = nil
+local layoutSourceLabelIndex = nil
 local layoutSourceExpires = -1
 local layoutPending = {}
 local layoutCells = {}
@@ -39,6 +40,14 @@ for _, record in ipairs(layoutRecords) do
   emu.addMemoryCallback(function(address, value)
     layoutSource = record
     layoutSourceValue = value
+    layoutSourceLabelIndex = nil
+    for _, label in ipairs(record.labels) do
+      if label.sourceStartAddress and address >= label.sourceStartAddress
+          and address <= label.sourceEndAddress then
+        layoutSourceLabelIndex = label.index
+        break
+      end
+    end
     layoutSourceExpires = record.dynamic and frame or
       (frame + layoutSourceTtlFrames)
   end, emu.callbackType.read, record.startAddress, record.endAddress,
@@ -165,8 +174,8 @@ local function onBufferWrite(address, value)
     (not layoutSource.dynamic or candidate.value == layoutSourceValue)
   if layoutMatches then
     local x, y = screenTilePixel(candidate.ppuAddress)
-    local labelIndex = layoutSource.dynamic and 1 or nil
-    if not layoutSource.dynamic then
+    local labelIndex = layoutSource.dynamic and 1 or layoutSourceLabelIndex
+    if not layoutSource.dynamic and not labelIndex then
       for _, label in ipairs(layoutSource.labels) do
         if x and y and x < label.endX and x + 8 > label.startX
             and y < label.endY and y + 8 > label.startY then
@@ -186,6 +195,7 @@ local function onBufferWrite(address, value)
     if layoutSource.dynamic then
       layoutSource = nil
       layoutSourceValue = nil
+      layoutSourceLabelIndex = nil
       layoutSourceExpires = -1
     end
   end
@@ -325,7 +335,7 @@ local function emitLayoutGroups()
         count = count + 1
         if owner.labelIndex then
           labelCounts[owner.labelIndex] = (labelCounts[owner.labelIndex] or 0) + 1
-          if owner.dynamic and owner.x and owner.y then
+          if owner.x and owner.y then
             local bounds = labelBounds[owner.labelIndex]
             if not bounds then
               bounds = { minX = owner.x, minY = owner.y,
@@ -492,7 +502,10 @@ local function onEndFrame()
   drawSelectedSegment()
   snapshotCells()
   frame = frame + 1
-  if layoutSource and frame > layoutSourceExpires then layoutSource = nil end
+  if layoutSource and frame > layoutSourceExpires then
+    layoutSource = nil
+    layoutSourceLabelIndex = nil
+  end
 end
 
 emu.addMemoryCallback(onChrStreamSelector, emu.callbackType.exec,

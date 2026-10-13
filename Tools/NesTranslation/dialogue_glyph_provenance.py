@@ -506,10 +506,22 @@ def build_config(
                 start_y = label.clear.y
                 end_x = label.clear.x + label.clear.width
                 end_y = label.clear.y + label.clear.height
+                source_fields = ""
+                if label.source_start is not None:
+                    assert label.source_end_exclusive is not None
+                    source_fields = (
+                        "sourceStartAddress = %d, sourceEndAddress = %d, "
+                        % (
+                            database.cpu_address_base + record.prg_start
+                            + label.source_start,
+                            database.cpu_address_base + record.prg_start
+                            + label.source_end_exclusive - 1,
+                        )
+                    )
                 lines.append(
-                    "    { index = %d, startX = %d, endX = %d, "
+                    "    { index = %d, %sstartX = %d, endX = %d, "
                     "startY = %d, endY = %d },"
-                    % (index, start_x, end_x, start_y, end_y)
+                    % (index, source_fields, start_x, end_x, start_y, end_y)
                 )
             lines.extend(["  } },"])
         if dictionary_catalog is not None and vocabulary is not None:

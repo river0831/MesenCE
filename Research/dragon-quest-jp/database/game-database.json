@@ -34,14 +34,14 @@
       "presentation": {
         "mode": "label-overlay",
         "labels": [
-          { "text": "交談", "x": 128, "y": 34, "clear": { "x": 128, "y": 32, "width": 32, "height": 12 } },
-          { "text": "咒文", "x": 182, "y": 34, "clear": { "x": 174, "y": 32, "width": 40, "height": 12 } },
-          { "text": "状態", "x": 128, "y": 50, "clear": { "x": 128, "y": 48, "width": 32, "height": 12 } },
-          { "text": "道具", "x": 182, "y": 50, "clear": { "x": 174, "y": 48, "width": 40, "height": 12 } },
-          { "text": "樓梯", "x": 128, "y": 66, "clear": { "x": 128, "y": 64, "width": 32, "height": 12 } },
-          { "text": "調査", "x": 182, "y": 66, "clear": { "x": 174, "y": 64, "width": 40, "height": 12 } },
-          { "text": "開門", "x": 128, "y": 82, "clear": { "x": 128, "y": 80, "width": 32, "height": 12 } },
-          { "text": "拿取", "x": 182, "y": 82, "clear": { "x": 174, "y": 80, "width": 40, "height": 12 } }
+          { "text": "交談", "sourceStart": 2, "sourceEndExclusive": 5, "x": 128, "y": 34, "clear": { "x": 128, "y": 32, "width": 32, "height": 12 } },
+          { "text": "咒文", "sourceStart": 8, "sourceEndExclusive": 13, "x": 182, "y": 34, "clear": { "x": 174, "y": 32, "width": 40, "height": 12 } },
+          { "text": "状態", "sourceStart": 18, "sourceEndExclusive": 21, "x": 128, "y": 50, "clear": { "x": 128, "y": 48, "width": 32, "height": 12 } },
+          { "text": "道具", "sourceStart": 24, "sourceEndExclusive": 29, "x": 182, "y": 50, "clear": { "x": 174, "y": 48, "width": 40, "height": 12 } },
+          { "text": "樓梯", "sourceStart": 35, "sourceEndExclusive": 40, "x": 128, "y": 66, "clear": { "x": 128, "y": 64, "width": 32, "height": 12 } },
+          { "text": "調査", "sourceStart": 42, "sourceEndExclusive": 47, "x": 182, "y": 66, "clear": { "x": 174, "y": 64, "width": 40, "height": 12 } },
+          { "text": "開門", "sourceStart": 52, "sourceEndExclusive": 56, "x": 128, "y": 82, "clear": { "x": 128, "y": 80, "width": 32, "height": 12 } },
+          { "text": "拿取", "sourceStart": 59, "sourceEndExclusive": 61, "x": 182, "y": 82, "clear": { "x": 174, "y": 80, "width": 40, "height": 12 } }
         ]
       },
       "deactivation": {

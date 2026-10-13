@@ -121,6 +121,12 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(strength.prg_end_exclusive, 0x03F6)
         self.assertIsNone(strength.return_to_record_id)
         self.assertEqual(len(database.records[0].presentation.labels), 8)
+        self.assertEqual(
+            database.records[0].presentation.labels[0].source_start, 2
+        )
+        self.assertEqual(
+            database.records[0].presentation.labels[0].source_end_exclusive, 5
+        )
         self.assertEqual(len(strength.presentation.labels), 10)
         assert database.ppu_update_buffer is not None
         self.assertEqual(database.ppu_update_buffer.ram_start, 0x0300)
@@ -1049,6 +1055,9 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("assignCell(destination, cell)", script)
         self.assertIn("labelIndex = labelIndex", script)
         self.assertIn("startX = 128, endX = 160", script)
+        self.assertIn(
+            "sourceStartAddress = 33883, sourceEndAddress = 33885", script
+        )
         self.assertIn('state["ppu.tmpVideoRamAddr"]', script)
         self.assertIn('state["ppu.xScroll"]', script)
         self.assertIn('id = "dict-a1"', script)
