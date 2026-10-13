@@ -39,6 +39,7 @@ from Tools.NesTranslation.dialogue_glyph_provenance import (
     validate_segments,
 )
 from Tools.NesTranslation.text_units import VisibilityUpdate, build_text_units
+from Tools.NesTranslation.text_run_state import NametableTextRunState, TextRun
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
 from Tools.NesTranslation.overlay import build_overlay_script
@@ -417,6 +418,35 @@ class DictionaryCatalogTests(unittest.TestCase):
 
 
 class ReadAnalysisTests(unittest.TestCase):
+    def test_incremental_text_runs_update_only_touched_rows(self) -> None:
+        state = NametableTextRunState()
+        changed = state.apply({
+            "type": "writes",
+            "frame": 10,
+            "runs": [
+                {"row": 20, "startColumn": 4, "hex": "0f10"},
+                {"row": 22, "startColumn": 7, "hex": "291b"},
+            ],
+        })
+        self.assertEqual(changed, (20, 22))
+        self.assertEqual(state.known_runs(20), (TextRun(20, 4, (0x0F, 0x10)),))
+        state.apply({
+            "type": "writes", "frame": 11,
+            "runs": [{"row": 20, "startColumn": 6, "hex": "1219"}],
+        })
+        self.assertEqual(
+            state.known_runs(20),
+            (TextRun(20, 4, (0x0F, 0x10, 0x12, 0x19)),),
+        )
+
+    def test_incremental_text_runs_reject_out_of_bounds_updates(self) -> None:
+        state = NametableTextRunState()
+        with self.assertRaisesRegex(ValueError, "exceeds"):
+            state.apply({
+                "type": "writes",
+                "runs": [{"row": 20, "startColumn": 31, "hex": "0f10"}],
+            })
+
     def test_logical_glyphs_skip_controls_and_collapse_modifier(self) -> None:
         character_map = load_character_map(CHARACTER_MAP)
         record = {
