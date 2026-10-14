@@ -33,7 +33,9 @@ local layoutCells = {}
 local layoutDirty = {}
 local layoutSourceTtlFrames = 3
 local textRunWrites = {}
-local textPending = {}
+local textCells = {}
+local previousTextProjection = ""
+local previousProjectedText = {}
 local discoveryNode = 1
 
 for _, record in ipairs(records) do
@@ -213,16 +215,6 @@ local function onBufferWrite(address, value)
       emu.read(address - 1, emu.memType.nesDebug),
     value = value,
   }
-  local textX, textY = screenTilePixel(candidate.ppuAddress)
-  if textX and textY then
-    local textRow = math.floor(textY / 8)
-    if textRow >= math.floor(visibilityStart / 32)
-        and textRow < math.floor(visibilityEndExclusive / 32) then
-      textPending[physicalNametableAddress(candidate.ppuAddress)] = {
-        value = value, x = textX, y = textY,
-      }
-    end
-  end
   if activeRecord then
     alignCandidate(candidate, false)
   else
@@ -261,13 +253,14 @@ local function onBufferWrite(address, value)
 end
 
 local function onNametableWrite(address, value)
-  local pendingText = textPending[address]
-  if pendingText and pendingText.value == value then
-    local textAddress = math.floor(pendingText.y / 8) * 32 +
-      math.floor(pendingText.x / 8)
-    textRunWrites[textAddress] = value
+  local within = address % 0x400
+  if within < 0x3C0 and within >= visibilityStart
+      and within < visibilityEndExclusive then
+    -- Keep the physical CIRAM contents even when this page is currently
+    -- offscreen.  Visibility is projected from the live PPU scroll at the end
+    -- of each frame instead of being frozen at write time.
+    textCells[address] = value
   end
-  textPending[address] = nil
   local oldLayout = layoutCells[address]
   local newLayout = layoutPending[address]
   if newLayout and newLayout.value == value then
@@ -303,6 +296,47 @@ local function onNametableWrite(address, value)
     untaggedWrites[address] = value
   end
   pendingUploads[address] = nil
+end
+
+local function projectVisibleText()
+  local projected = {}
+  for address, value in pairs(textCells) do
+    local physicalPage = math.floor(address / 0x400)
+    local within = address % 0x400
+    -- Dragon Quest uses vertical mirroring: physical A is logical pages 0/2,
+    -- and physical B is logical pages 1/3.  Try both aliases because either
+    -- can be selected by the current vertical scroll position.
+    for verticalPage = 0, 1 do
+      local logicalPage = physicalPage + verticalPage * 2
+      local ppuAddress = 0x2000 + logicalPage * 0x400 + within
+      local x, y = screenTilePixel(ppuAddress)
+      if x and y then
+        local screenAddress = math.floor(y / 8) * 32 + math.floor(x / 8)
+        projected[screenAddress] = value
+      end
+    end
+  end
+
+  local addresses = {}
+  for address, _ in pairs(projected) do table.insert(addresses, address) end
+  table.sort(addresses)
+  local signatureParts = {}
+  for _, address in ipairs(addresses) do
+    table.insert(signatureParts, tostring(address) .. ":" ..
+      tostring(projected[address]))
+  end
+  local signature = table.concat(signatureParts, ",")
+  if signature == previousTextProjection then return false end
+  previousTextProjection = signature
+  textRunWrites = {}
+  for address, value in pairs(projected) do textRunWrites[address] = value end
+  -- The incremental matcher retains its last screen grid. Explicitly blank
+  -- cells that disappeared because the viewport moved to the other page.
+  for address, _ in pairs(previousProjectedText) do
+    if projected[address] == nil then textRunWrites[address] = 0x5F end
+  end
+  previousProjectedText = projected
+  return true
 end
 
 local function emitTextRuns()
@@ -532,8 +566,9 @@ end
 
 local function onEndFrame()
   propagateCopiedCells()
+  local textProjectionChanged = projectVisibleText()
   local frameHasSnapshotEvents = changed or next(layoutDirty) ~= nil
-    or next(textRunWrites) ~= nil
+    or textProjectionChanged
   emitLayoutGroups()
   emitTextRuns()
   if changed then
