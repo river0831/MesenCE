@@ -441,16 +441,19 @@ local function emitSegmentCoverage()
   for _, segment in ipairs(activeRecord.segments) do
     local visible = 0
     for _, cell in pairs(cells) do
-      if cell.recordId == activeRecord.id
-          and cell.glyphIndex >= segment.sourceStart
-          and cell.glyphIndex < segment.sourceEndExclusive then
-        visible = visible + 1
+      if cell.recordId == activeRecord.id then
+        for _, range in ipairs(segment.ranges) do
+          if cell.glyphIndex >= range.start
+              and cell.glyphIndex < range.endExclusive then
+            visible = visible + 1
+            break
+          end
+        end
       end
     end
     table.insert(parts, string.format(
-      "{\"sourceStart\":%d,\"sourceEndExclusive\":%d," ..
-      "\"visibleCount\":%d}",
-      segment.sourceStart, segment.sourceEndExclusive, visible
+      "{\"segmentId\":%s,\"visibleCount\":%d}",
+      jsonString(segment.id), visible
     ))
   end
   print(string.format(
@@ -472,8 +475,10 @@ local function chooseSegment()
   end
   if not record then return nil end
   for _, segment in ipairs(record.segments) do
-    if newest >= segment.sourceStart and newest < segment.sourceEndExclusive then
-      return segment
+    for _, range in ipairs(segment.ranges) do
+      if newest >= range.start and newest < range.endExclusive then
+        return segment
+      end
     end
   end
   return nil
@@ -508,9 +513,9 @@ local function onEndFrame()
       selectedSegment = candidate
       print(string.format(
         "DQGLYPH {\"type\":\"segment\",\"frame\":%d," ..
-        "\"recordId\":%s,\"sourceStart\":%d,\"sourceEndExclusive\":%d}",
-        frame, jsonString(activeRecord.id), selectedSegment.sourceStart,
-        selectedSegment.sourceEndExclusive
+        "\"recordId\":%s,\"instanceId\":%s,\"segmentId\":%s}",
+        frame, jsonString(activeRecord.id), jsonString(activeInstanceId),
+        jsonString(selectedSegment.id)
       ))
     end
   elseif activeRecord then

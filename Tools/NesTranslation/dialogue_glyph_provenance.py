@@ -23,6 +23,7 @@ from .text_review import load_character_map
 from .text_units import PpuBounds, TextUnit, VisibilityUpdate, build_text_units
 from .text_run_state import NametableTextMatcher
 from .translation_pack import load_translation_pack
+from .segments import parse_record_segments, select_segment_by_visible_source
 
 
 CONFIG_MARKER = "-- __NES_TRANSLATION_GLYPH_PROVENANCE_CONFIG__"
@@ -89,29 +90,17 @@ def group_visible_cells(
 
 
 def validate_segments(record: dict[str, Any], glyph_count: int) -> None:
-    segments = record.get("segments")
-    if not isinstance(segments, list) or not segments:
-        raise DatabaseError(f"dialogue segments must be non-empty: {record.get('id')}")
-    expected_start = 0
-    for index, segment in enumerate(segments):
-        if not isinstance(segment, dict):
-            raise DatabaseError(f"dialogue segment must be an object: {record.get('id')}")
-        start = segment.get("sourceStart")
-        end = segment.get("sourceEndExclusive")
-        lines = segment.get("lines")
-        if start != expected_start or not isinstance(end, int) or end <= start:
-            raise DatabaseError(
-                f"dialogue segments must be contiguous at segment {index}: "
-                f"{record.get('id')}"
-            )
-        if not isinstance(lines, list) or not lines or not all(
-            isinstance(line, str) and line for line in lines
-        ):
-            raise DatabaseError(f"dialogue segment lines must be non-empty: {record.get('id')}")
-        expected_start = end
-    if expected_start != glyph_count:
+    segments = parse_record_segments(record)
+    covered = sorted(
+        index
+        for segment in segments
+        for item in segment.ranges
+        for index in range(item.start, item.end_exclusive)
+    )
+    if covered != list(range(glyph_count)):
         raise DatabaseError(
-            f"dialogue segments must cover {glyph_count} glyphs: {record.get('id')}"
+            f"dialogue segments must form contiguous coverage of {glyph_count} glyphs: "
+            f"{record.get('id')}"
         )
 
 
@@ -122,11 +111,13 @@ def select_segment(
     indices = list(visible_indices)
     if not indices:
         return None
-    anchor = max(indices)
-    for index, segment in enumerate(segments):
-        if segment["sourceStart"] <= anchor < segment["sourceEndExclusive"]:
-            return index
-    return None
+    selected = select_segment_by_visible_source(
+        parse_record_segments({"id": "runtime", "segments": segments}), indices
+    )
+    if selected is None:
+        return None
+    return next(index for index, item in enumerate(segments)
+                if item.get("id", f"runtime#{index}") == selected.id)
 
 
 class SubtitleEventRouter:
@@ -174,7 +165,7 @@ class SubtitleEventRouter:
             record["id"]: record for record in (vocabulary or {}).get("records", [])
         }
         self._dialogue_units = {
-            (unit.record_id, unit.source_start, unit.source_end_exclusive): unit
+            (unit.record_id, unit.segment_id): unit
             for unit in units if unit.kind == "dialogue"
         }
         self._visible_units: dict[str, int] = {}
@@ -464,9 +455,8 @@ class SubtitleEventRouter:
             # item name, amounts, etc.) can prevent the fixed glyph sequence
             # from reaching the coverage threshold, so show the first segment
             # immediately and let later coverage snapshots refine it.
-            segment = record["segments"][0]
-            key = (segment["sourceStart"], segment["sourceEndExclusive"])
-            unit = self._dialogue_units[(record["id"], *key)]
+            segment = parse_record_segments(record)[0]
+            unit = self._dialogue_units[(record["id"], segment.id)]
             self._source_fallback_records = {record["id"]}
             self._active_source_record = record["id"]
             self._compose_source_dialogue(record["id"])
@@ -512,19 +502,25 @@ class SubtitleEventRouter:
                 and instance_id != active_instance
             ):
                 return None
+            coverage_by_id = {
+                item.get("segmentId"): item
+                for item in event.get("segments", [])
+                if isinstance(item, dict) and isinstance(item.get("segmentId"), str)
+            }
             coverage_by_range = {
                 (item.get("sourceStart"), item.get("sourceEndExclusive")): item
-                for item in event.get("segments", [])
-                if isinstance(item, dict)
+                for item in event.get("segments", []) if isinstance(item, dict)
             }
             unit_counts = []
-            for segment in record.get("segments", []):
-                key = (segment["sourceStart"], segment["sourceEndExclusive"])
-                item = coverage_by_range.get(key, {})
+            for segment in parse_record_segments(record):
+                first = segment.ranges[0]
+                item = coverage_by_id.get(segment.id, coverage_by_range.get(
+                    (first.start, first.end_exclusive), {}
+                ))
                 visible = int(item.get("visibleCount", 0))
-                total = segment["sourceEndExclusive"] - segment["sourceStart"]
+                total = segment.total_count
                 if total > 0 and visible / total >= self._activation_coverage:
-                    unit = self._dialogue_units[(record["id"], *key)]
+                    unit = self._dialogue_units[(record["id"], segment.id)]
                     unit_counts.append((unit.id, visible))
             if not unit_counts and record["id"] in self._source_fallback_records:
                 # Keep the source-record fallback until the Lua lifecycle
@@ -588,9 +584,8 @@ class SubtitleEventRouter:
                 "text": display,
                 "category": str(selected.get("category", "")),
             }
-        segment = record["segments"][0]
-        key = (segment["sourceStart"], segment["sourceEndExclusive"])
-        unit = self._dialogue_units[(record_id, *key)]
+        segment = parse_record_segments(record)[0]
+        unit = self._dialogue_units[(record_id, segment.id)]
         previous = self._dialogue_text_overrides.get(unit.id)
         previous_parameters = self._runtime_parameters.get(record_id)
         self._dialogue_text_overrides[unit.id] = text
@@ -719,11 +714,17 @@ def build_config(
             f"    height = {box['height']}, lineHeight = {box['lineHeight']},",
             "    segments = {",
         ])
-        for segment in translation["segments"]:
-            lines.append("      { sourceStart = %d, sourceEndExclusive = %d, lines = { %s } }," % (
-                segment["sourceStart"], segment["sourceEndExclusive"],
-                ", ".join(_lua_string(line) for line in segment["lines"]),
-            ))
+        for segment in parse_record_segments(translation):
+            ranges = ", ".join(
+                "{ start = %d, endExclusive = %d }" %
+                (item.start, item.end_exclusive) for item in segment.ranges
+            )
+            lines.append(
+                "      { id = %s, ranges = { %s }, lines = { %s } }," % (
+                    _lua_string(segment.id), ranges,
+                    ", ".join(_lua_string(line) for line in segment.lines),
+                )
+            )
         lines.extend([
             "    },",
             "    glyphs = {",

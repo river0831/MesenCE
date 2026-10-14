@@ -762,6 +762,34 @@ class ReadAnalysisTests(unittest.TestCase):
         with self.assertRaisesRegex(DatabaseError, "contiguous"):
             validate_segments(broken, 4)
 
+    def test_multi_range_segment_routes_coverage_by_stable_id(self) -> None:
+        spec = {"records": [{
+            "id": "shared-branch",
+            "box": {"x": 8, "y": 160, "width": 200, "height": 48,
+                    "lineHeight": 15},
+            "segments": [
+                {"id": "first", "sourceRanges": [
+                    {"start": 0, "endExclusive": 3},
+                    {"start": 6, "endExclusive": 8},
+                ], "lines": ["第一分支"]},
+                {"id": "second", "sourceStart": 3,
+                 "sourceEndExclusive": 6, "lines": ["第二分支"]},
+            ],
+        }]}
+        router = SubtitleEventRouter(spec, activation_coverage=0.5)
+        scene = router.consume(
+            'DQGLYPH {"type":"coverage","recordId":"shared-branch",'
+            '"segments":[{"segmentId":"first","visibleCount":4},'
+            '{"segmentId":"second","visibleCount":0}]}'
+        )
+        assert scene is not None
+        self.assertEqual([item["text"] for item in scene["items"]], ["第一分支"])
+        self.assertEqual(scene["items"][0]["segmentId"], "first")
+        self.assertEqual(scene["items"][0]["sourceRanges"], [
+            {"start": 0, "endExclusive": 3},
+            {"start": 6, "endExclusive": 8},
+        ])
+
     def test_subtitle_router_maps_segment_and_reset_events(self) -> None:
         spec = json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8"))
         router = SubtitleEventRouter(spec, load_database(DATABASE))
@@ -1306,7 +1334,8 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertNotIn("__NES_TRANSLATION_GLYPH_PROVENANCE_CONFIG__", script)
         self.assertIn('id = "chr-fc-38a7"', script)
         self.assertIn("expandedIndex = 0", script)
-        self.assertIn("sourceEndExclusive = 90", script)
+        self.assertIn("endExclusive = 90", script)
+        self.assertIn('id = "chr-fc-38a7#4"', script)
         self.assertIn("emptyGraceFrames = 20", script)
         self.assertIn("local nextInstanceNumber = 1", script)
         self.assertIn('activeInstanceId = "msg-"', script)

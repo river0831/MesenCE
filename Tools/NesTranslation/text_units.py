@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
 from .database import DatabaseError, GameDatabase
+from .segments import parse_record_segments
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,8 @@ class TextUnit:
     source_index: int | None = None
     source_start: int | None = None
     source_end_exclusive: int | None = None
+    segment_id: str | None = None
+    source_ranges: tuple[tuple[int, int], ...] = ()
     line_count: int = 1
     line_height: int | None = None
 
@@ -55,6 +58,13 @@ class TextUnit:
             item["sourceStart"] = self.source_start
         if self.source_end_exclusive is not None:
             item["sourceEndExclusive"] = self.source_end_exclusive
+        if self.segment_id is not None:
+            item["segmentId"] = self.segment_id
+        if self.source_ranges:
+            item["sourceRanges"] = [
+                {"start": start, "endExclusive": end}
+                for start, end in self.source_ranges
+            ]
         return item
 
 
@@ -108,22 +118,31 @@ def build_text_units(
             ))
     for record in translations.get("records", []):
         box = record["box"]
-        for segment in record.get("segments", []):
-            start = segment["sourceStart"]
-            end = segment["sourceEndExclusive"]
-            lines = segment["lines"]
+        for segment in parse_record_segments(record):
+            start = min(item.start for item in segment.ranges)
+            end = max(item.end_exclusive for item in segment.ranges)
+            lines = segment.lines
+            legacy_range = len(segment.ranges) == 1
+            unit_id = (
+                f"{record['id']}#glyph-{start}-{end}" if legacy_range
+                else f"{record['id']}#segment-{segment.id}"
+            )
             units.append(TextUnit(
-                id=f"{record['id']}#glyph-{start}-{end}",
+                id=unit_id,
                 record_id=record["id"],
                 kind="dialogue",
                 text="\n".join(lines),
                 ppu_bounds=PpuBounds(
                     box["x"], box["y"], box["width"], box["height"]
                 ),
-                total_count=end - start,
+                total_count=segment.total_count,
                 font_size=8.5,
                 source_start=start,
                 source_end_exclusive=end,
+                segment_id=segment.id,
+                source_ranges=tuple(
+                    (item.start, item.end_exclusive) for item in segment.ranges
+                ),
                 line_count=len(lines),
                 line_height=box["lineHeight"],
             ))
