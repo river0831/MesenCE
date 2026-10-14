@@ -937,6 +937,13 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual([item["text"] for item in shown["items"]], [
             "發現了鑰匙。"
         ])
+        item = shown["items"][0]
+        self.assertEqual(item["parameters"]["ITEM"], {
+            "recordId": "dict-a1",
+            "sourceText": "かぎ",
+            "text": "鑰匙",
+            "category": "item",
+        })
         # A variable field can leave exact coverage below threshold. The
         # positive source match remains authoritative until reset.
         self.assertIsNone(router.consume(
@@ -980,6 +987,40 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         assert hidden is not None
         self.assertFalse(hidden["visible"])
+
+    def test_runtime_item_parameter_is_resolved_for_each_instance(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+            json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8")),
+            json.loads((
+                ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+            ).read_text(encoding="utf-8")),
+        )
+        router.consume('DQTERM {"type":"source-term","frame":1,"recordId":"dict-a1"}')
+        key_scene = router.consume(
+            'DQGLYPH {"type":"record","frame":2,'
+            '"recordId":"chr-fc-35e7","instanceId":"msg-1"}'
+        )
+        assert key_scene is not None
+        self.assertEqual(key_scene["items"][0]["text"], "發現了鑰匙。")
+        self.assertEqual(key_scene["items"][0]["instanceId"], "msg-1")
+        router.consume(
+            'DQGLYPH {"type":"reset","frame":3,'
+            '"recordId":"chr-fc-35e7","instanceId":"msg-1"}'
+        )
+        router.consume('DQTERM {"type":"source-term","frame":100,"recordId":"dict-a2"}')
+        torch_scene = router.consume(
+            'DQGLYPH {"type":"record","frame":101,'
+            '"recordId":"chr-fc-35e7","instanceId":"msg-2"}'
+        )
+        assert torch_scene is not None
+        self.assertEqual(torch_scene["items"][0]["text"], "發現了火把。")
+        self.assertEqual(torch_scene["items"][0]["instanceId"], "msg-2")
+        self.assertEqual(
+            torch_scene["items"][0]["parameters"]["ITEM"]["sourceText"],
+            "たいまつ",
+        )
 
     def test_snapshot_stacks_visible_dialogue_units_without_overlap(self) -> None:
         router = SubtitleEventRouter(

@@ -168,6 +168,7 @@ class SubtitleEventRouter:
         self._source_terms: list[tuple[int, str]] = []
         self._dialogue_text_overrides: dict[str, str] = {}
         self._active_dialogue_instances: dict[str, str] = {}
+        self._runtime_parameters: dict[str, dict[str, dict[str, Any]]] = {}
         self._vocabulary_records = {
             record["id"]: record for record in (vocabulary or {}).get("records", [])
         }
@@ -303,6 +304,12 @@ class SubtitleEventRouter:
                 item = unit.snapshot_item(self._visible_units[unit.id], bounds)
                 if unit.id in self._dialogue_text_overrides:
                     item["text"] = self._dialogue_text_overrides[unit.id]
+                instance_id = self._active_dialogue_instances.get(record_id)
+                if instance_id is not None:
+                    item["instanceId"] = instance_id
+                parameters = self._runtime_parameters.get(record_id)
+                if parameters:
+                    item["parameters"] = parameters
                 items.append(item)
                 next_y += item_height
         if self._dynamic_item is not None:
@@ -483,6 +490,7 @@ class SubtitleEventRouter:
                 return None
             self._source_fallback_records.discard(record_id)
             self._active_dialogue_instances.pop(record_id, None)
+            self._runtime_parameters.pop(record_id, None)
             if self._active_source_record == record_id:
                 self._active_source_record = None
             for unit_id in self._scope_units.get(f"dialogue:{record_id}", ()):
@@ -539,34 +547,54 @@ class SubtitleEventRouter:
         runtime = record.get("runtimeComposition")
         if not isinstance(runtime, dict):
             return False
-        action = self._vocabulary_records.get(runtime.get("actionId"), {})
-        spec = action.get("composition")
-        if not isinstance(spec, dict):
+        template = runtime.get("template")
+        parameter_specs = runtime.get("parameters")
+        if not isinstance(template, str) or not isinstance(parameter_specs, dict):
             return False
-        max_age = int(runtime.get("objectMaxAgeFrames", 60))
-        categories = set(spec.get("objectCategories", []))
-        candidates = [
-            (term_frame, self._vocabulary_records[term_id])
-            for term_frame, term_id in self._source_terms
-            if 0 <= self._frame - term_frame <= max_age
-            and self._vocabulary_records[term_id].get("category") in categories
-        ]
-        if not candidates:
-            return False
-        # Dictionary lookup scans entries in order until it reaches the
-        # selected token. A later scan commonly expands the action template
-        # and passes other object words. The object precedes the action in
-        # these compositions, so use the final eligible term from the earliest
-        # scan frame rather than the globally most recent dictionary read.
-        object_frame = min(item[0] for item in candidates)
-        selected = [item[1] for item in candidates if item[0] == object_frame][-1]
+        text = template
+        bindings: dict[str, dict[str, Any]] = {}
+        for slot, parameter_spec in parameter_specs.items():
+            if (
+                not isinstance(slot, str) or not slot
+                or not isinstance(parameter_spec, dict)
+                or parameter_spec.get("source") != "preceding-vocabulary-term"
+            ):
+                return False
+            max_age = int(parameter_spec.get("maxAgeFrames", 60))
+            categories = set(parameter_spec.get("categories", []))
+            candidates = [
+                (term_frame, term_id, self._vocabulary_records[term_id])
+                for term_frame, term_id in self._source_terms
+                if term_id in self._vocabulary_records
+                and 0 <= self._frame - term_frame <= max_age
+                and self._vocabulary_records[term_id].get("category") in categories
+            ]
+            if not candidates:
+                return False
+            if parameter_spec.get("selection") != "earliest-frame-last":
+                return False
+            selected_frame = min(item[0] for item in candidates)
+            selected_id, selected = [
+                (term_id, term)
+                for term_frame, term_id, term in candidates
+                if term_frame == selected_frame
+            ][-1]
+            display = str(selected["display"])
+            text = text.replace("{" + slot + "}", display)
+            bindings[slot] = {
+                "recordId": selected_id,
+                "sourceText": str(selected.get("sourceText", "")),
+                "text": display,
+                "category": str(selected.get("category", "")),
+            }
         segment = record["segments"][0]
         key = (segment["sourceStart"], segment["sourceEndExclusive"])
         unit = self._dialogue_units[(record_id, *key)]
-        text = str(spec["format"]).replace("{object}", selected["display"])
         previous = self._dialogue_text_overrides.get(unit.id)
+        previous_parameters = self._runtime_parameters.get(record_id)
         self._dialogue_text_overrides[unit.id] = text
-        return previous != text
+        self._runtime_parameters[record_id] = bindings
+        return previous != text or previous_parameters != bindings
 
 
 def _lua_string(value: str) -> str:

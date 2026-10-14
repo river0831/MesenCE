@@ -136,7 +136,15 @@
       ],
       "runtimeComposition": {
         "actionId": "dict-bb",
-        "objectMaxAgeFrames": 60
+        "template": "發現了{ITEM}。",
+        "parameters": {
+          "ITEM": {
+            "source": "preceding-vocabulary-term",
+            "categories": ["item", "weapon", "armor", "shield"],
+            "maxAgeFrames": 60,
+            "selection": "earliest-frame-last"
+          }
+        }
       },
       "box": { "x": 52, "y": 158, "width": 152, "height": 18, "lineHeight": 14 }
     },
