@@ -235,7 +235,7 @@ python3 -m Tools.NesTranslation.dialogue_catalog \
   --modifier f8 \
   --control-minimum f0 \
   --minimum-length 2 \
-  --maximum-length 256 \
+  --maximum-length 512 \
   --catalog-output Research/dragon-quest-jp/generated/dialogue-catalog.json \
   --review-output Research/dragon-quest-jp/generated/dialogue-candidate-review.md \
   --review-likelihood high \
@@ -316,6 +316,8 @@ python3 -m Tools.NesTranslation.catalog_validation \
   --matches Research/dragon-quest-jp/generated/dialogue-runtime-matches.json \
   --matches Research/dragon-quest-jp/generated/dialogue-catalog-validation-matches.json \
   --matches Research/dragon-quest-jp/generated/dialogue-catalog-validation-2-matches.json \
+  --matches Research/dragon-quest-jp/generated/opening-dialogue-matches.json \
+  --matches Research/dragon-quest-jp/generated/opening-room-dialogue-matches.json \
   --output Research/dragon-quest-jp/generated/dialogue-catalog-validated.json
 ```
 
@@ -513,11 +515,21 @@ without inferring lifecycle changes from screenshots.
 ## Broad ROM text inventory
 
 `output/text-catalog.zh.md` is the human-readable inventory of every extracted
-CHR `$FC` record and every PRG dictionary entry. The matching JSON preserves
-all 686 records, including raw bytes, ROM offsets, unresolved controls, and
-low-confidence candidates that may actually be graphics. Translation status is
+CHR `$FC` container and every PRG dictionary entry. The matching JSON currently
+preserves 686 containers/entries and 916 inner CHR message units, including raw
+bytes, ROM offsets, unresolved controls, and low-confidence candidates that may
+actually be graphics. Translation status is
 kept independent from extraction status: reviewed runtime text, draft Chinese,
 and pending candidates are explicitly distinguished.
+
+An `$FC` range is a lossless storage container, not necessarily one semantic
+message. The extractor now also splits raw `$FF` boundaries inside each
+container. Separator-adjacent `$FE/$57/$FB` bytes remain recorded in
+`separatorHex`, while each unit receives its own stable ID and exact CHR/file
+range. `$FC` termination is code-confirmed; interpreting `$FF` as an inner
+message/entry boundary is static-inferred and must ultimately be checked by
+runtime entry-point traces. Translations for multi-unit containers belong on
+the nested unit IDs rather than being shown as one concatenated subtitle.
 
 Each record also has a `displayDifficulty` assessment. `easy` means a short,
 fixed CHR record with no runtime player/object/number substitution and no

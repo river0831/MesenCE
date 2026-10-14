@@ -2,6 +2,7 @@
 
 - ROM SHA-256: `f3973016ecc113ec89b8b20f49072a2ff677d6b581920683d9c72acc4b667a3e`
 - 总记录：**686**（CHR `$FC` 候选 563；PRG 词典 123）
+- CHR 消息单元：**916**（包含多个单元的 `$FC` 容器：133）
 - `reviewed`：现有运行时数据库已采用；`draft`：本轮人工草译；`pending`：保留原文，尚未可靠翻译。
 - `uncertain-or-graphics` 不代表台词：它们是为保证“尽可能多提取”而保留的低可信字节记录。
 
@@ -26,9 +27,16 @@
 
 ## 翻译进度
 
-- `draft`：237
+- `container-summary`：1
+- `draft`：236
 - `pending`：402
 - `reviewed`：47
+
+消息单元翻译状态：
+
+- `draft`：176
+- `pending`：732
+- `reviewed`：8
 
 ## 游戏显示难度
 
@@ -153,12 +161,48 @@
 - 中文：你已经足够强大了！为什么还没有打倒龙王？如果想暂时结束旅程，就去见国王，记下复活咒文。
 - 显示判断：contains unresolved source bytes or non-layout controls
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-2014-u1 · `pending` · display `hard`
+
+- CHR：`$2014-$203B`
+- 原文：＊「そなたは もう じゅう<E8>んに / つよい！ なぜに まだ / りゅうおうを たおせぬのか<60>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-2014-u2 · `pending` · display `easy`
+
+- CHR：`$203E-$2066`
+- 原文：＊「たびをいちど やめたいときは / おうにあい ふっかつのじゅもんを / きいておくことだな<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-2067 · `item-spell-action` · `draft` · display `hard`
 
 - 位置：CHR `$2067` / file `$A077`
 - 原文：{PLAYER_NAME}は にじのしずくを / てんに かざした<4F> / <57><FF>しかし<50> ここに にじは / かからなかった<4F><END>
 - 中文：{PLAYER_NAME}把彩虹水滴高举向天空。然而这里没有架起彩虹。
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-2067-u1 · `pending` · display `hard`
+
+- CHR：`$2067-$2076`
+- 原文：{PLAYER_NAME}は にじのしずくを / てんに かざした<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-2067-u2 · `pending` · display `easy`
+
+- CHR：`$2079-$208C`
+- 原文：しかし<50> ここに にじは / かからなかった<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-208d · `shop-or-inn` · `draft` · display `hard`
 
@@ -167,12 +211,48 @@
 - 中文：早上好。昨晚过得愉快吧。那么，欢迎下次再来。
 - 显示判断：contains unresolved source bytes or non-layout controls
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-208d-u1 · `pending` · display `hard`
+
+- CHR：`$208D-$20A4`
+- 原文：＊「おはよう ございます<4F> / ゆう<E9>は おたのしみでしたね<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-208d-u2 · `pending` · display `easy`
+
+- CHR：`$20A7-$20B2`
+- 原文：＊「では また どうぞ<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-20b3 · `shop-or-inn` · `draft` · display `hard`
 
 - 位置：CHR `$20B3` / file `$A0C3`
 - 原文：＊「おはよう ございます<4F> / ゆう<E9>は よく おやすみ / でしたね<4F> / <57><FF>＊「では おやすみなさいませ<4F><END>
 - 中文：早上好。昨晚睡得好吗？那么，请再好好休息。
 - 显示判断：contains unresolved source bytes or non-layout controls
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-20b3-u1 · `pending` · display `hard`
+
+- CHR：`$20B3-$20CD`
+- 原文：＊「おはよう ございます<4F> / ゆう<E9>は よく おやすみ / でしたね<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-20b3-u2 · `pending` · display `easy`
+
+- CHR：`$20D0-$20DE`
+- 原文：＊「では おやすみなさいませ<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-20df · `npc-dialogue` · `draft` · display `easy`
 
@@ -244,6 +324,32 @@
 - 中文：看来你的钱不够。抱歉，不能再便宜了。来，给你一把钥匙。还要买钥匙吗？
 - 显示判断：fixed text, but long or split across several dialogue pages
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 3 个 `$FF` 分隔消息：
+
+#### chr-fc-21ab-u1 · `pending` · display `easy`
+
+- CHR：`$21AB-$21BF`
+- 原文：＊「おまえさまは おかねが / たらないようじゃな<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-21ab-u2 · `pending` · display `easy`
+
+- CHR：`$21C2-$21DB`
+- 原文：＊「わるいが これいじょう / うるわけには いかんな<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-21ab-u3 · `pending` · display `easy`
+
+- CHR：`$21DE-$21F9`
+- 原文：＊「ほれ<4F> かぎをひとつ わたそう<4F> / まだ かぎを かうかな<60>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-21fa · `shop-or-inn` · `draft` · display `hard`
 
 - 位置：CHR `$21FA` / file `$A20A`
@@ -257,6 +363,32 @@
 - 原文：＊「ざんねんです<4F> / <57><FF>のろいで からだから はなれない！ / <57><FF>＊「もちものが ありません<4F><END>
 - 中文：真遗憾。因为诅咒，它无法离开身体！没有携带任何物品。
 - 显示判断：fixed text, but long or split across several dialogue pages
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 3 个 `$FF` 分隔消息：
+
+#### chr-fc-222c-u1 · `pending` · display `easy`
+
+- CHR：`$222C-$2232`
+- 原文：＊「ざんねんです<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-222c-u2 · `pending` · display `easy`
+
+- CHR：`$2235-$2246`
+- 原文：のろいで からだから はなれない！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-222c-u3 · `pending` · display `easy`
+
+- CHR：`$2249-$2256`
+- 原文：＊「もちものが ありません<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-2257 · `shop-or-inn` · `draft` · display `easy`
 
@@ -300,12 +432,46 @@
 - 中文：还要买别的吗？
 - 显示判断：short fixed text with only understood layout controls
 
-### chr-fc-22c4 · `shop-or-inn` · `draft` · display `hard`
+### chr-fc-22c4 · `shop-or-inn` · `container-summary` · display `hard`
 
 - 位置：CHR `$22C4` / file `$A2D4`
 - 原文：＊「それいじょう やくそうを / もてませんが<4F> / <57><FF>＊「それいじょう もちものを / もてませんが<4F> / <57><FF>＊「おかねが たりませんが<4F> / <57><FF>＊「<FD>で ございますね<4F> / まいど ありがとうございます<4F><END>
-- 中文：不能再携带更多药草了。不能再携带更多物品了。金钱不够。您要的是<FD>吧？感谢惠顾。
+- 中文：此容器包含药草上限、物品上限、金钱不足和购买成功四条独立消息。
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 4 个 `$FF` 分隔消息：
+
+#### chr-fc-22c4-u1 · `draft` · display `easy`
+
+- CHR：`$22C4-$22D1`
+- 原文：＊「それいじょう やくそうを / もてませんが<4F>
+- 中文：不能再携带更多药草了。
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-22c4-u2 · `draft` · display `easy`
+
+- CHR：`$22D4-$22E4`
+- 原文：＊「それいじょう もちものを / もてませんが<4F>
+- 中文：不能再携带更多物品了。
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-22c4-u3 · `draft` · display `easy`
+
+- CHR：`$22E7-$22F4`
+- 原文：＊「おかねが たりませんが<4F>
+- 中文：金钱不够。
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-22c4-u4 · `draft` · display `hard`
+
+- CHR：`$22F7-$2305`
+- 原文：＊「<FD>で ございますね<4F> / まいど ありがとうございます<4F>
+- 中文：您要的是<FD>吧？感谢惠顾。
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-2306 · `shop-or-inn` · `draft` · display `easy`
 
@@ -979,6 +1145,24 @@
 - 中文：欢迎来到里姆尔达尔镇！来吧，少爷。如果想休息，费用是5金币。
 - 显示判断：contains unresolved source bytes or non-layout controls
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-2d25-u1 · `pending` · display `hard`
+
+- CHR：`$2D25-$2D2D`
+- 原文：＊「り<4D><43><47>゙<4E><43>のまちに ようこそ！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-2d25-u2 · `pending` · display `hard`
+
+- CHR：`$2D2E-$2D4D`
+- 原文：＊「おいで <EA>うや<4F> / <EB>ふ<EB>ふしてほしいなら / <05><00><45>゙<4E><43><42>よ<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-2d4e · `npc-dialogue` · `draft` · display `hard`
 
 - 位置：CHR `$2D4E` / file `$AD5E`
@@ -1168,6 +1352,24 @@
 - 中文：公主被魔物掳走已经半年。国王虽然什么也没说，内心一定十分痛苦。{PLAYER_NAME}，请救出公主！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-3011-u1 · `pending` · display `easy`
+
+- CHR：`$3011-$3047`
+- 原文：＊「ひめさまが まものたちに / さらわれて はんとしになる<6C> / <57>＊「おうさまは なにも / おっしゃらないが / とても くるしんでいるはず<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3011-u2 · `pending` · display `hard`
+
+- CHR：`$304A-$3057`
+- 原文：＊「{PLAYER_NAME}！ / どうか ひめを / たすけだして ください！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-3058 · `npc-dialogue` · `draft` · display `hard`
 
 - 位置：CHR `$3058` / file `$B068`
@@ -1182,6 +1384,24 @@
 - 中文：我一直等待像你这样的年轻人出现。这里应该已经没有你的事了，去吧。
 - 显示判断：fixed text, but long or split across several dialogue pages
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-3069-u1 · `pending` · display `easy`
+
+- CHR：`$3069-$3088`
+- 原文：＊「わしは まっておった<4F> / そなたのような わかものが / あらわれることを<6C>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3069-u2 · `pending` · display `easy`
+
+- CHR：`$308B-$309F`
+- 原文：＊「ここには もう ようがないはず<4F> / いくがよい<52>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-30a0 · `npc-dialogue` · `draft` · display `easy`
 
 - 位置：CHR `$30A0` / file `$B0B0`
@@ -1195,6 +1415,24 @@
 - 原文：＊「のろいをといて しんぜよう<4F> / <57><FF>＊「さあ ゆくがよい<52><END>
 - 中文：我来为你解除诅咒。那么，去吧。
 - 显示判断：fixed text, but long or split across several dialogue pages
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-30b7-u1 · `pending` · display `easy`
+
+- CHR：`$30B7-$30C6`
+- 原文：＊「のろいをといて しんぜよう<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-30b7-u2 · `pending` · display `easy`
+
+- CHR：`$30C9-$30D0`
+- 原文：＊「さあ ゆくがよい<52>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-30d1 · `npc-dialogue` · `draft` · display `hard`
 
@@ -1266,6 +1504,24 @@
 - 中文：噢，{PLAYER_NAME}！你带来竖琴了！如果你真是继承洛特血脉的勇者，应该持有印记。愚蠢之人，退下！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-31d4-u1 · `pending` · display `hard`
+
+- CHR：`$31D4-$31E8`
+- 原文：＊「おお {PLAYER_NAME}！ / たてごとを もってきたな！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-31d4-u2 · `pending` · display `hard`
+
+- CHR：`$31EB-$3215`
+- 原文：＊「そなたが <41><6B>のちをひく / まことの ゆうしゃなら / しるしが あるはず / <57>＊「おろかものよ！ たちされい！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-3216 · `npc-dialogue` · `draft` · display `hard`
 
 - 位置：CHR `$3216` / file `$B226`
@@ -1280,12 +1536,72 @@
 - 中文：萝拉：竟然真的有人来救我，我仍不敢相信！我是国王的女儿萝拉。怎么能这样……你把公主抱了起来。萝拉：我好高兴……
 - 显示判断：contains unresolved source bytes or non-layout controls
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 4 个 `$FF` 分隔消息：
+
+#### chr-fc-3245-u1 · `pending` · display `hard`
+
+- CHR：`$3245-$3280`
+- 原文：<41><4E><40>「ああ！ たすけだしてくださる / かたが ほんとうにいたなんて / まだ しんじられませんわ！ / <57><41><4E><40>「わたしは <40><43><69><01><06>せいの / むすめ <41><4E><40>です<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3245-u2 · `pending` · display `hard`
+
+- CHR：`$3283-$328E`
+- 原文：<41><4E><40>「そんな ひどい<6C><6C><4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3245-u3 · `pending` · display `easy`
+
+- CHR：`$3291-$329E`
+- 原文：あなたは ひめを だきかかえた<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3245-u4 · `pending` · display `hard`
+
+- CHR：`$32A1-$32AB`
+- 原文：<41><4E><40>「うれしゅうございます<4F> <EF>っ
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-32ac · `story-or-ending` · `draft` · display `hard`
 
 - 位置：CHR `$32AC` / file `$B2BC`
 - 原文：＊「おお {PLAYER_NAME}！ よくぞ / ひめを たすけだしてくれた<4F> / こころから れいをいうぞ！ / <57>＊「さあ <41><4E><40><4F> / わたしのとなりへ<4F> / <57><41><4E><40>「まってください<4F> <41><4E><40>は / {PLAYER_NAME}さまに おくりものを / しとうございます<4F> / <57><41><4E><40>「{PLAYER_NAME}さまを あいする / わたしの こころ<4F> どうか / うけとってくださいませ<4F> / <57><FF><41><4E><40>「そして <41><4E><40>にも / あなたさまから / なにか ひとつ<6C> / <57><41><4E><40>「<FD>を <41><4E><40>に / くださいませね<4F> / <57><FF><41><4E><40>「ああ！ たとえ はなれて / いても <41><4E><40>は いつも / あなたと ともに あります<4F><END>
 - 中文：噢，{PLAYER_NAME}！感谢你救出了公主，我由衷向你致谢！来，萝拉，到我身边。萝拉：请等一下。我想送给{PLAYER_NAME}大人一件礼物。请收下我爱慕您的心意。也请您送给我一样东西，把<FD>送给萝拉吧。啊！即使相隔两地，萝拉也永远与你同在。
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 3 个 `$FF` 分隔消息：
+
+#### chr-fc-32ac-u1 · `pending` · display `hard`
+
+- CHR：`$32AC-$3317`
+- 原文：＊「おお {PLAYER_NAME}！ よくぞ / ひめを たすけだしてくれた<4F> / こころから れいをいうぞ！ / <57>＊「さあ <41><4E><40><4F> / わたしのとなりへ<4F> / <57><41><4E><40>「まってください<4F> <41><4E><40>は / {PLAYER_NAME}さまに おくりものを / しとうございます<4F> / <57><41><4E><40>「{PLAYER_NAME}さまを あいする / わたしの こころ<4F> どうか / うけとってくださいませ<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-32ac-u2 · `pending` · display `hard`
+
+- CHR：`$331A-$333C`
+- 原文：<41><4E><40>「そして <41><4E><40>にも / あなたさまから / なにか ひとつ<6C> / <57><41><4E><40>「<FD>を <41><4E><40>に / くださいませね<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-32ac-u3 · `pending` · display `hard`
+
+- CHR：`$333F-$3362`
+- 原文：<41><4E><40>「ああ！ たとえ はなれて / いても <41><4E><40>は いつも / あなたと ともに あります<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-3384 · `npc-dialogue` · `draft` · display `hard`
 
@@ -1308,6 +1624,48 @@
 - 中文：噢，{PLAYER_NAME}！你平安回来了，我非常高兴。升到下一级还需要<F3>点经验。我来告诉你复活咒文，请把它记录下来。那么，下次再见，勇者{PLAYER_NAME}！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 5 个 `$FF` 分隔消息：
+
+#### chr-fc-33c1-u1 · `pending` · display `hard`
+
+- CHR：`$33C1-$33E6`
+- 原文：＊「おお {PLAYER_NAME}！ / よくぞ <E8>じで もどってきた<4F> / わしは とても うれしいぞ<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-33c1-u2 · `pending` · display `hard`
+
+- CHR：`$33E9-$340C`
+- 原文：＊「そなたが つぎの<44>べ<43>になるには / あと <F3><00><00><49><F9><4A><46><6B>の / けいけんが ひつようじゃ<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-33c1-u3 · `pending` · display `easy`
+
+- CHR：`$340F-$3422`
+- 原文：＊「そなたに ふっかつの じゅもんを / おしえよう！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-33c1-u4 · `pending` · display `easy`
+
+- CHR：`$3425-$3435`
+- 原文：＊「これを かきとめておくのだぞ<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-33c1-u5 · `pending` · display `hard`
+
+- CHR：`$3438-$3449`
+- 原文：＊「では また あおう！ / ゆうしゃ {PLAYER_NAME}よ！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-344a · `npc-dialogue` · `draft` · display `hard`
 
 - 位置：CHR `$344A` / file `$B45A`
@@ -1329,6 +1687,24 @@
 - 中文：欢迎你，{PLAYER_NAME}。我就是王中之王——龙王。如果你愿意成为我的同伴，我就把世界的一半送给你。怎么样？愿意成为我的同伴吗？
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-3470-u1 · `pending` · display `hard`
+
+- CHR：`$3470-$348F`
+- 原文：＊「よくきた {PLAYER_NAME}よ<4F> / わしが おうのなかの おう / りゅうおうだ<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3470-u2 · `pending` · display `hard`
+
+- CHR：`$3492-$34CA`
+- 原文：＊「もし わしの みかたになれば / せかいの はん<E8>んを / {PLAYER_NAME}に やろう<4F> / <57>＊「どうじゃ<60> / わしの みかたに なるか<60>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-34cb · `npc-dialogue` · `draft` · display `easy`
 
 - 位置：CHR `$34CB` / file `$B4DB`
@@ -1342,6 +1718,24 @@
 - 原文：＊「では せかいの はん<E8>ん / やみのせかいを あたえよう！ / そして<6C> / <57><FF>＊「おまえの たびは おわった<4F> / さあ ゆっくり やすむがよい！ / わあっはっはっはっ<END>
 - 中文：那么，就把世界的一半——黑暗世界赐给你！然后……你的旅程结束了。好好休息吧！哇哈哈哈哈！
 - 显示判断：contains unresolved source bytes or non-layout controls
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-34de-u1 · `pending` · display `hard`
+
+- CHR：`$34DE-$34FF`
+- 原文：＊「では せかいの はん<E8>ん / やみのせかいを あたえよう！ / そして<6C>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-34de-u2 · `pending` · display `easy`
+
+- CHR：`$3502-$3529`
+- 原文：＊「おまえの たびは おわった<4F> / さあ ゆっくり やすむがよい！ / わあっはっはっはっ
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-352a · `chest-or-system` · `draft` · display `easy`
 
@@ -1377,6 +1771,24 @@
 - 原文：{PLAYER_NAME}は じ<E8>んのあしもとを / しら<E9>た<4F> / <57><FF>しかし なにも みつからなかった<4F><END>
 - 中文：{PLAYER_NAME}调查了脚边，但什么也没找到。
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-3577-u1 · `pending` · display `hard`
+
+- CHR：`$3577-$3589`
+- 原文：{PLAYER_NAME}は じ<E8>んのあしもとを / しら<E9>た<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3577-u2 · `pending` · display `easy`
+
+- CHR：`$358C-$359B`
+- 原文：しかし なにも みつからなかった<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-359c · `chest-or-system` · `draft` · display `easy`
 
@@ -1441,12 +1853,80 @@
 - 中文：在{PLAYER_NAME}摆好架势前，<FD>就袭击了过来！{PLAYER_NAME}的攻击！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-3681-u1 · `pending` · display `hard`
+
+- CHR：`$3681-$369C`
+- 原文：{PLAYER_NAME}が みがまえるより はやく / <FD>は おそいかかってきた
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3681-u2 · `pending` · display `hard`
+
+- CHR：`$369F-$36A7`
+- 原文：{PLAYER_NAME}の こうげき！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-36e2 · `battle` · `draft` · display `hard`
 
 - 位置：CHR `$36E2` / file `$B6F2`
 - 原文：それは たたかいに つかえない！ / <FB><FF>しかし じゅもんは / ふうじこまれている！ / <FB><FF>しかし じゅもんは きかなかった！ / <FB><FF><FD>を ねむらせた！ / <FB><FF><FD>の じゅもんを / ふうじこめた！ / <FB><FF><FD>を たおした！<END>
 - 中文：那个不能用于战斗！但是咒文被封住了！但是咒文没有生效！使<FD>睡着了！封住了<FD>的咒文！打倒了<FD>！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 6 个 `$FF` 分隔消息：
+
+#### chr-fc-36e2-u1 · `pending` · display `easy`
+
+- CHR：`$36E2-$36F2`
+- 原文：それは たたかいに つかえない！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-36e2-u2 · `pending` · display `easy`
+
+- CHR：`$36F5-$3704`
+- 原文：しかし じゅもんは / ふうじこまれている！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-36e2-u3 · `pending` · display `easy`
+
+- CHR：`$3707-$3713`
+- 原文：しかし じゅもんは きかなかった！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-36e2-u4 · `pending` · display `hard`
+
+- CHR：`$3716-$371F`
+- 原文：<FD>を ねむらせた！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-36e2-u5 · `pending` · display `hard`
+
+- CHR：`$3722-$372F`
+- 原文：<FD>の じゅもんを / ふうじこめた！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-36e2-u6 · `pending` · display `hard`
+
+- CHR：`$3732-$373A`
+- 原文：<FD>を たおした！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-375b · `battle` · `draft` · display `hard`
 
@@ -1455,12 +1935,72 @@
 - 中文：{PLAYER_NAME}的等级提升了！学会了一个咒文！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-375b-u1 · `pending` · display `hard`
+
+- CHR：`$375B-$3767`
+- 原文：<57>{PLAYER_NAME}は <44>べ<43>が あがった！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-375b-u2 · `pending` · display `hard`
+
+- CHR：`$376A-$3775`
+- 原文：じゅもんを <01>つ お<EA>えた！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-3776 · `battle` · `draft` · display `hard`
 
 - 位置：CHR `$3776` / file `$B786`
 - 原文：<45>゙<4E><44><4D>は しずかに めをとじる<6C> / ねむってしまった！ / <FB><FF><FD>は うれしそうだ！ / <FB><FF>{PLAYER_NAME}は にげだした！ / <FB><FF>しかし まわりこまれてしまった！ / <FB><FF>{PLAYER_NAME}は やくそうを つかった！<END>
 - 中文：巨像静静闭上眼睛，睡着了！<FD>看起来很高兴！{PLAYER_NAME}逃跑了！但被挡住了去路！{PLAYER_NAME}使用了药草！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 5 个 `$FF` 分隔消息：
+
+#### chr-fc-3776-u1 · `pending` · display `hard`
+
+- CHR：`$3776-$3792`
+- 原文：<45>゙<4E><44><4D>は しずかに めをとじる<6C> / ねむってしまった！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3776-u2 · `pending` · display `hard`
+
+- CHR：`$3795-$379F`
+- 原文：<FD>は うれしそうだ！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3776-u3 · `pending` · display `hard`
+
+- CHR：`$37A2-$37AB`
+- 原文：{PLAYER_NAME}は にげだした！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3776-u4 · `pending` · display `easy`
+
+- CHR：`$37AE-$37BC`
+- 原文：しかし まわりこまれてしまった！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3776-u5 · `pending` · display `hard`
+
+- CHR：`$37BF-$37CA`
+- 原文：{PLAYER_NAME}は やくそうを つかった！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-37cb · `battle` · `draft` · display `hard`
 
@@ -1482,6 +2022,24 @@
 - 原文： {PLAYER_NAME}の じゅもんは /  ふうじこまれた！ / <FB><FF> <FD>は ほのおをはいた！<END>
 - 中文：{PLAYER_NAME}的咒文被封住了！<FD>喷出了火焰！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-3827-u1 · `pending` · display `hard`
+
+- CHR：`$3827-$3837`
+- 原文： {PLAYER_NAME}の じゅもんは /  ふうじこまれた！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3827-u2 · `pending` · display `hard`
+
+- CHR：`$383A-$3846`
+- 原文： <FD>は ほのおをはいた！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-3847 · `chest-or-system` · `reviewed` · display `hard`
 
@@ -1518,6 +2076,72 @@
 - 中文：会心一击！！听见萝拉公主的声音。萝拉：您的等级已经达到最高。{PLAYER_NAME}睡着了！{PLAYER_NAME}正在睡觉……{PLAYER_NAME}醒来了！<FD>的伤势恢复了！<FD>迅速闪开了！这里没有门！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 8 个 `$FF` 分隔消息：
+
+#### chr-fc-3afc-u1 · `pending` · display `easy`
+
+- CHR：`$3AFC-$3B08`
+- 原文：かいしんの いちげき！！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3afc-u2 · `pending` · display `hard`
+
+- CHR：`$3B0B-$3B2A`
+- 原文：<41><4E><40>ひめの こえが きこえる<4F> / <57><41><4E><40>「あなたの<44>べ<43>は もう / さいこうで ございます<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3afc-u3 · `pending` · display `hard`
+
+- CHR：`$3B2D-$3B39`
+- 原文：{PLAYER_NAME}は ねむってしまった！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3afc-u4 · `pending` · display `hard`
+
+- CHR：`$3B3C-$3B47`
+- 原文：{PLAYER_NAME}は ねむっている<6C><6C>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3afc-u5 · `pending` · display `hard`
+
+- CHR：`$3B4A-$3B53`
+- 原文：{PLAYER_NAME}は めをさました！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3afc-u6 · `pending` · display `hard`
+
+- CHR：`$3B56-$3B66`
+- 原文： <FD>は きずが /  かいふくした！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3afc-u7 · `pending` · display `hard`
+
+- CHR：`$3B69-$3B78`
+- 原文：<FD>は すばやく / みをかわした！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3afc-u8 · `pending` · display `easy`
+
+- CHR：`$3B7B-$3B87`
+- 原文：ここには とびらがない！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-3b88 · `system-or-unknown` · `draft` · display `hard`
 
 - 位置：CHR `$3B88` / file `$BB98`
@@ -1532,6 +2156,24 @@
 - 中文：噢，{PLAYER_NAME}！竟然死掉了，成何体统！真拿你没办法，再给你一次机会。战斗受伤后要回城住旅店恢复。希望这种事不要再次发生。力量提升了<F3>！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-3b95-u1 · `pending` · display `hard`
+
+- CHR：`$3B95-$3C26`
+- 原文：＊「おお {PLAYER_NAME}！ / しんでしまうとは なにごとだ！ / <57>＊「しかたのない やつだな<4F> / おまえに もう いちど / きかいを あたえよう！ / <57>＊「たたかいで <6A><69>゙ついたときは / まちにもどり やどやに とまって / <6A><69>゙をかいふくさせるのだぞ<4F> / <57>＊「ふたたび このようなことが / おこらぬことを / わしは いのっている！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3b95-u2 · `pending` · display `hard`
+
+- CHR：`$3C29-$3C3B`
+- 原文：ちからが <F3><00><00><49><F9><4A><46><6B>あがった！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-3c7b · `dynamic-template` · `draft` · display `hard`
 
 - 位置：CHR `$3C7B` / file `$BC8B`
@@ -1539,12 +2181,48 @@
 - 中文：升到下一级还需要<F3>点经验。那么，出发吧，{PLAYER_NAME}！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-3c7b-u1 · `pending` · display `hard`
+
+- CHR：`$3C7B-$3C9E`
+- 原文：＊「おまえが つぎの<44>べ<43>になるには / あと <F3><00><00><49><F9><4A><46><6B>の / けいけんが ひつようじゃ<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3c7b-u2 · `pending` · display `hard`
+
+- CHR：`$3CA1-$3CAC`
+- 原文：＊「では ゆけ！ {PLAYER_NAME}よ！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-3cad · `system-or-unknown` · `draft` · display `hard`
 
 - 位置：CHR `$3CAD` / file `$BCBD`
 - 原文：＊「おお {PLAYER_NAME}よ！ / しんでしまうとは なにごとだ！ / <57>＊「しかも のろわれているではないか / のろわれしものよ<50>でてゆけっ！ / <FB><FF>＊「<6C><6C><6C><6C><6C><END>
 - 中文：噢，{PLAYER_NAME}！竟然死掉了，成何体统！而且还中了诅咒。被诅咒的人啊，滚出去！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-3cad-u1 · `pending` · display `hard`
+
+- CHR：`$3CAD-$3CE7`
+- 原文：＊「おお {PLAYER_NAME}よ！ / しんでしまうとは なにごとだ！ / <57>＊「しかも のろわれているではないか / のろわれしものよ<50>でてゆけっ！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe fb ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3cad-u2 · `pending` · display `easy`
+
+- CHR：`$3CEA-$3CF0`
+- 原文：＊「<6C><6C><6C><6C><6C>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-3cf1 · `npc-dialogue` · `draft` · display `easy`
 
@@ -1559,6 +2237,32 @@
 - 原文：＊「おお {PLAYER_NAME}！ / よくぞ もどってきてくれた！ / わしは とても うれしいぞ<4F> / <57><FF>＊「<44>べ<43>が あがったときは / わしに あいにくるようにな<4F> / <57><FF>りゅうおうが しょうたいを / あらわした！！<END>
 - 中文：噢，{PLAYER_NAME}！你终于回来了，我非常高兴。等级提升时要来见我。龙王显出了真身！！
 - 显示判断：contains a runtime-substituted name, object, enemy, or number
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 3 个 `$FF` 分隔消息：
+
+#### chr-fc-3cfa-u1 · `pending` · display `hard`
+
+- CHR：`$3CFA-$3D1E`
+- 原文：＊「おお {PLAYER_NAME}！ / よくぞ もどってきてくれた！ / わしは とても うれしいぞ<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3cfa-u2 · `pending` · display `hard`
+
+- CHR：`$3D21-$3D3B`
+- 原文：＊「<44>べ<43>が あがったときは / わしに あいにくるようにな<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3cfa-u3 · `pending` · display `easy`
+
+- CHR：`$3D3E-$3D53`
+- 原文：りゅうおうが しょうたいを / あらわした！！
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-3d54 · `story-or-ending` · `draft` · display `medium`
 
@@ -1587,6 +2291,24 @@
 - 原文：<41><4E><40>「その あなたの たびに / <41><4E><40>も / おともしとうございます<4F> / <57><FF><41><4E><40>「この<41><4E><40>も つれてって / くださいますわね<60><END>
 - 中文：萝拉：我也想陪伴你继续旅行。你会带上萝拉一起走吧？
 - 显示判断：contains unresolved source bytes or non-layout controls
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-3e57-u1 · `pending` · display `hard`
+
+- CHR：`$3E57-$3E6C`
+- 原文：<41><4E><40>「その あなたの たびに / <41><4E><40>も / おともしとうございます<4F>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`fe 57 ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-3e57-u2 · `pending` · display `hard`
+
+- CHR：`$3E6F-$3E81`
+- 原文：<41><4E><40>「この<41><4E><40>も つれてって / くださいますわね<60>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-3e82 · `story-or-ending` · `draft` · display `hard`
 
@@ -1623,12 +2345,48 @@
 - 中文：（待翻译/待确认）
 - 显示判断：contains unresolved source bytes or non-layout controls
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-42f0-u1 · `pending` · display `hard`
+
+- CHR：`$42F0-$435B`
+- 原文：ききてきき<40><47>゙<6B><4E><4D><41><6B>のよろい力゙<40><4A>のはかなれ<03>お<06><06>はずます<4F>ら<08><40><5C>「<02><04>そ<03>かなを<6C> / そ<3C><44><44><44><44>ひ<04><08>きょら<60>ございます<4F><06><06>はずます<4F>ございます<4F><08>らございます<4F><40>り<49><4E>る<52><3C>かいだんください<43><4E><40>うそそららぬぬ<EC>るのM<6A><3F><40>のつばさのなれあった<67>ばあるらしいはずます<4F>ございます<4F><08>き<3C><42><02><02><3C><3F>かいだんぞあめと たいようが あわさるあめと たいようが あわさるぞかいだん<3F>ぬぬ<EC>るの「たいまつひくださいくださいください
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-42f0-u2 · `pending` · display `hard`
+
+- CHR：`$435D-$43AA`
+- 原文：くださいたすけだしてあめと たいようが あわさるきます<4F>ぬろ:まぬてうおかかえ<3C>  ぶき:゙<F0><08><08>ききっま<48><46>らららしかし<F0><F0><40><47>゙<6B><4E><4D>ら<00><00><00><F0><08><08>き<60><3F>かいだんくださいどうのつるぎたり！だ<00><50>ございます<4F>まち<44>っぬぬだだだだあった<3C>にか<00>きどれをまちくさりかたびらくさりかたびらっき<01>ば
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-4b68 · `system-or-unknown` · `pending` · display `hard`
 
 - 位置：CHR `$4B68` / file `$CB78`
 - 原文：どこかにそなたび<FF><EF>まことの ございます<4F><00><END>
 - 中文：（待翻译/待确认）
 - 显示判断：contains unresolved source bytes or non-layout controls
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-4b68-u1 · `pending` · display `easy`
+
+- CHR：`$4B68-$4B6B`
+- 原文：どこかにそなたび
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-4b68-u2 · `pending` · display `hard`
+
+- CHR：`$4B6C-$4B70`
+- 原文：<EF>まことの ございます<4F><00>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-570b · `system-or-unknown` · `pending` · display `hard`
 
@@ -1692,6 +2450,24 @@
 - 原文：あめと たいようが あわさるは<F7>ぬ<FF><FD><43><4E><40>ねちおきすえたこせ とたこつつきす ほに<END>
 - 中文：（待翻译/待确认）
 - 显示判断：late CHR range behaves like tiles/graphics rather than dialogue
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-57a5-u1 · `pending` · display `hard`
+
+- CHR：`$57A5-$57A9`
+- 原文：あめと たいようが あわさるは<F7>ぬ
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-57a5-u2 · `pending` · display `hard`
+
+- CHR：`$57AA-$57C0`
+- 原文：<FD><43><4E><40>ねちおきすえたこせ とたこつつきす ほに
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-57c1 · `system-or-unknown` · `pending` · display `hard`
 
@@ -2169,6 +2945,24 @@
 - 中文：（待翻译/待确认）
 - 显示判断：late CHR range behaves like tiles/graphics rather than dialogue
 
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-7848-u1 · `pending` · display `hard`
+
+- CHR：`$7848-$78E9`
+- 原文：きいくのくろく<4D>く<5A>くます<4F>く<6A>゙<40>くまちく<EB>くすけ<45>け<44><68><4E><40>け<41><6B>のつるぎけかぎけしのくびかざりけちこ<3F>こHここ<4B><49><6B><4E><46>こまほうのよろいこたすけだしてこ<E9>こかさふさっさ<4A>さ<60>さ<40><47>゙<6B><4E><4D>さぬののふくさゆうしゃさずさ<02>しむし<48>し<52>し:し<5E>しMしり<4D><43><47>゙<4E><43>しこんぼうし<3C>  ぶき:し<41><6B>のしるししあなたしあらわれしがしびし<F0>し<FD>しよすっす<47>す<52>す<5E>す<67>すす<42><4D><42><4E><40>す<6A>゙<40>す<41><6B>の ちをひくす<41><6B>のしるしすおうさますざすぢす<F5>す<07>せすせのせるせょせ<4E>せ<5B>せ<6A>せ<42><4D><42><4E><40>せてつのよろいせたいまつせあまぐものつえせです<4F>せゆうしゃせがせだせ
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-7848-u2 · `pending` · display `hard`
+
+- CHR：`$78EA-$78FB`
+- 原文：せしそちそほそゅそ<47>そせんしのゆびわそ<08>たとち
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
+
 ### chr-fc-78fc · `item-spell-action` · `pending` · display `hard`
 
 - 位置：CHR `$78FC` / file `$F90C`
@@ -2196,6 +2990,24 @@
 - 原文：<F7><04> <00><49><4A><68><44><68><4E><40>どうのつるぎはがねのつるぎ<41><6B>のつるぎくさりかたびらりゅうのうろこ<41><6B>のしるしぎんのたてごとあまぐものつえわたし<41><4E><40>ひめあめと たいようが あわさるはずあるらしいおまえまものたちば<EA><EE>{PLAYER_NAME}<FF><F7><04> <END>
 - 中文：（待翻译/待确认）
 - 显示判断：late CHR range behaves like tiles/graphics rather than dialogue
+
+- 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
+
+#### chr-fc-79fd-u1 · `pending` · display `hard`
+
+- CHR：`$79FD-$7A17`
+- 原文：<F7><04> <00><49><4A><68><44><68><4E><40>どうのつるぎはがねのつるぎ<41><6B>のつるぎくさりかたびらりゅうのうろこ<41><6B>のしるしぎんのたてごとあまぐものつえわたし<41><4E><40>ひめあめと たいようが あわさるはずあるらしいおまえまものたちば<EA><EE>{PLAYER_NAME}
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`ff`
+- 边界置信度：`static-ff-boundary`
+
+#### chr-fc-79fd-u2 · `pending` · display `hard`
+
+- CHR：`$7A18-$7A1B`
+- 原文：<F7><04>
+- 中文：（待翻译/待确认）
+- 后置分隔字节：`FC container end`
+- 边界置信度：`container-terminator`
 
 ### chr-fc-7a1c · `dynamic-template` · `pending` · display `hard`
 

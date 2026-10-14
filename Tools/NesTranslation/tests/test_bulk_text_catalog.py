@@ -78,6 +78,46 @@ class BulkTextCatalogTest(unittest.TestCase):
         self.assertEqual(result["records"][1]["translation"], "药草")
         self.assertEqual(result["records"][1]["translationStatus"], "reviewed")
 
+    def test_maps_split_unit_translations_without_using_container_summary(self) -> None:
+        source = {
+            "id": "chr-fc-22c4",
+            "decoded": "first<FF>second<END>",
+            "evidence": {"likelihood": "high"},
+            "unknownBytes": [],
+            "source": {"chrStart": 0x22C4, "fileStart": 0xA2D4},
+            "rawHex": "01 ff 02 fc",
+            "messageUnits": [
+                {"id": "chr-fc-22c4-u1", "ordinal": 1,
+                 "source": {"chrStart": 0x22C4, "chrEndExclusive": 0x22C5},
+                 "decoded": "first", "rawHex": "01", "separatorHex": "ff",
+                 "boundaryConfidence": "static-ff-boundary"},
+                {"id": "chr-fc-22c4-u2", "ordinal": 2,
+                 "source": {"chrStart": 0x22C6, "chrEndExclusive": 0x22C7},
+                 "decoded": "second", "rawHex": "02", "separatorHex": "",
+                 "boundaryConfidence": "container-terminator"},
+            ],
+        }
+        translations = {
+            "chr-fc-22c4": {
+                "translation": "container only",
+                "translationStatus": "container-summary",
+                "units": [
+                    {"id": "chr-fc-22c4-u1", "translation": "第一条",
+                     "translationStatus": "draft"},
+                    {"id": "chr-fc-22c4-u2", "translation": "第二条",
+                     "translationStatus": "draft"},
+                ],
+            },
+        }
+        result = build_catalog(
+            {"romSha256": "abc", "records": [source]},
+            {"entries": []},
+            translations,
+        )
+        units = result["records"][0]["messageUnits"]
+        self.assertEqual([unit["translation"] for unit in units], ["第一条", "第二条"])
+        self.assertEqual(result["summary"]["messageUnitCount"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,71 @@ from .dictionary_codec import expand_tokens, ines_prg, read_dictionary
 from .text_review import load_character_map, render_bytes
 
 
+MESSAGE_SEPARATOR_SUFFIX = frozenset((0xFE, 0x57, 0xFB))
+
+
+def extract_message_units(
+    raw: bytes,
+    *,
+    chr_start: int,
+    file_start: int,
+    dictionary: tuple[bytes, ...],
+    token_base: int,
+    character_map: dict[int, dict[str, Any]],
+    modifier_values: frozenset[int],
+    control_minimum: int,
+) -> list[dict[str, Any]]:
+    """Split one lossless FC container at raw FF message-entry boundaries.
+
+    FC remains the only confirmed container terminator. FF is retained as a
+    statically inferred inner boundary; adjacent layout bytes are recorded as
+    the separator rather than assigned to either message's visible content.
+    """
+    payload_end = len(raw) - 1 if raw and raw[-1] == 0xFC else len(raw)
+    units: list[dict[str, Any]] = []
+    unit_start = 0
+    boundaries = [index for index, value in enumerate(raw[:payload_end]) if value == 0xFF]
+    for ordinal, boundary in enumerate(boundaries + [payload_end]):
+        separator_end = boundary + 1 if boundary < payload_end else boundary
+        content_end = boundary
+        if boundary < payload_end:
+            while content_end > unit_start and raw[content_end - 1] in MESSAGE_SEPARATOR_SUFFIX:
+                content_end -= 1
+        content = raw[unit_start:content_end]
+        separator = raw[content_end:separator_end]
+        if content:
+            tokens = expand_tokens(
+                content,
+                dictionary,
+                token_base,
+                source_offset=chr_start + unit_start,
+                modifier_values=modifier_values,
+                control_minimum=control_minimum,
+            )
+            expanded = [value for token in tokens for value in token.expanded]
+            units.append({
+                "id": f"chr-fc-{chr_start:04x}-u{len(units) + 1}",
+                "ordinal": len(units) + 1,
+                "source": {
+                    "containerId": f"chr-fc-{chr_start:04x}",
+                    "chrStart": chr_start + unit_start,
+                    "chrEndExclusive": chr_start + content_end,
+                    "fileStart": file_start + unit_start,
+                    "fileEndExclusive": file_start + content_end,
+                },
+                "rawHex": content.hex(" "),
+                "expandedHex": bytes(expanded).hex(" "),
+                "decoded": render_bytes(expanded, character_map),
+                "separatorHex": separator.hex(" "),
+                "boundaryConfidence": (
+                    "static-ff-boundary" if separator else "container-terminator"
+                ),
+                "tokens": [asdict(token) for token in tokens],
+            })
+        unit_start = separator_end
+    return units
+
+
 def analyze_record(
     raw: bytes,
     *,
@@ -72,6 +137,16 @@ def analyze_record(
     else:
         likelihood = "low"
 
+    message_units = extract_message_units(
+        raw,
+        chr_start=chr_start,
+        file_start=file_start,
+        dictionary=dictionary,
+        token_base=token_base,
+        character_map=character_map,
+        modifier_values=modifier_values,
+        control_minimum=control_minimum,
+    )
     return {
         "id": f"chr-fc-{chr_start:04x}",
         "source": {
@@ -107,6 +182,14 @@ def analyze_record(
             "notes": None,
         },
         "tokens": [asdict(token) for token in expanded_tokens],
+        "messageUnitCount": len(message_units),
+        "messageUnits": message_units,
+        "segmentation": {
+            "containerTerminator": 0xFC,
+            "messageBoundary": 0xFF,
+            "messageBoundaryConfidence": "static-inferred",
+            "notes": "FF boundaries are extracted generically; runtime entry-point tracing remains the confirmation step",
+        },
     }
 
 
@@ -153,6 +236,8 @@ def build_catalog(
         )
         for likelihood in ("high", "medium", "low")
     }
+    message_unit_count = sum(record["messageUnitCount"] for record in analyzed)
+    multi_unit_count = sum(record["messageUnitCount"] > 1 for record in analyzed)
     return {
         "formatVersion": 1,
         "romSha256": hashlib.sha256(rom).hexdigest(),
@@ -170,7 +255,12 @@ def build_catalog(
             "tokenBase": token_base,
             "entryCount": len(dictionary),
         },
-        "summary": {"recordCount": len(analyzed), **counts},
+        "summary": {
+            "recordCount": len(analyzed),
+            "messageUnitCount": message_unit_count,
+            "multiUnitContainerCount": multi_unit_count,
+            **counts,
+        },
         "records": analyzed,
     }
 

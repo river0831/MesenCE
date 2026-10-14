@@ -1212,6 +1212,25 @@ class ReadAnalysisTests(unittest.TestCase):
             len(bytes.fromhex(record["rawHex"])),
             record["metrics"]["sourceByteCount"],
         )
+        shared_shop = next(
+            item for item in catalog["records"] if item["id"] == "chr-fc-22c4"
+        )
+        self.assertEqual(shared_shop["messageUnitCount"], 4)
+        self.assertEqual(
+            [unit["id"] for unit in shared_shop["messageUnits"]],
+            [
+                "chr-fc-22c4-u1", "chr-fc-22c4-u2",
+                "chr-fc-22c4-u3", "chr-fc-22c4-u4",
+            ],
+        )
+        self.assertEqual(
+            [unit["separatorHex"] for unit in shared_shop["messageUnits"]],
+            ["fe 57 ff", "fe 57 ff", "fe 57 ff", ""],
+        )
+        self.assertEqual(
+            shared_shop["messageUnits"][2]["decoded"],
+            "＊「おかねが たりませんが<4F>",
+        )
         review = render_catalog_review(catalog, {"high"})
         self.assertIn("chr-fc-3397 — high", review)
         self.assertNotIn("chr-fc-0000", review)

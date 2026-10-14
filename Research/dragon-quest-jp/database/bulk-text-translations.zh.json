@@ -118,7 +118,18 @@
     {"id":"chr-fc-2014","category":"npc-dialogue","translation":"你已经足够强大了！为什么还没有打倒龙王？如果想暂时结束旅程，就去见国王，记下复活咒文。","translationStatus":"draft"},
     {"id":"chr-fc-21ab","category":"shop-or-inn","translation":"看来你的钱不够。抱歉，不能再便宜了。来，给你一把钥匙。还要买钥匙吗？","translationStatus":"draft"},
     {"id":"chr-fc-222c","category":"system-or-unknown","translation":"真遗憾。因为诅咒，它无法离开身体！没有携带任何物品。","translationStatus":"draft"},
-    {"id":"chr-fc-22c4","category":"shop-or-inn","translation":"不能再携带更多药草了。不能再携带更多物品了。金钱不够。您要的是<FD>吧？感谢惠顾。","translationStatus":"draft"},
+    {
+      "id":"chr-fc-22c4",
+      "category":"shop-or-inn",
+      "translation":"此容器包含药草上限、物品上限、金钱不足和购买成功四条独立消息。",
+      "translationStatus":"container-summary",
+      "units":[
+        {"id":"chr-fc-22c4-u1","category":"shop-or-inn","translation":"不能再携带更多药草了。","translationStatus":"draft"},
+        {"id":"chr-fc-22c4-u2","category":"shop-or-inn","translation":"不能再携带更多物品了。","translationStatus":"draft"},
+        {"id":"chr-fc-22c4-u3","category":"shop-or-inn","translation":"金钱不够。","translationStatus":"draft"},
+        {"id":"chr-fc-22c4-u4","category":"shop-or-inn","translation":"您要的是<FD>吧？感谢惠顾。","translationStatus":"draft"}
+      ]
+    },
     {"id":"chr-fc-238a","category":"shop-or-inn","translation":"抱歉，你的钱好像不够。","translationStatus":"draft"},
     {"id":"chr-fc-250c","category":"dynamic-template","translation":"<FD>正紧紧勒住你的身体！","translationStatus":"draft"},
     {"id":"chr-fc-2520","category":"npc-dialogue","translation":"被诅咒的人啊，滚出去！","translationStatus":"draft"},

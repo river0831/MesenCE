@@ -177,6 +177,27 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   unmatched bytes in this capture. This validation does not yet assign meaning
   to the remaining unknown controls in their decoded review text.
 
+### Inner message units inside `$FC` containers
+
+- `$FC` is a code-confirmed storage-container terminator, but it is not a
+  reliable semantic-message start/end pair. Several shop, battle, and system
+  containers hold mutually exclusive messages selected by different game
+  conditions.
+- The generic catalog pass now extracts a second level at every raw `$FF`
+  boundary. The immediately preceding `$FE/$57/$FB` run is preserved as the
+  boundary's `separatorHex`; it is not silently assigned to either visible
+  message.
+- Each inner unit has a stable container-relative ID, exact CHR/file range,
+  raw and expanded bytes, decoded review text, and boundary confidence.
+- CHR `$22C4` demonstrates the issue: one `$FC` container becomes four units
+  for herb capacity, general inventory capacity, insufficient money, and the
+  successful dynamic-item purchase response. The first three are fixed/easy
+  display units; the fourth remains dynamic because it contains `$FD`.
+- `$FF` unit splitting is currently `static-inferred`, not code-confirmed.
+  Runtime tracing should confirm which unit address the decoder enters for
+  each branch. The parent `$FC` container remains intact so no byte provenance
+  is lost if that interpretation is later refined.
+
 ### First translated dialogue presentation
 
 - `chr-fc-35c8` and `chr-fc-38a7` form the initial short/long presentation

@@ -94,6 +94,54 @@ def build_catalog(
             source_offset=source.get("source", {}).get("chrStart"),
         )
         translated = translations.get(str(source.get("id")))
+        translated_units = {
+            str(item.get("id")): item
+            for item in (translated or {}).get("units", [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        source_units = source.get("messageUnits") or [{
+            "id": f"{source.get('id')}-u1",
+            "ordinal": 1,
+            "source": {**(source.get("source") or {}), "containerId": source.get("id")},
+            "rawHex": source.get("rawHex"),
+            "expandedHex": source.get("expandedHex"),
+            "decoded": source.get("decoded", ""),
+            "separatorHex": "",
+            "boundaryConfidence": "legacy-container",
+        }]
+        message_units = []
+        for unit in source_units:
+            unit_translation = translated_units.get(str(unit.get("id")))
+            if unit_translation is None and len(source_units) == 1:
+                unit_translation = translated
+            unit_category, unit_category_reason = classify_dialogue(
+                str(unit.get("decoded", "")), likelihood
+            )
+            unit_difficulty, unit_difficulty_reason = assess_display_difficulty(
+                str(unit.get("decoded", "")), likelihood, [], kind="chr-record",
+                source_offset=unit.get("source", {}).get("chrStart"),
+            )
+            message_units.append({
+                "id": unit.get("id"),
+                "ordinal": unit.get("ordinal"),
+                "category": (
+                    unit_translation.get("category", unit_category)
+                    if unit_translation else unit_category
+                ),
+                "categoryEvidence": unit_category_reason,
+                "sourceText": unit.get("decoded", ""),
+                "translation": unit_translation.get("translation") if unit_translation else None,
+                "translationStatus": (
+                    unit_translation.get("translationStatus", "reviewed")
+                    if unit_translation else "pending"
+                ),
+                "displayDifficulty": unit_difficulty,
+                "displayDifficultyReason": unit_difficulty_reason,
+                "source": unit.get("source"),
+                "rawHex": unit.get("rawHex"),
+                "separatorHex": unit.get("separatorHex"),
+                "boundaryConfidence": unit.get("boundaryConfidence"),
+            })
         records.append({
             "id": source.get("id"),
             "kind": "chr-record",
@@ -110,6 +158,9 @@ def build_catalog(
             "unknownBytes": source.get("unknownBytes", []),
             "source": source.get("source"),
             "rawHex": source.get("rawHex"),
+            "messageUnitCount": len(message_units),
+            "messageUnits": message_units,
+            "segmentation": source.get("segmentation"),
         })
     for source in dictionary.get("entries", []):
         translated = translations.get(str(source.get("id")))
@@ -143,6 +194,10 @@ def build_catalog(
     counts = Counter(str(record["category"]) for record in records)
     statuses = Counter(str(record["translationStatus"]) for record in records)
     difficulties = Counter(str(record["displayDifficulty"]) for record in records)
+    chr_units = [
+        unit for record in records if record["kind"] == "chr-record"
+        for unit in record.get("messageUnits", [])
+    ]
     return {
         "formatVersion": 1,
         "language": "zh-Hans",
@@ -156,6 +211,14 @@ def build_catalog(
             "recordCount": len(records),
             "chrRecordCount": len(dialogue.get("records", [])),
             "dictionaryEntryCount": len(dictionary.get("entries", [])),
+            "messageUnitCount": len(chr_units),
+            "multiUnitContainerCount": sum(
+                record.get("messageUnitCount", 0) > 1
+                for record in records if record["kind"] == "chr-record"
+            ),
+            "messageUnitsByTranslationStatus": dict(sorted(Counter(
+                unit["translationStatus"] for unit in chr_units
+            ).items())),
             "byCategory": dict(sorted(counts.items())),
             "byTranslationStatus": dict(sorted(statuses.items())),
             "byDisplayDifficulty": dict(sorted(difficulties.items())),
@@ -171,6 +234,7 @@ def render_markdown(catalog: dict[str, Any]) -> str:
         "",
         f"- ROM SHA-256: `{catalog['romSha256']}`",
         f"- 总记录：**{summary['recordCount']}**（CHR `$FC` 候选 {summary['chrRecordCount']}；PRG 词典 {summary['dictionaryEntryCount']}）",
+        f"- CHR 消息单元：**{summary['messageUnitCount']}**（包含多个单元的 `$FC` 容器：{summary['multiUnitContainerCount']}）",
         "- `reviewed`：现有运行时数据库已采用；`draft`：本轮人工草译；`pending`：保留原文，尚未可靠翻译。",
         "- `uncertain-or-graphics` 不代表台词：它们是为保证“尽可能多提取”而保留的低可信字节记录。",
         "",
@@ -181,6 +245,9 @@ def render_markdown(catalog: dict[str, Any]) -> str:
         lines.append(f"- `{category}`：{count}")
     lines.extend(["", "## 翻译进度", ""])
     for status, count in summary["byTranslationStatus"].items():
+        lines.append(f"- `{status}`：{count}")
+    lines.extend(["", "消息单元翻译状态：", ""])
+    for status, count in summary["messageUnitsByTranslationStatus"].items():
         lines.append(f"- `{status}`：{count}")
     lines.extend(["", "## 游戏显示难度", ""])
     for difficulty, count in summary["byDisplayDifficulty"].items():
@@ -225,6 +292,25 @@ def render_markdown(catalog: dict[str, Any]) -> str:
             f"- 显示判断：{record['displayDifficultyReason']}",
             "",
         ])
+        if record.get("messageUnitCount", 1) > 1:
+            lines.extend([
+                f"- 注意：这是 `$FC` 容器概览；实际重新提取为 {record['messageUnitCount']} 个 `$FF` 分隔消息：",
+                "",
+            ])
+            for unit in record["messageUnits"]:
+                unit_source = unit.get("source") or {}
+                unit_text = str(unit.get("sourceText", "")).rstrip().replace("\n", " / ")
+                unit_translation = unit.get("translation") or "（待翻译/待确认）"
+                lines.extend([
+                    f"#### {unit['id']} · `{unit['translationStatus']}` · display `{unit['displayDifficulty']}`",
+                    "",
+                    f"- CHR：`${unit_source.get('chrStart', 0):04X}-${unit_source.get('chrEndExclusive', 0):04X}`",
+                    f"- 原文：{unit_text}",
+                    f"- 中文：{unit_translation}",
+                    f"- 后置分隔字节：`{unit.get('separatorHex') or 'FC container end'}`",
+                    f"- 边界置信度：`{unit.get('boundaryConfidence')}`",
+                    "",
+                ])
     lines.extend([
         "## 低可信候选",
         "",
