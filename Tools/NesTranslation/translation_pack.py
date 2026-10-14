@@ -10,6 +10,7 @@ from typing import Any
 
 from .database import DatabaseError, GameDatabase, load_database
 from .text_review import load_character_map
+from .segments import parse_record_segments
 
 
 SLOT_PATTERN = re.compile(r"\{([A-Z][A-Z0-9_]*)\}")
@@ -72,18 +73,7 @@ def _validate_segments(dialogue: dict[str, Any]) -> None:
         if record_id in seen_ids:
             raise DatabaseError(f"duplicate dialogue record id: {record_id}")
         seen_ids.add(record_id)
-        previous_end = -1
-        for segment_index, segment in enumerate(record.get("segments", [])):
-            context = f"{record_id}.segments[{segment_index}]"
-            segment = _object(segment, context)
-            start = segment.get("sourceStart")
-            end = segment.get("sourceEndExclusive")
-            if (
-                not isinstance(start, int) or not isinstance(end, int)
-                or start < 0 or end <= start or start < previous_end
-            ):
-                raise DatabaseError(f"{context} has an invalid or overlapping range")
-            previous_end = end
+        parse_record_segments(record)
 
 
 def _validate_runtime_parameters(dialogue: dict[str, Any]) -> None:

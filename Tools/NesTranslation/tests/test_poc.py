@@ -67,6 +67,10 @@ from Tools.NesTranslation.snapshot_replay import load_snapshots, replay_snapshot
 from Tools.NesTranslation.snapshot_audit import audit_snapshots, render_markdown
 from Tools.NesTranslation.text_review import load_character_map, render_bytes
 from Tools.NesTranslation.translation_pack import load_translation_pack
+from Tools.NesTranslation.segments import (
+    parse_record_segments,
+    select_segment_by_visible_source,
+)
 
 
 ROOT = Path(__file__).parents[3]
@@ -103,6 +107,39 @@ def read_event(prg_offset: int, frame: int = 1) -> RomReadEvent:
 
 
 class DatabaseTests(unittest.TestCase):
+    def test_segments_select_adjacent_runtime_branch_by_source_position(self) -> None:
+        segments = parse_record_segments({
+            "id": "shop-errors",
+            "segments": [
+                {"id": "herb-full", "sourceStart": 0,
+                 "sourceEndExclusive": 12, "lines": ["药草已满。"]},
+                {"id": "money-short", "sourceStart": 12,
+                 "sourceEndExclusive": 21, "lines": ["金钱不足。"]},
+            ],
+        })
+        selected = select_segment_by_visible_source(segments, (14, 15, 16))
+        assert selected is not None
+        self.assertEqual(selected.id, "money-short")
+
+    def test_segment_can_own_prefix_and_shared_suffix_ranges(self) -> None:
+        segments = parse_record_segments({
+            "id": "shared-message",
+            "segments": [{
+                "id": "found-key",
+                "sourceRanges": [
+                    {"start": 0, "endExclusive": 4},
+                    {"start": 20, "endExclusive": 25},
+                ],
+                "lines": ["发现了钥匙。"],
+            }],
+        })
+        segment = segments[0]
+        self.assertEqual(segment.total_count, 9)
+        self.assertEqual(segment.visible_count((0, 1, 21, 22, 30)), 4)
+        self.assertIs(
+            select_segment_by_visible_source(segments, (1, 22)), segment
+        )
+
     def test_translation_pack_loads_exact_rom_bound_resources(self) -> None:
         package = load_translation_pack(TRANSLATION_PACK)
         self.assertEqual(package.id, "dragon-quest-jp.zh")
