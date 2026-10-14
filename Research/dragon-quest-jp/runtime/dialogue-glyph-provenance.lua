@@ -33,6 +33,7 @@ local layoutCells = {}
 local layoutDirty = {}
 local layoutSourceTtlFrames = 3
 local textRunWrites = {}
+local discoveryNode = 1
 
 for _, record in ipairs(records) do
   maxPrefixLength = math.max(maxPrefixLength, #record.matchPrefix)
@@ -75,6 +76,23 @@ local function prefixMatches(prefix)
     if stream[index] ~= prefix[index] then return false end
   end
   return true
+end
+
+local function observeCatalogByte(value)
+  if discoveryNode == 0 then return end
+  local node = discoveryNodes[discoveryNode]
+  local nextNode = node and node.edges[value] or nil
+  if not nextNode then
+    discoveryNode = 0
+    return
+  end
+  discoveryNode = nextNode
+  for _, recordId in ipairs(discoveryNodes[discoveryNode].records) do
+    print(string.format(
+      "DQDISCOVERY {\"type\":\"catalog-record\",\"frame\":%d," ..
+      "\"recordId\":%s}", frame, jsonString(recordId)
+    ))
+  end
 end
 
 local function assignCell(address, tag)
@@ -142,6 +160,7 @@ local function activateRecord(record)
 end
 
 local function consumeSourceByte(value)
+  observeCatalogByte(value)
   table.insert(stream, value)
   if #stream > maxPrefixLength or activeRecord then return end
   for _, record in ipairs(records) do
@@ -152,6 +171,7 @@ end
 local function onChrStreamSelector()
   stream = {}
   pendingBeforeMatch = {}
+  discoveryNode = 1
 end
 
 local function onChrWindowSetup() expectingFirstByte = true end

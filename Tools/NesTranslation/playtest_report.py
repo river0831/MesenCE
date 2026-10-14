@@ -59,6 +59,23 @@ def load_text_run_events(path: Path) -> list[dict[str, Any]]:
     return events
 
 
+def load_discovery_events(path: Path) -> list[dict[str, Any]]:
+    events = []
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), 1
+    ):
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"invalid discovery JSON at line {line_number}") from error
+        if not isinstance(event, dict) or event.get("type") != "catalog-record":
+            raise ValueError(f"invalid discovery event at line {line_number}")
+        events.append(event)
+    return events
+
+
 def build_playtest_report(
     snapshots: Iterable[dict[str, Any]],
     text_run_events: Iterable[dict[str, Any]],
@@ -66,6 +83,7 @@ def build_playtest_report(
     translations: dict[str, Any],
     vocabulary: dict[str, Any],
     dialogue_catalog: dict[str, Any] | None = None,
+    discovery_events: Iterable[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     snapshots = list(snapshots)
     translated_dialogue = {
@@ -144,6 +162,21 @@ def build_playtest_report(
         )
     ]
     observed_records = sorted(record_frames)
+    discovery_counts = Counter(
+        str(event["recordId"])
+        for event in discovery_events if isinstance(event.get("recordId"), str)
+    )
+    discoveries = [
+        {
+            "recordId": record_id,
+            "occurrences": count,
+            "translated": record_id in translated_dialogue,
+            "sourceText": str(catalog_by_id.get(record_id, {}).get("decoded", "")),
+        }
+        for record_id, count in sorted(
+            discovery_counts.items(), key=lambda item: (-item[1], item[0])
+        )
+    ]
     return {
         "summary": {
             "snapshotCount": len(snapshots),
@@ -157,6 +190,10 @@ def build_playtest_report(
             ),
             "configuredDialogueCount": len(translated_dialogue),
             "configuredVocabularyCount": len(translated_vocabulary),
+            "discoveredCatalogRecordCount": len(discoveries),
+            "discoveredUntranslatedCount": sum(
+                not item["translated"] for item in discoveries
+            ),
         },
         "observedRecords": [
             {
@@ -174,6 +211,7 @@ def build_playtest_report(
             slot: dict(sorted(counts.items()))
             for slot, counts in sorted(parameters.items())
         },
+        "catalogDiscoveries": discoveries,
         "textCandidates": candidates,
     }
 
@@ -189,6 +227,8 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Runtime message instances: {summary['observedInstanceCount']}",
         f"- Decoded text candidates: {summary['decodedCandidateCount']}",
         f"- Candidates needing review: {summary['reviewCandidateCount']}",
+        f"- Catalog records discovered: {summary['discoveredCatalogRecordCount']}",
+        f"- Discovered without translation: {summary['discoveredUntranslatedCount']}",
         "",
         "## Observed records",
         "",
@@ -208,6 +248,19 @@ def render_markdown(report: dict[str, Any]) -> str:
             ))
     else:
         lines.append("- None observed.")
+    lines.extend(["", "## Discovered catalog records without translation", ""])
+    untranslated = [
+        item for item in report["catalogDiscoveries"] if not item["translated"]
+    ]
+    if not untranslated:
+        lines.append("No untranslated catalog records were discovered.")
+    else:
+        lines.extend(["| Record | Occurrences | Source |", "|---|---:|---|"])
+        for item in untranslated:
+            source = item["sourceText"].replace("|", "\\|").replace("\n", " / ")
+            lines.append(
+                f"| `{item['recordId']}` | {item['occurrences']} | {source} |"
+            )
     lines.extend(["", "## Text candidates needing review", ""])
     review = [
         item for item in report["textCandidates"]
@@ -238,6 +291,7 @@ def main() -> None:
     parser.add_argument("--translations", required=True, type=Path)
     parser.add_argument("--vocabulary", required=True, type=Path)
     parser.add_argument("--dialogue-catalog", type=Path)
+    parser.add_argument("--discoveries", type=Path)
     parser.add_argument("--json-output", required=True, type=Path)
     parser.add_argument("--markdown-output", required=True, type=Path)
     args = parser.parse_args()
@@ -246,6 +300,7 @@ def main() -> None:
         load_character_map(args.character_map), _load_json(args.translations),
         _load_json(args.vocabulary),
         _load_json(args.dialogue_catalog) if args.dialogue_catalog else None,
+        load_discovery_events(args.discoveries) if args.discoveries else (),
     )
     args.json_output.parent.mkdir(parents=True, exist_ok=True)
     args.markdown_output.parent.mkdir(parents=True, exist_ok=True)

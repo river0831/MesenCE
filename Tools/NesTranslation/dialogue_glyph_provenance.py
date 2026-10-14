@@ -635,6 +635,27 @@ def _lua_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
+def _catalog_discovery_trie(catalog: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build a flat O(1)-per-byte trie for observing untranslated records."""
+    nodes: list[dict[str, Any]] = [{"edges": {}, "records": []}]
+    for record in catalog.get("records", []):
+        try:
+            values = bytes.fromhex(str(record.get("rawHex", "")))
+        except ValueError:
+            continue
+        if not values:
+            continue
+        node_index = 0
+        for value in values:
+            edges = nodes[node_index]["edges"]
+            if value not in edges:
+                edges[value] = len(nodes)
+                nodes.append({"edges": {}, "records": []})
+            node_index = edges[value]
+        nodes[node_index]["records"].append(str(record["id"]))
+    return nodes
+
+
 def build_config(
     catalog: dict[str, Any],
     translations: dict[str, Any],
@@ -724,6 +745,19 @@ def build_config(
                         database.cpu_address_base + entry["prgEndExclusive"] - 1,
                     )
                 )
+    lines.extend([
+        "}",
+        "local discoveryNodes = {",
+    ])
+    for node in _catalog_discovery_trie(catalog):
+        edges = ", ".join(
+            f"[{value}] = {target + 1}"
+            for value, target in sorted(node["edges"].items())
+        )
+        terminal = ", ".join(_lua_string(value) for value in node["records"])
+        lines.append(
+            "  { edges = { %s }, records = { %s } }," % (edges, terminal)
+        )
     lines.extend([
         "}",
         "local records = {",
@@ -819,6 +853,7 @@ def run(
     subtitle_companion_path: Path | None,
     snapshot_trace_path: Path | None = None,
     text_run_trace_path: Path | None = None,
+    discovery_trace_path: Path | None = None,
     dictionary_catalog_path: Path | None = None,
     vocabulary_path: Path | None = None,
 ) -> int:
@@ -882,6 +917,8 @@ def run(
             snapshot_trace_path.parent.mkdir(parents=True, exist_ok=True)
         if text_run_trace_path is not None:
             text_run_trace_path.parent.mkdir(parents=True, exist_ok=True)
+        if discovery_trace_path is not None:
+            discovery_trace_path.parent.mkdir(parents=True, exist_ok=True)
         with ExitStack() as stack:
             companion = None
             if external_subtitles:
@@ -898,6 +935,10 @@ def run(
                 stack.enter_context(text_run_trace_path.open("w", encoding="utf-8"))
                 if text_run_trace_path is not None else None
             )
+            discovery_file = (
+                stack.enter_context(discovery_trace_path.open("w", encoding="utf-8"))
+                if discovery_trace_path is not None else None
+            )
             process = stack.enter_context(subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
@@ -911,6 +952,12 @@ def run(
                     if text_run_file is not None:
                         text_run_file.write(line[len("DQRUN "):])
                         text_run_file.flush()
+                elif line.startswith("DQDISCOVERY "):
+                    if discovery_file is not None:
+                        discovery_file.write(line[len("DQDISCOVERY "):])
+                        discovery_file.flush()
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
                 elif not line.startswith("DQFRAME "):
                     sys.stdout.write(line)
                     sys.stdout.flush()
@@ -965,6 +1012,10 @@ def main() -> None:
         "--text-run-trace", type=Path,
         help="write incremental Nametable text-row updates as JSONL",
     )
+    parser.add_argument(
+        "--discovery-trace", type=Path,
+        help="write statically cataloged runtime text discoveries as JSONL",
+    )
     args = parser.parse_args()
     if args.translation_pack is not None:
         if any(value is not None for value in (
@@ -992,7 +1043,7 @@ def main() -> None:
         args.translations, args.character_map,
         args.display_segments, args.font_source,
         args.external_subtitles, args.subtitle_companion,
-        args.snapshot_trace, args.text_run_trace,
+        args.snapshot_trace, args.text_run_trace, args.discovery_trace,
         args.dictionary_catalog, args.vocabulary,
     ))
 

@@ -606,6 +606,9 @@ class ReadAnalysisTests(unittest.TestCase):
              0x0B: {"type": "glyph", "display": "い"}},
             {"records": [{"id": "dialogue"}]},
             {"records": []},
+            {"records": [{"id": "dialogue", "decoded": "既知"},
+                         {"id": "new-dialogue", "decoded": "あたらしい"}]},
+            [{"type": "catalog-record", "recordId": "new-dialogue"}],
         )
         self.assertEqual(report["summary"]["observedInstanceCount"], 1)
         self.assertEqual(report["parameters"], {"ITEM": {"钥匙": 1}})
@@ -614,6 +617,10 @@ class ReadAnalysisTests(unittest.TestCase):
             report["textCandidates"][0]["classification"], "needs-review"
         )
         self.assertIn("あい", render_playtest_markdown(report))
+        self.assertEqual(report["summary"]["discoveredUntranslatedCount"], 1)
+        self.assertEqual(
+            report["catalogDiscoveries"][0]["recordId"], "new-dialogue"
+        )
 
     def test_frame_snapshot_buffer_publishes_only_final_state(self) -> None:
         buffer = FrameSnapshotBuffer()
@@ -1434,6 +1441,8 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("candidate.value == layoutSourceValue", script)
         self.assertIn('\\"reason\\":\\"coverage-timeout\\"', script)
         self.assertIn('DQTERM {\\"type\\":\\"source-term\\"', script)
+        self.assertIn('DQDISCOVERY {\\"type\\":\\"catalog-record\\"', script)
+        self.assertIn("local discoveryNodes = {", script)
         self.assertIn('id = "dict-a1"', script)
         self.assertIn("dynamic = true", script)
         self.assertNotIn('id = "dict-bb"', script)

@@ -389,7 +389,8 @@ python3 -m Tools.NesTranslation.dialogue_glyph_provenance \
   --external-subtitles \
   --subtitle-companion Tools/NesTranslation/subtitle_companion_macos.py \
   --snapshot-trace Research/dragon-quest-jp/generated/visible-snapshots.jsonl \
-  --text-run-trace Research/dragon-quest-jp/generated/playtest-text-runs.jsonl
+  --text-run-trace Research/dragon-quest-jp/generated/playtest-text-runs.jsonl \
+  --discovery-trace Research/dragon-quest-jp/generated/playtest-discoveries.jsonl
 ```
 
 `--snapshot-trace` is optional. It records exactly the renderer-independent
@@ -404,6 +405,7 @@ dynamic parameters, and newly decoded Nametable text candidates with:
 python3 -m Tools.NesTranslation.playtest_report \
   --snapshots Research/dragon-quest-jp/generated/visible-snapshots.jsonl \
   --text-runs Research/dragon-quest-jp/generated/playtest-text-runs.jsonl \
+  --discoveries Research/dragon-quest-jp/generated/playtest-discoveries.jsonl \
   --character-map Research/dragon-quest-jp/database/character-map.json \
   --translations Research/dragon-quest-jp/database/dialogue-translations.json \
   --vocabulary Research/dragon-quest-jp/database/vocabulary-translations.json \
