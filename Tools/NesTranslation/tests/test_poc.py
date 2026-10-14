@@ -66,6 +66,10 @@ from Tools.NesTranslation.runtime_catalog_match import (
 )
 from Tools.NesTranslation.snapshot_replay import load_snapshots, replay_snapshots
 from Tools.NesTranslation.snapshot_audit import audit_snapshots, render_markdown
+from Tools.NesTranslation.playtest_report import (
+    build_playtest_report,
+    render_markdown as render_playtest_markdown,
+)
 from Tools.NesTranslation.text_review import load_character_map, render_bytes
 from Tools.NesTranslation.translation_pack import load_translation_pack
 from Tools.NesTranslation.segments import (
@@ -578,6 +582,39 @@ class DictionaryCatalogTests(unittest.TestCase):
 
 
 class ReadAnalysisTests(unittest.TestCase):
+    def test_playtest_report_tracks_instances_parameters_and_candidates(self) -> None:
+        snapshots = [{
+            "frame": 10,
+            "items": [{
+                "unitId": "dialogue#segment-a", "recordId": "dialogue",
+                "instanceId": "msg-1", "parameters": {
+                    "ITEM": {"text": "钥匙"},
+                },
+            }],
+            "delta": {
+                "appeared": ["dialogue#segment-a"],
+                "updated": [], "disappeared": [],
+            },
+        }]
+        runs = [{
+            "type": "writes", "frame": 11,
+            "runs": [{"row": 20, "startColumn": 2, "hex": "0a0b"}],
+        }]
+        report = build_playtest_report(
+            snapshots, runs,
+            {0x0A: {"type": "glyph", "display": "あ"},
+             0x0B: {"type": "glyph", "display": "い"}},
+            {"records": [{"id": "dialogue"}]},
+            {"records": []},
+        )
+        self.assertEqual(report["summary"]["observedInstanceCount"], 1)
+        self.assertEqual(report["parameters"], {"ITEM": {"钥匙": 1}})
+        self.assertEqual(report["textCandidates"][0]["text"], "あい")
+        self.assertEqual(
+            report["textCandidates"][0]["classification"], "needs-review"
+        )
+        self.assertIn("あい", render_playtest_markdown(report))
+
     def test_frame_snapshot_buffer_publishes_only_final_state(self) -> None:
         buffer = FrameSnapshotBuffer()
         first = {"frame": 20, "items": [{"unitId": "old"}]}

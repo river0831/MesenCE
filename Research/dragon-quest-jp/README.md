@@ -388,13 +388,33 @@ python3 -m Tools.NesTranslation.dialogue_glyph_provenance \
   --translation-pack Research/dragon-quest-jp/translation-pack.json \
   --external-subtitles \
   --subtitle-companion Tools/NesTranslation/subtitle_companion_macos.py \
-  --snapshot-trace Research/dragon-quest-jp/generated/visible-snapshots.jsonl
+  --snapshot-trace Research/dragon-quest-jp/generated/visible-snapshots.jsonl \
+  --text-run-trace Research/dragon-quest-jp/generated/playtest-text-runs.jsonl
 ```
 
 `--snapshot-trace` is optional. It records exactly the renderer-independent
 snapshots sent to the companion, including frame numbers and unit deltas. It
 does not contain ROM bytes. The trace can also be recorded without
 `--external-subtitles` when only a diagnostic capture is needed.
+
+After a playtest, summarize translated coverage, runtime message instances,
+dynamic parameters, and newly decoded Nametable text candidates with:
+
+```sh
+python3 -m Tools.NesTranslation.playtest_report \
+  --snapshots Research/dragon-quest-jp/generated/visible-snapshots.jsonl \
+  --text-runs Research/dragon-quest-jp/generated/playtest-text-runs.jsonl \
+  --character-map Research/dragon-quest-jp/database/character-map.json \
+  --translations Research/dragon-quest-jp/database/dialogue-translations.json \
+  --vocabulary Research/dragon-quest-jp/database/vocabulary-translations.json \
+  --dialogue-catalog Research/dragon-quest-jp/generated/dialogue-catalog-validated.json \
+  --json-output Research/dragon-quest-jp/generated/playtest-report.json \
+  --markdown-output Research/dragon-quest-jp/output/playtest-report.md
+```
+
+The candidate list is deliberately conservative: it reports readable tile
+sequences not already covered by a reviewed source string. It is a review
+queue, not an assertion that every sequence is dialogue.
 
 With the dictionary catalog and vocabulary options, dictionary-backed words
 become independent text units. Their translation rectangles come from the
