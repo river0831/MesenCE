@@ -38,6 +38,29 @@ class LogicalGlyph:
     source_offset: int
 
 
+class FrameSnapshotBuffer:
+    """Publish only the last translation state produced within one PPU frame."""
+
+    def __init__(self) -> None:
+        self._pending: dict[str, Any] | None = None
+
+    def observe(
+        self, line: str, state: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
+        if state is not None:
+            self._pending = state
+        if not line.startswith("DQFRAME "):
+            return None
+        ready = self._pending
+        self._pending = None
+        return ready
+
+    def finish(self) -> dict[str, Any] | None:
+        ready = self._pending
+        self._pending = None
+        return ready
+
+
 def logical_glyphs(
     record: dict[str, Any], character_map: dict[int, dict[str, Any]]
 ) -> tuple[LogicalGlyph, ...]:
@@ -839,6 +862,7 @@ def run(
         router = SubtitleEventRouter(
             translations, database, vocabulary, dictionary_catalog=dictionary_catalog
         )
+        frame_buffer = FrameSnapshotBuffer()
         if snapshot_trace_path is not None:
             snapshot_trace_path.parent.mkdir(parents=True, exist_ok=True)
         if text_run_trace_path is not None:
@@ -872,12 +896,23 @@ def run(
                     if text_run_file is not None:
                         text_run_file.write(line[len("DQRUN "):])
                         text_run_file.flush()
-                else:
+                elif not line.startswith("DQFRAME "):
                     sys.stdout.write(line)
                     sys.stdout.flush()
                 state = router.consume(line)
+                state = frame_buffer.observe(line, state)
                 if state is None:
                     continue
+                serialized = json.dumps(state, ensure_ascii=False)
+                if trace_file is not None:
+                    trace_file.write(serialized + "\n")
+                    trace_file.flush()
+                if companion is not None and companion.poll() is None:
+                    assert companion.stdin is not None
+                    companion.stdin.write(serialized + "\n")
+                    companion.stdin.flush()
+            state = frame_buffer.finish()
+            if state is not None:
                 serialized = json.dumps(state, ensure_ascii=False)
                 if trace_file is not None:
                     trace_file.write(serialized + "\n")

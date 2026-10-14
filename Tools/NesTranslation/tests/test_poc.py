@@ -31,6 +31,7 @@ from Tools.NesTranslation.dialogue_overlay import (
     validate_presentation_characters,
 )
 from Tools.NesTranslation.dialogue_glyph_provenance import (
+    FrameSnapshotBuffer,
     build_script as build_glyph_provenance_script,
     group_visible_cells,
     logical_glyphs,
@@ -577,6 +578,23 @@ class DictionaryCatalogTests(unittest.TestCase):
 
 
 class ReadAnalysisTests(unittest.TestCase):
+    def test_frame_snapshot_buffer_publishes_only_final_state(self) -> None:
+        buffer = FrameSnapshotBuffer()
+        first = {"frame": 20, "items": [{"unitId": "old"}]}
+        final = {"frame": 20, "items": [{"unitId": "new"}]}
+        self.assertIsNone(buffer.observe("DQMENU {}", first))
+        self.assertIsNone(buffer.observe("DQGLYPH {}", final))
+        self.assertIs(buffer.observe(
+            'DQFRAME {"type":"end","frame":20}', None
+        ), final)
+        self.assertIsNone(buffer.finish())
+
+    def test_frame_snapshot_buffer_flushes_last_state_at_process_end(self) -> None:
+        buffer = FrameSnapshotBuffer()
+        state = {"frame": 21, "items": []}
+        self.assertIsNone(buffer.observe("DQGLYPH {}", state))
+        self.assertIs(buffer.finish(), state)
+
     def test_incremental_text_runs_update_only_touched_rows(self) -> None:
         state = NametableTextRunState()
         changed = state.apply({

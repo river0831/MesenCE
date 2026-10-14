@@ -498,6 +498,8 @@ end
 
 local function onEndFrame()
   propagateCopiedCells()
+  local frameHasSnapshotEvents = changed or next(layoutDirty) ~= nil
+    or next(textRunWrites) ~= nil
   emitLayoutGroups()
   emitTextRuns()
   if changed then
@@ -510,6 +512,7 @@ local function onEndFrame()
   if candidate then
     emptySinceFrame = nil
     if candidate ~= selectedSegment then
+      frameHasSnapshotEvents = true
       selectedSegment = candidate
       print(string.format(
         "DQGLYPH {\"type\":\"segment\",\"frame\":%d," ..
@@ -521,6 +524,7 @@ local function onEndFrame()
   elseif activeRecord then
     if not emptySinceFrame then emptySinceFrame = frame end
     if frame - emptySinceFrame >= emptyGraceFrames then
+      frameHasSnapshotEvents = true
       print(string.format(
         "DQGLYPH {\"type\":\"instance-end\",\"frame\":%d," ..
         "\"recordId\":%s,\"instanceId\":%s," ..
@@ -546,6 +550,11 @@ local function onEndFrame()
   end
   drawSelectedSegment()
   snapshotCells()
+  if frameHasSnapshotEvents then
+    print(string.format(
+      "DQFRAME {\"type\":\"end\",\"frame\":%d}", frame
+    ))
+  end
   frame = frame + 1
   if layoutSource and frame > layoutSourceExpires then
     layoutSource = nil
