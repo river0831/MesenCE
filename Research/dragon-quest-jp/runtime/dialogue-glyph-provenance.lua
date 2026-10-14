@@ -16,6 +16,7 @@ local nextGlyph = 1
 local pendingBeforeMatch = {}
 local pendingUploads = {}
 local cells = {}
+local visibleCells = {}
 local previousCells = {}
 local untaggedWrites = {}
 local changed = false
@@ -34,8 +35,10 @@ local layoutDirty = {}
 local layoutSourceTtlFrames = 3
 local textRunWrites = {}
 local textCells = {}
-local previousTextProjection = ""
 local previousProjectedText = {}
+local textCellsDirty = false
+local previousProjectionKey = nil
+local previousSourceProjectionKey = nil
 local discoveryNode = 1
 
 for _, record in ipairs(records) do
@@ -123,8 +126,6 @@ local function alignCandidate(candidate, alreadyUploaded)
   local glyph = activeRecord.glyphs[nextGlyph]
   if not glyph or candidate.value ~= glyph.value then return end
   local address = physicalNametableAddress(candidate.ppuAddress)
-  local within = address % 0x400
-  if within < visibilityStart or within >= visibilityEndExclusive then return end
   local tag = {
     recordId = activeRecord.id,
     instanceId = activeInstanceId,
@@ -186,14 +187,7 @@ local function onChrWindowWrite(address, value)
   consumeSourceByte(value)
 end
 
-local function screenTilePixel(ppuAddress)
-  local offset = (ppuAddress - 0x2000) % 0x1000
-  local within = offset % 0x400
-  if within >= 0x3C0 then return nil, nil end
-  local nameTable = math.floor(offset / 0x400)
-  local worldX = (nameTable % 2) * 256 + (within % 32) * 8
-  local worldY = math.floor(nameTable / 2) * 240 +
-    math.floor(within / 32) * 8
+local function currentProjection()
   local state = emu.getState()
   local temporary = state["ppu.tmpVideoRamAddr"] or 0
   local fineX = state["ppu.xScroll"] or 0
@@ -202,8 +196,24 @@ local function screenTilePixel(ppuAddress)
   local scrollY = ((temporary & 0x3E0) >> 2) +
     ((temporary & 0x7000) >> 12)
   if (temporary & 0x800) ~= 0 then scrollY = scrollY + 240 end
-  local screenX = (worldX - scrollX) % 512
-  local screenY = (worldY - scrollY) % 480
+  return {
+    scrollX = scrollX,
+    scrollY = scrollY,
+    key = tostring(scrollX) .. ":" .. tostring(scrollY),
+  }
+end
+
+local function screenTilePixel(ppuAddress, projection)
+  local offset = (ppuAddress - 0x2000) % 0x1000
+  local within = offset % 0x400
+  if within >= 0x3C0 then return nil, nil end
+  local nameTable = math.floor(offset / 0x400)
+  local worldX = (nameTable % 2) * 256 + (within % 32) * 8
+  local worldY = math.floor(nameTable / 2) * 240 +
+    math.floor(within / 32) * 8
+  projection = projection or currentProjection()
+  local screenX = (worldX - projection.scrollX) % 512
+  local screenY = (worldY - projection.scrollY) % 480
   if screenX >= 256 or screenY >= 240 then return nil, nil end
   return screenX, screenY
 end
@@ -254,12 +264,14 @@ end
 
 local function onNametableWrite(address, value)
   local within = address % 0x400
-  if within < 0x3C0 and within >= visibilityStart
-      and within < visibilityEndExclusive then
+  if within < 0x3C0 then
     -- Keep the physical CIRAM contents even when this page is currently
     -- offscreen.  Visibility is projected from the live PPU scroll at the end
     -- of each frame instead of being frozen at write time.
-    textCells[address] = value
+    if textCells[address] ~= value then
+      textCells[address] = value
+      textCellsDirty = true
+    end
   end
   local oldLayout = layoutCells[address]
   local newLayout = layoutPending[address]
@@ -292,13 +304,64 @@ local function onNametableWrite(address, value)
     cells[address] = nil
     changed = true
     untaggedWrites[address] = value
-  elseif address >= visibilityStart and address < visibilityEndExclusive then
+  elseif within < 0x3C0 then
     untaggedWrites[address] = value
   end
   pendingUploads[address] = nil
 end
 
-local function projectVisibleText()
+local function sameCell(left, right)
+  return left and right and left.instanceId == right.instanceId
+    and left.glyphIndex == right.glyphIndex and left.value == right.value
+end
+
+local function projectVisibleCells(projection)
+  if not changed and projection.key == previousSourceProjectionKey then
+    return false
+  end
+  previousSourceProjectionKey = projection.key
+  local projected = {}
+  for address, cell in pairs(cells) do
+    local physicalPage = math.floor(address / 0x400)
+    local within = address % 0x400
+    for verticalPage = 0, 1 do
+      local logicalPage = physicalPage + verticalPage * 2
+      local ppuAddress = 0x2000 + logicalPage * 0x400 + within
+      local x, y = screenTilePixel(ppuAddress, projection)
+      if x and y then
+        local screenAddress = math.floor(y / 8) * 32 + math.floor(x / 8)
+        if screenAddress >= visibilityStart
+            and screenAddress < visibilityEndExclusive then
+          projected[screenAddress] = cell
+        end
+      end
+    end
+  end
+  local projectionChanged = false
+  for address, cell in pairs(projected) do
+    if not sameCell(cell, visibleCells[address]) then
+      projectionChanged = true
+      break
+    end
+  end
+  if not projectionChanged then
+    for address, _ in pairs(visibleCells) do
+      if projected[address] == nil then
+        projectionChanged = true
+        break
+      end
+    end
+  end
+  visibleCells = projected
+  return projectionChanged
+end
+
+local function projectVisibleText(projection)
+  if not textCellsDirty and projection.key == previousProjectionKey then
+    return false
+  end
+  textCellsDirty = false
+  previousProjectionKey = projection.key
   local projected = {}
   for address, value in pairs(textCells) do
     local physicalPage = math.floor(address / 0x400)
@@ -309,34 +372,34 @@ local function projectVisibleText()
     for verticalPage = 0, 1 do
       local logicalPage = physicalPage + verticalPage * 2
       local ppuAddress = 0x2000 + logicalPage * 0x400 + within
-      local x, y = screenTilePixel(ppuAddress)
+      local x, y = screenTilePixel(ppuAddress, projection)
       if x and y then
         local screenAddress = math.floor(y / 8) * 32 + math.floor(x / 8)
-        projected[screenAddress] = value
+        if screenAddress >= visibilityStart
+            and screenAddress < visibilityEndExclusive then
+          projected[screenAddress] = value
+        end
       end
     end
   end
-
-  local addresses = {}
-  for address, _ in pairs(projected) do table.insert(addresses, address) end
-  table.sort(addresses)
-  local signatureParts = {}
-  for _, address in ipairs(addresses) do
-    table.insert(signatureParts, tostring(address) .. ":" ..
-      tostring(projected[address]))
-  end
-  local signature = table.concat(signatureParts, ",")
-  if signature == previousTextProjection then return false end
-  previousTextProjection = signature
   textRunWrites = {}
-  for address, value in pairs(projected) do textRunWrites[address] = value end
+  local changedProjection = false
+  for address, value in pairs(projected) do
+    if previousProjectedText[address] ~= value then
+      textRunWrites[address] = value
+      changedProjection = true
+    end
+  end
   -- The incremental matcher retains its last screen grid. Explicitly blank
   -- cells that disappeared because the viewport moved to the other page.
   for address, _ in pairs(previousProjectedText) do
-    if projected[address] == nil then textRunWrites[address] = 0x5F end
+    if projected[address] == nil then
+      textRunWrites[address] = 0x5F
+      changedProjection = true
+    end
   end
   previousProjectedText = projected
-  return true
+  return changedProjection
 end
 
 local function emitTextRuns()
@@ -474,8 +537,8 @@ end
 
 local function emitVisibleRanges()
   local rows = {}
-  for address, cell in pairs(cells) do
-    local row = math.floor((address % 0x400) / 32)
+  for address, cell in pairs(visibleCells) do
+    local row = math.floor(address / 32)
     local key = cell.instanceId .. ":" .. tostring(row)
     local item = rows[key]
     if not item then
@@ -508,7 +571,7 @@ local function emitSegmentCoverage()
   local parts = {}
   for _, segment in ipairs(activeRecord.segments) do
     local visible = 0
-    for _, cell in pairs(cells) do
+    for _, cell in pairs(visibleCells) do
       if cell.recordId == activeRecord.id then
         for _, range in ipairs(segment.ranges) do
           if cell.glyphIndex >= range.start
@@ -535,8 +598,9 @@ end
 local function chooseSegment()
   local newest = -1
   local record = nil
-  for _, cell in pairs(cells) do
-    if cell.glyphIndex > newest then
+  for _, cell in pairs(visibleCells) do
+    if activeRecord and cell.recordId == activeRecord.id
+        and cell.glyphIndex > newest then
       newest = cell.glyphIndex
       record = activeRecord
     end
@@ -566,12 +630,14 @@ end
 
 local function onEndFrame()
   propagateCopiedCells()
-  local textProjectionChanged = projectVisibleText()
+  local projection = currentProjection()
+  local sourceProjectionChanged = projectVisibleCells(projection)
+  local textProjectionChanged = projectVisibleText(projection)
   local frameHasSnapshotEvents = changed or next(layoutDirty) ~= nil
-    or textProjectionChanged
+    or sourceProjectionChanged or textProjectionChanged
   emitLayoutGroups()
   emitTextRuns()
-  if changed then
+  if changed or sourceProjectionChanged then
     emitVisibleRanges()
     emitSegmentCoverage()
     changed = false
@@ -615,6 +681,8 @@ local function onEndFrame()
       pendingBeforeMatch = {}
       pendingUploads = {}
       cells = {}
+      visibleCells = {}
+      previousSourceProjectionKey = nil
     end
   end
   drawSelectedSegment()
