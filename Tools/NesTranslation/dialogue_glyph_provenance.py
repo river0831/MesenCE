@@ -461,6 +461,12 @@ class SubtitleEventRouter:
                     else self._layout_units.get((record_id, index))
                 )
                 if unit is not None:
+                    minimum_visible = (
+                        max(2, (unit.total_count + 1) // 2)
+                        if unit.kind == "vocabulary" else 1
+                    )
+                    if count < minimum_visible:
+                        continue
                     unit_counts.append((unit.id, count))
                     item = next((
                         candidate for candidate in (label_counts or [])
@@ -510,11 +516,6 @@ class SubtitleEventRouter:
                 isinstance(instance_id, str)
                 and active_instance is not None
                 and instance_id != active_instance
-            ):
-                return None
-            if (
-                event.get("reason") == "coverage-timeout"
-                and record_id in self._source_fallback_records
             ):
                 return None
             self._source_fallback_records.discard(record_id)

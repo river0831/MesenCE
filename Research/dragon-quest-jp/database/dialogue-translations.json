@@ -173,6 +173,81 @@
         { "sourceStart": 0, "sourceEndExclusive": 16, "lines": ["那個方向沒有人。"] }
       ],
       "box": { "x": 52, "y": 158, "width": 152, "height": 18, "lineHeight": 14 }
+    },
+    {
+      "id": "chr-fc-2562",
+      "sourceText": "魔物たちと戦って経験を積んでください。そうすれば勇者としてのレベルが次々と上がり、強くなってゆくでしょう。",
+      "translation": "请与魔物战斗并积累经验。这样勇者的等级会不断提升，逐渐变强。",
+      "pages": [
+        { "lines": ["請與魔物戰鬥，積累經驗。"] },
+        { "lines": ["這樣等級會不斷提升，", "勇者也會逐漸變強。"] }
+      ],
+      "segments": [
+        { "sourceStart": 0, "sourceEndExclusive": 27, "lines": ["請與魔物戰鬥，積累經驗。"] },
+        { "sourceStart": 27, "sourceEndExclusive": 66, "lines": ["這樣等級會不斷提升，", "勇者也會逐漸變強。"] }
+      ],
+      "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
+    },
+    {
+      "id": "chr-fc-25a0",
+      "sourceText": "復活の呪文があれば、それを聞いた時の状態で蘇ることができるだろう。",
+      "translation": "只要有复活咒文，就能以听取咒文时的状态复活。",
+      "pages": [
+        { "lines": ["只要有復活咒文，", "就能再次復活。"] }
+      ],
+      "segments": [
+        { "sourceStart": 0, "sourceEndExclusive": 47, "lines": ["只要有復活咒文，", "就能再次復活。"] }
+      ],
+      "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
+    },
+    {
+      "id": "chr-fc-25f2",
+      "sourceText": "ここラダトームは、その昔楽園でした。それを魔物たちが……",
+      "translation": "这里的拉达托姆从前曾是乐园。然而魔物们……",
+      "pages": [
+        { "lines": ["拉達托姆從前曾是樂園。", "然而魔物們……"] }
+      ],
+      "segments": [
+        { "sourceStart": 0, "sourceEndExclusive": 20, "lines": ["拉達托姆從前曾是樂園。"] },
+        { "sourceStart": 20, "sourceEndExclusive": 30, "lines": ["然而魔物們……"] }
+      ],
+      "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
+    },
+    {
+      "id": "chr-fc-2eb7",
+      "sourceText": "洞窟に入るときは、たいまつを持って行けよ。",
+      "translation": "进入洞窟时，记得带上火把。",
+      "pages": [
+        { "lines": ["進入洞窟時，記得帶上火把。"] }
+      ],
+      "segments": [
+        { "sourceStart": 0, "sourceEndExclusive": 26, "lines": ["進入洞窟時，記得帶上火把。"] }
+      ],
+      "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
+    },
+    {
+      "id": "chr-fc-2f78",
+      "sourceText": "ああ、ローラ姫はいったいどこに……",
+      "translation": "啊，劳拉公主究竟在哪里……",
+      "pages": [
+        { "lines": ["蘿拉公主究竟身在何處……"] }
+      ],
+      "segments": [
+        { "sourceStart": 0, "sourceEndExclusive": 16, "lines": ["蘿拉公主究竟身在何處……"] }
+      ],
+      "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
+    },
+    {
+      "id": "chr-fc-3134",
+      "sourceText": "おお、神よ！古い言い伝えの勇者に光あれ！",
+      "translation": "哦，神明啊！愿光明保佑传说中的勇者！",
+      "pages": [
+        { "lines": ["神明！願光明保佑", "傳聞中的勇者！"] }
+      ],
+      "segments": [
+        { "sourceStart": 0, "sourceEndExclusive": 32, "lines": ["神明！願光明保佑", "傳聞中的勇者！"] }
+      ],
+      "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
     }
   ]
 }

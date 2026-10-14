@@ -418,6 +418,17 @@ The candidate list is deliberately conservative: it reports readable tile
 sequences not already covered by a reviewed source string. It is a review
 queue, not an assertion that every sequence is dialogue.
 
+Exact full-record discoveries can be promoted into the generated validated
+catalog before adding reviewed translations. Re-running this command is safe;
+an observation from the same trace and frame is recorded only once:
+
+```sh
+python3 -m Tools.NesTranslation.promote_discoveries \
+  --catalog Research/dragon-quest-jp/generated/dialogue-catalog-validated.json \
+  --discoveries Research/dragon-quest-jp/generated/playtest-discoveries.jsonl \
+  --output Research/dragon-quest-jp/generated/dialogue-catalog-validated.json
+```
+
 With the dictionary catalog and vocabulary options, dictionary-backed words
 become independent text units. Their translation rectangles come from the
 currently tagged Nametable cells, so inventory rows are not assigned fixed

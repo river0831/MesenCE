@@ -10,7 +10,10 @@ from Tools.NesTranslation.database import DatabaseError, load_database, validate
 from Tools.NesTranslation.dialogue_catalog import build_catalog, render_catalog_review
 from Tools.NesTranslation.analyze_reads import cluster_reads
 from Tools.NesTranslation.chr_records import ines_chr_layout, split_chr_records
-from Tools.NesTranslation.catalog_validation import apply_runtime_matches
+from Tools.NesTranslation.catalog_validation import (
+    apply_runtime_discoveries,
+    apply_runtime_matches,
+)
 from Tools.NesTranslation.capture import build_capture_script
 from Tools.NesTranslation.dictionary_codec import (
     expand_tokens,
@@ -112,6 +115,24 @@ def read_event(prg_offset: int, frame: int = 1) -> RomReadEvent:
 
 
 class DatabaseTests(unittest.TestCase):
+    def test_runtime_discoveries_promote_exact_catalog_records(self) -> None:
+        catalog = {"records": [{
+            "id": "new", "runtime": {"status": "unverified"},
+        }]}
+        promoted = apply_runtime_discoveries(
+            catalog,
+            [
+                {"type": "catalog-record", "frame": 42, "recordId": "new"},
+                {"type": "catalog-record", "frame": 42, "recordId": "new"},
+            ],
+            trace="playtest.jsonl",
+        )
+        runtime = promoted["records"][0]["runtime"]
+        self.assertEqual(runtime["status"], "runtime-confirmed")
+        self.assertEqual(runtime["observations"], [{
+            "trace": "playtest.jsonl", "frame": 42,
+        }])
+
     def test_segments_select_adjacent_runtime_branch_by_source_position(self) -> None:
         segments = parse_record_segments({
             "id": "shop-errors",
@@ -995,6 +1016,20 @@ class ReadAnalysisTests(unittest.TestCase):
         assert hidden is not None
         self.assertFalse(hidden["visible"])
 
+    def test_vocabulary_visibility_rejects_single_cell_fragments(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE), vocabulary,
+        )
+        fragment = router.consume(
+            'DQMENU {"type":"group","frame":9,"recordId":"dict-af",'
+            '"cellCount":1,"labels":[{"index":1,"cellCount":1,'
+            '"x":168,"y":64,"width":8,"height":8}]}'
+        )
+        assert fragment is not None
+        self.assertFalse(fragment["visible"])
+
     def test_system_template_fragments_are_not_independent_text_units(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
         units = build_text_units({}, vocabulary=vocabulary)
@@ -1143,19 +1178,15 @@ class ReadAnalysisTests(unittest.TestCase):
             "category": "item",
         })
         # A variable field can leave exact coverage below threshold. The
-        # positive source match remains authoritative until reset.
+        # positive source match remains authoritative until lifecycle timeout.
         self.assertIsNone(router.consume(
             'DQGLYPH {"type":"coverage","frame":11,'
             '"recordId":"chr-fc-35e7","segments":['
             '{"sourceStart":0,"sourceEndExclusive":7,"visibleCount":0}]}'
         ))
-        self.assertIsNone(router.consume(
+        hidden = router.consume(
             'DQGLYPH {"type":"reset","frame":30,'
             '"recordId":"chr-fc-35e7","reason":"coverage-timeout"}'
-        ))
-        hidden = router.consume(
-            'DQGLYPH {"type":"reset","frame":31,'
-            '"recordId":"chr-fc-35e7"}'
         )
         assert hidden is not None
         self.assertFalse(hidden["visible"])
