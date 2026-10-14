@@ -167,6 +167,7 @@ class SubtitleEventRouter:
         self._active_source_record: str | None = None
         self._source_terms: list[tuple[int, str]] = []
         self._dialogue_text_overrides: dict[str, str] = {}
+        self._active_dialogue_instances: dict[str, str] = {}
         self._vocabulary_records = {
             record["id"]: record for record in (vocabulary or {}).get("records", [])
         }
@@ -447,6 +448,9 @@ class SubtitleEventRouter:
             record = self._records.get(event.get("recordId"))
             if record is None:
                 return None
+            instance_id = event.get("instanceId")
+            if isinstance(instance_id, str) and instance_id:
+                self._active_dialogue_instances[record["id"]] = instance_id
             # A unique source-byte prefix is already strong evidence that this
             # dialogue is being rendered. Runtime substitutions (player name,
             # item name, amounts, etc.) can prevent the fixed glyph sequence
@@ -464,12 +468,21 @@ class SubtitleEventRouter:
             ))
         if event.get("type") == "reset":
             record_id = str(event.get("recordId"))
+            instance_id = event.get("instanceId")
+            active_instance = self._active_dialogue_instances.get(record_id)
+            if (
+                isinstance(instance_id, str)
+                and active_instance is not None
+                and instance_id != active_instance
+            ):
+                return None
             if (
                 event.get("reason") == "coverage-timeout"
                 and record_id in self._source_fallback_records
             ):
                 return None
             self._source_fallback_records.discard(record_id)
+            self._active_dialogue_instances.pop(record_id, None)
             if self._active_source_record == record_id:
                 self._active_source_record = None
             for unit_id in self._scope_units.get(f"dialogue:{record_id}", ()):
@@ -481,6 +494,14 @@ class SubtitleEventRouter:
         if event.get("type") == "coverage":
             record = self._records.get(event.get("recordId"))
             if record is None:
+                return None
+            instance_id = event.get("instanceId")
+            active_instance = self._active_dialogue_instances.get(record["id"])
+            if (
+                isinstance(instance_id, str)
+                and active_instance is not None
+                and instance_id != active_instance
+            ):
                 return None
             coverage_by_range = {
                 (item.get("sourceStart"), item.get("sourceEndExclusive")): item

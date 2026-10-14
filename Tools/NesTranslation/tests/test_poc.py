@@ -955,6 +955,32 @@ class ReadAnalysisTests(unittest.TestCase):
         assert hidden is not None
         self.assertFalse(hidden["visible"])
 
+    def test_stale_message_instance_cannot_hide_new_lifecycle(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+        )
+        first = router.consume(
+            'DQGLYPH {"type":"record","frame":10,'
+            '"recordId":"chr-fc-38a7","instanceId":"msg-1"}'
+        )
+        assert first is not None
+        second = router.consume(
+            'DQGLYPH {"type":"record","frame":20,'
+            '"recordId":"chr-fc-38a7","instanceId":"msg-2"}'
+        )
+        assert second is not None
+        self.assertIsNone(router.consume(
+            'DQGLYPH {"type":"reset","frame":21,'
+            '"recordId":"chr-fc-38a7","instanceId":"msg-1"}'
+        ))
+        hidden = router.consume(
+            'DQGLYPH {"type":"reset","frame":30,'
+            '"recordId":"chr-fc-38a7","instanceId":"msg-2"}'
+        )
+        assert hidden is not None
+        self.assertFalse(hidden["visible"])
+
     def test_snapshot_stacks_visible_dialogue_units_without_overlap(self) -> None:
         router = SubtitleEventRouter(
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
@@ -1147,6 +1173,11 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("expandedIndex = 0", script)
         self.assertIn("sourceEndExclusive = 90", script)
         self.assertIn("emptyGraceFrames = 20", script)
+        self.assertIn("local nextInstanceNumber = 1", script)
+        self.assertIn('activeInstanceId = "msg-"', script)
+        self.assertIn("characterId = activeInstanceId", script)
+        self.assertIn('\\"type\\":\\"instance-begin\\"', script)
+        self.assertIn('\\"type\\":\\"instance-end\\"', script)
         self.assertNotIn("stableFrames", script)
         self.assertIn("propagateCopiedCells()", script)
         self.assertIn("emitTextRuns()", script)

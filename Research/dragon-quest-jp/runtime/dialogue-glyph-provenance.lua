@@ -10,6 +10,8 @@ local expectingFirstByte = false
 local stream = {}
 local maxPrefixLength = 0
 local activeRecord = nil
+local activeInstanceId = nil
+local nextInstanceNumber = 1
 local nextGlyph = 1
 local pendingBeforeMatch = {}
 local pendingUploads = {}
@@ -79,7 +81,7 @@ local function assignCell(address, tag)
   -- One logical source glyph has one current screen location. Moving it during
   -- a scroll must retire its previous location instead of duplicating it.
   for otherAddress, other in pairs(cells) do
-    if otherAddress ~= address and other.recordId == tag.recordId
+    if otherAddress ~= address and other.instanceId == tag.instanceId
         and other.glyphIndex == tag.glyphIndex then
       cells[otherAddress] = nil
     end
@@ -104,6 +106,8 @@ local function alignCandidate(candidate, alreadyUploaded)
   if within < visibilityStart or within >= visibilityEndExclusive then return end
   local tag = {
     recordId = activeRecord.id,
+    instanceId = activeInstanceId,
+    characterId = activeInstanceId .. ":" .. tostring(glyph.index),
     glyphIndex = glyph.index,
     sourceOffset = glyph.sourceOffset,
     expandedIndex = glyph.expandedIndex,
@@ -120,12 +124,20 @@ end
 
 local function activateRecord(record)
   activeRecord = record
+  activeInstanceId = "msg-" .. tostring(nextInstanceNumber)
+  nextInstanceNumber = nextInstanceNumber + 1
   nextGlyph = 1
   for _, candidate in ipairs(pendingBeforeMatch) do alignCandidate(candidate, true) end
   pendingBeforeMatch = {}
   print(string.format(
-    "DQGLYPH {\"type\":\"record\",\"frame\":%d,\"recordId\":%s}",
-    frame, jsonString(record.id)
+    "DQGLYPH {\"type\":\"record\",\"frame\":%d,\"recordId\":%s," ..
+    "\"instanceId\":%s}",
+    frame, jsonString(record.id), jsonString(activeInstanceId)
+  ))
+  print(string.format(
+    "DQGLYPH {\"type\":\"instance-begin\",\"frame\":%d," ..
+    "\"recordId\":%s,\"instanceId\":%s}",
+    frame, jsonString(record.id), jsonString(activeInstanceId)
   ))
 end
 
@@ -396,10 +408,11 @@ local function emitVisibleRanges()
   local rows = {}
   for address, cell in pairs(cells) do
     local row = math.floor((address % 0x400) / 32)
-    local key = cell.recordId .. ":" .. tostring(row)
+    local key = cell.instanceId .. ":" .. tostring(row)
     local item = rows[key]
     if not item then
-      item = { recordId = cell.recordId, row = row, start = cell.glyphIndex,
+      item = { recordId = cell.recordId, instanceId = cell.instanceId,
+        row = row, start = cell.glyphIndex,
         finish = cell.glyphIndex, count = 0 }
       rows[key] = item
     end
@@ -410,9 +423,10 @@ local function emitVisibleRanges()
   local parts = {}
   for _, item in pairs(rows) do
     table.insert(parts, string.format(
-      "{\"recordId\":%s,\"row\":%d,\"start\":%d," ..
+      "{\"recordId\":%s,\"instanceId\":%s,\"row\":%d,\"start\":%d," ..
       "\"endExclusive\":%d,\"cellCount\":%d}",
-      jsonString(item.recordId), item.row, item.start, item.finish + 1, item.count
+      jsonString(item.recordId), jsonString(item.instanceId), item.row,
+      item.start, item.finish + 1, item.count
     ))
   end
   print(string.format(
@@ -441,7 +455,8 @@ local function emitSegmentCoverage()
   end
   print(string.format(
     "DQGLYPH {\"type\":\"coverage\",\"frame\":%d,\"recordId\":%s," ..
-    "\"segments\":[%s]}", frame, jsonString(activeRecord.id),
+    "\"instanceId\":%s,\"segments\":[%s]}",
+    frame, jsonString(activeRecord.id), jsonString(activeInstanceId),
     table.concat(parts, ",")
   ))
 end
@@ -502,11 +517,19 @@ local function onEndFrame()
     if not emptySinceFrame then emptySinceFrame = frame end
     if frame - emptySinceFrame >= emptyGraceFrames then
       print(string.format(
-        "DQGLYPH {\"type\":\"reset\",\"frame\":%d,\"recordId\":%s," ..
+        "DQGLYPH {\"type\":\"instance-end\",\"frame\":%d," ..
+        "\"recordId\":%s,\"instanceId\":%s," ..
         "\"reason\":\"coverage-timeout\"}",
-        frame, jsonString(activeRecord.id)
+        frame, jsonString(activeRecord.id), jsonString(activeInstanceId)
+      ))
+      print(string.format(
+        "DQGLYPH {\"type\":\"reset\",\"frame\":%d,\"recordId\":%s," ..
+        "\"instanceId\":%s," ..
+        "\"reason\":\"coverage-timeout\"}",
+        frame, jsonString(activeRecord.id), jsonString(activeInstanceId)
       ))
       activeRecord = nil
+      activeInstanceId = nil
       nextGlyph = 1
       selectedSegment = nil
       emptySinceFrame = nil
