@@ -21,6 +21,10 @@ class VisibleTextMatch:
     top: int
     right: int
     bottom: int
+    object_id: str | None = None
+    object_source_text: str | None = None
+    object_text: str | None = None
+    object_category: str | None = None
 
 
 class NametableTextRunState:
@@ -227,5 +231,15 @@ class NametableTextMatcher:
                 top=min(item[1] for item in matches),
                 right=max(item[2] + len(item[0]["pattern"]) for item in matches),
                 bottom=max(item[1] for item in matches) + 1,
+                object_id=selected[0]["id"] if selected else None,
+                object_source_text=(
+                    str(selected[0].get("sourceText", "")) if selected else None
+                ),
+                object_text=(
+                    str(selected[0].get("display", "")) if selected else None
+                ),
+                object_category=(
+                    str(selected[0].get("category", "")) if selected else None
+                ),
             )
         return None

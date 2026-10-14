@@ -290,7 +290,8 @@ class DatabaseTests(unittest.TestCase):
             database.records[0].deactivation_confidence,
             "runtime-confirmed",
         )
-        strength = database.records[1]
+        strength = next(record for record in database.records
+                        if record.id == "dq.menu.strength")
         self.assertEqual(strength.id, "dq.menu.strength")
         self.assertEqual(strength.prg_start, 0x030F)
         self.assertEqual(strength.prg_end_exclusive, 0x03F6)
@@ -303,6 +304,13 @@ class DatabaseTests(unittest.TestCase):
             database.records[0].presentation.labels[0].source_end_exclusive, 5
         )
         self.assertEqual(len(strength.presentation.labels), 10)
+        direction = next(record for record in database.records
+                         if record.id == "dq.menu.direction")
+        self.assertEqual(
+            [label.text for label in direction.presentation.labels],
+            ["北", "西", "東", "南"],
+        )
+        self.assertEqual(direction.return_to_record_id, "dq.menu.main")
         assert database.ppu_update_buffer is not None
         self.assertEqual(database.ppu_update_buffer.ram_start, 0x0300)
         self.assertEqual(database.ppu_update_buffer.ram_end_exclusive, 0x03C0)
@@ -1142,7 +1150,7 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(len(reset["items"]), 8)
         self.assertTrue(all("#label-" in item["unitId"] for item in reset["items"]))
 
-    def test_source_record_fallback_shows_variable_chest_message(self) -> None:
+    def test_visible_nametable_resolves_variable_chest_message(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
         catalog = json.loads((
             ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
@@ -1152,19 +1160,16 @@ class ReadAnalysisTests(unittest.TestCase):
             load_database(DATABASE), vocabulary, catalog,
         )
         self.assertIsNone(router.consume(
-            'DQTERM {"type":"source-term","frame":8,"recordId":"dict-a0"}'
-        ))
-        self.assertIsNone(router.consume(
-            'DQTERM {"type":"source-term","frame":8,"recordId":"dict-a1"}'
-        ))
-        # A later dictionary scan for the action passes another item. It must
-        # not replace the object selected by the earlier scan.
-        self.assertIsNone(router.consume(
-            'DQTERM {"type":"source-term","frame":9,"recordId":"dict-af"}'
-        ))
-        shown = router.consume(
             'DQGLYPH {"type":"record","frame":10,'
             '"recordId":"chr-fc-35e7"}'
+        ))
+        self.assertIsNone(router.consume(
+            'DQRUN {"type":"writes","frame":11,"runs":['
+            '{"row":20,"startColumn":17,"hex":"0f9936"}]}'
+        ))
+        shown = router.consume(
+            'DQRUN {"type":"writes","frame":12,"runs":['
+            '{"row":22,"startColumn":11,"hex":"291b1219"}]}'
         )
         assert shown is not None
         self.assertEqual([item["text"] for item in shown["items"]], [
@@ -1177,16 +1182,10 @@ class ReadAnalysisTests(unittest.TestCase):
             "text": "鑰匙",
             "category": "item",
         })
-        # A variable field can leave exact coverage below threshold. The
-        # positive source match remains authoritative until lifecycle timeout.
-        self.assertIsNone(router.consume(
-            'DQGLYPH {"type":"coverage","frame":11,'
-            '"recordId":"chr-fc-35e7","segments":['
-            '{"sourceStart":0,"sourceEndExclusive":7,"visibleCount":0}]}'
-        ))
         hidden = router.consume(
-            'DQGLYPH {"type":"reset","frame":30,'
-            '"recordId":"chr-fc-35e7","reason":"coverage-timeout"}'
+            'DQRUN {"type":"writes","frame":13,"runs":['
+            '{"row":20,"startColumn":17,"hex":"5f5f5f"},'
+            '{"row":22,"startColumn":11,"hex":"5f5f5f5f"}]}'
         )
         assert hidden is not None
         self.assertFalse(hidden["visible"])
@@ -1226,23 +1225,28 @@ class ReadAnalysisTests(unittest.TestCase):
                 ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
             ).read_text(encoding="utf-8")),
         )
-        router.consume('DQTERM {"type":"source-term","frame":1,"recordId":"dict-a1"}')
-        key_scene = router.consume(
+        self.assertIsNone(router.consume(
             'DQGLYPH {"type":"record","frame":2,'
             '"recordId":"chr-fc-35e7","instanceId":"msg-1"}'
-        )
+        ))
+        router.consume('DQRUN {"type":"writes","frame":3,"runs":['
+                       '{"row":20,"startColumn":17,"hex":"0f9936"}]}')
+        key_scene = router.consume('DQRUN {"type":"writes","frame":4,"runs":['
+                                   '{"row":22,"startColumn":11,"hex":"291b1219"}]}')
         assert key_scene is not None
         self.assertEqual(key_scene["items"][0]["text"], "發現了鑰匙。")
         self.assertEqual(key_scene["items"][0]["instanceId"], "msg-1")
+        router.consume('DQRUN {"type":"writes","frame":5,"runs":['
+                       '{"row":20,"startColumn":17,"hex":"5f5f5f"},'
+                       '{"row":22,"startColumn":11,"hex":"5f5f5f5f"}]}')
         router.consume(
-            'DQGLYPH {"type":"reset","frame":3,'
-            '"recordId":"chr-fc-35e7","instanceId":"msg-1"}'
-        )
-        router.consume('DQTERM {"type":"source-term","frame":100,"recordId":"dict-a2"}')
-        torch_scene = router.consume(
             'DQGLYPH {"type":"record","frame":101,'
             '"recordId":"chr-fc-35e7","instanceId":"msg-2"}'
         )
+        router.consume('DQRUN {"type":"writes","frame":102,"runs":['
+                       '{"row":20,"startColumn":17,"hex":"190b281b"}]}')
+        torch_scene = router.consume('DQRUN {"type":"writes","frame":103,"runs":['
+                                     '{"row":22,"startColumn":11,"hex":"291b1219"}]}')
         assert torch_scene is not None
         self.assertEqual(torch_scene["items"][0]["text"], "發現了火把。")
         self.assertEqual(torch_scene["items"][0]["instanceId"], "msg-2")
@@ -1771,7 +1775,9 @@ class ResolverTests(unittest.TestCase):
 
     def test_child_record_can_restore_declared_parent(self) -> None:
         value = json.loads(DATABASE.read_text(encoding="utf-8"))
-        value["records"][1]["deactivation"]["returnToRecordId"] = "dq.menu.main"
+        strength = next(record for record in value["records"]
+                        if record["id"] == "dq.menu.strength")
+        strength["deactivation"]["returnToRecordId"] = "dq.menu.main"
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "database.json"
             path.write_text(json.dumps(value), encoding="utf-8")

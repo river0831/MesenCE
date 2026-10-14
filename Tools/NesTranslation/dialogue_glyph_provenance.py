@@ -421,6 +421,20 @@ class SubtitleEventRouter:
                     "visibleCount": 1, "totalCount": 1,
                     "visibleRatio": 1.0, "fontSize": 8.5,
                 }
+                active_instance = None
+                if self._active_source_record is not None:
+                    active_instance = self._active_dialogue_instances.get(
+                        self._active_source_record
+                    )
+                if active_instance is not None:
+                    dynamic_item["instanceId"] = active_instance
+                if match.object_id is not None:
+                    dynamic_item["parameters"] = {"ITEM": {
+                        "recordId": match.object_id,
+                        "sourceText": match.object_source_text,
+                        "text": match.object_text,
+                        "category": match.object_category,
+                    }}
             if dynamic_item == self._dynamic_item:
                 return None
             self._dynamic_item = dynamic_item
@@ -494,6 +508,12 @@ class SubtitleEventRouter:
             instance_id = event.get("instanceId")
             if isinstance(instance_id, str) and instance_id:
                 self._active_dialogue_instances[record["id"]] = instance_id
+            # Runtime-composed messages are resolved from the visible
+            # Nametable text. A ROM dictionary scan reads many adjacent terms
+            # and cannot identify which one was actually placed on screen.
+            if isinstance(record.get("runtimeComposition"), dict):
+                self._active_source_record = record["id"]
+                return None
             # A unique source-byte prefix is already strong evidence that this
             # dialogue is being rendered. Runtime substitutions (player name,
             # item name, amounts, etc.) can prevent the fixed glyph sequence

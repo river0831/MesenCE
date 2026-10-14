@@ -33,6 +33,7 @@ local layoutCells = {}
 local layoutDirty = {}
 local layoutSourceTtlFrames = 3
 local textRunWrites = {}
+local textPending = {}
 local discoveryNode = 1
 
 for _, record in ipairs(records) do
@@ -212,6 +213,16 @@ local function onBufferWrite(address, value)
       emu.read(address - 1, emu.memType.nesDebug),
     value = value,
   }
+  local textX, textY = screenTilePixel(candidate.ppuAddress)
+  if textX and textY then
+    local textRow = math.floor(textY / 8)
+    if textRow >= math.floor(visibilityStart / 32)
+        and textRow < math.floor(visibilityEndExclusive / 32) then
+      textPending[physicalNametableAddress(candidate.ppuAddress)] = {
+        value = value, x = textX, y = textY,
+      }
+    end
+  end
   if activeRecord then
     alignCandidate(candidate, false)
   else
@@ -250,10 +261,13 @@ local function onBufferWrite(address, value)
 end
 
 local function onNametableWrite(address, value)
-  local textAddress = address % 0x400
-  if textAddress >= visibilityStart and textAddress < visibilityEndExclusive then
+  local pendingText = textPending[address]
+  if pendingText and pendingText.value == value then
+    local textAddress = math.floor(pendingText.y / 8) * 32 +
+      math.floor(pendingText.x / 8)
     textRunWrites[textAddress] = value
   end
+  textPending[address] = nil
   local oldLayout = layoutCells[address]
   local newLayout = layoutPending[address]
   if newLayout and newLayout.value == value then

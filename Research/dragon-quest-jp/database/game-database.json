@@ -50,6 +50,32 @@
       }
     },
     {
+      "id": "dq.menu.direction",
+      "kind": "direction-menu",
+      "prgRange": {
+        "start": 1240,
+        "endExclusive": 1296
+      },
+      "rawHex": "3c f7 08 5f 5b ff 5c f7 08 5d 5e ff 59 3d 3d 3e 23 1e 16 3d 3d 5a ff 3c 5f 5f 5f 10 19 5f 5f 5f 5b ff 3c 5f 1f 15 5f 5f 24 d7 15 5b ff 3c 5f 5f 5f 29 1e 29 5f 5f 5b ff",
+      "sourceText": "きた　　\nにし　ひがし\nみなみ",
+      "translation": "北\n西　东\n南",
+      "confidence": "runtime-confirmed",
+      "presentation": {
+        "mode": "label-overlay",
+        "labels": [
+          { "text": "北", "sourceStart": 27, "sourceEndExclusive": 29, "x": 128, "y": 66, "clear": { "x": 120, "y": 64, "width": 32, "height": 12 } },
+          { "text": "西", "sourceStart": 36, "sourceEndExclusive": 38, "x": 112, "y": 82, "clear": { "x": 104, "y": 80, "width": 32, "height": 12 } },
+          { "text": "東", "sourceStart": 40, "sourceEndExclusive": 43, "x": 160, "y": 82, "clear": { "x": 152, "y": 80, "width": 32, "height": 12 } },
+          { "text": "南", "sourceStart": 49, "sourceEndExclusive": 52, "x": 128, "y": 98, "clear": { "x": 120, "y": 96, "width": 32, "height": 12 } }
+        ]
+      },
+      "deactivation": {
+        "dismissInputMask": 2,
+        "returnToRecordId": "dq.menu.main",
+        "confidence": "runtime-confirmed"
+      }
+    },
+    {
       "id": "dq.menu.strength",
       "kind": "status-menu",
       "prgRange": {
