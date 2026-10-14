@@ -385,12 +385,7 @@ python3 -m Tools.NesTranslation.dialogue_glyph_provenance \
   --mesen bin/osx-arm64/Release/osx-arm64/publish/Mesen.app/Contents/MacOS/Mesen \
   --template Research/dragon-quest-jp/runtime/dialogue-glyph-provenance.lua \
   --rom "test_roms/Dragon Quest (Japan).nes" \
-  --game-database Research/dragon-quest-jp/database/game-database.json \
-  --catalog Research/dragon-quest-jp/generated/dialogue-catalog-validated.json \
-  --translations Research/dragon-quest-jp/database/dialogue-translations.json \
-  --character-map Research/dragon-quest-jp/database/character-map.json \
-  --dictionary-catalog Research/dragon-quest-jp/generated/prg-dictionary-catalog.json \
-  --vocabulary Research/dragon-quest-jp/database/vocabulary-translations.json \
+  --translation-pack Research/dragon-quest-jp/translation-pack.json \
   --external-subtitles \
   --subtitle-companion Tools/NesTranslation/subtitle_companion_macos.py \
   --snapshot-trace Research/dragon-quest-jp/generated/visible-snapshots.jsonl

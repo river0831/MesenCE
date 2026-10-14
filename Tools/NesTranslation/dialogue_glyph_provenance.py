@@ -22,6 +22,7 @@ from .dialogue_overlay import (
 from .text_review import load_character_map
 from .text_units import PpuBounds, TextUnit, VisibilityUpdate, build_text_units
 from .text_run_state import NametableTextMatcher
+from .translation_pack import load_translation_pack
 
 
 CONFIG_MARKER = "-- __NES_TRANSLATION_GLYPH_PROVENANCE_CONFIG__"
@@ -894,10 +895,11 @@ def main() -> None:
     parser.add_argument("--mesen", required=True, type=Path)
     parser.add_argument("--template", required=True, type=Path)
     parser.add_argument("--rom", required=True, type=Path)
-    parser.add_argument("--game-database", required=True, type=Path)
-    parser.add_argument("--catalog", required=True, type=Path)
-    parser.add_argument("--translations", required=True, type=Path)
-    parser.add_argument("--character-map", required=True, type=Path)
+    parser.add_argument("--translation-pack", type=Path)
+    parser.add_argument("--game-database", type=Path)
+    parser.add_argument("--catalog", type=Path)
+    parser.add_argument("--translations", type=Path)
+    parser.add_argument("--character-map", type=Path)
     parser.add_argument("--display-segments", action="store_true")
     parser.add_argument("--font-source", type=Path)
     parser.add_argument("--external-subtitles", action="store_true")
@@ -913,6 +915,27 @@ def main() -> None:
         help="write incremental Nametable text-row updates as JSONL",
     )
     args = parser.parse_args()
+    if args.translation_pack is not None:
+        if any(value is not None for value in (
+            args.game_database, args.catalog, args.translations,
+            args.character_map, args.dictionary_catalog, args.vocabulary,
+        )):
+            parser.error(
+                "--translation-pack cannot be combined with individual data files"
+            )
+        package = load_translation_pack(args.translation_pack)
+        args.game_database = package.paths["gameDatabase"]
+        args.catalog = package.paths["dialogueCatalog"]
+        args.translations = package.paths["dialogueTranslations"]
+        args.character_map = package.paths["characterMap"]
+        args.dictionary_catalog = package.paths["dictionaryCatalog"]
+        args.vocabulary = package.paths["vocabularyTranslations"]
+    elif any(value is None for value in (
+        args.game_database, args.catalog, args.translations, args.character_map,
+    )):
+        parser.error(
+            "provide --translation-pack or all individual core data files"
+        )
     raise SystemExit(run(
         args.mesen, args.template, args.rom, args.game_database, args.catalog,
         args.translations, args.character_map,

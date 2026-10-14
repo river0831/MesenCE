@@ -66,6 +66,7 @@ from Tools.NesTranslation.runtime_catalog_match import (
 from Tools.NesTranslation.snapshot_replay import load_snapshots, replay_snapshots
 from Tools.NesTranslation.snapshot_audit import audit_snapshots, render_markdown
 from Tools.NesTranslation.text_review import load_character_map, render_bytes
+from Tools.NesTranslation.translation_pack import load_translation_pack
 
 
 ROOT = Path(__file__).parents[3]
@@ -82,6 +83,7 @@ VOCABULARY_TRANSLATIONS = (
 SNAPSHOT_LIFECYCLE = (
     ROOT / "Tools/NesTranslation/tests/fixtures/visible-snapshot-lifecycle.jsonl"
 )
+TRANSLATION_PACK = ROOT / "Research/dragon-quest-jp/translation-pack.json"
 
 
 def prg_byte(cpu_address: int) -> int:
@@ -101,6 +103,61 @@ def read_event(prg_offset: int, frame: int = 1) -> RomReadEvent:
 
 
 class DatabaseTests(unittest.TestCase):
+    def test_translation_pack_loads_exact_rom_bound_resources(self) -> None:
+        package = load_translation_pack(TRANSLATION_PACK)
+        self.assertEqual(package.id, "dragon-quest-jp.zh")
+        self.assertEqual(package.system, "NES")
+        self.assertEqual(package.locale, "zh-CN")
+        self.assertEqual(package.rom_sha256, package.database.rom_sha256)
+        self.assertEqual(
+            package.paths["dialogueCatalog"].name,
+            "dialogue-catalog-validated.json",
+        )
+        self.assertIn(0xF8, package.character_map)
+        chest = next(
+            record for record in package.dialogue_translations["records"]
+            if record["id"] == "chr-fc-35e7"
+        )
+        self.assertEqual(
+            chest["runtimeComposition"]["template"], "發現了{ITEM}。"
+        )
+
+    def test_translation_pack_rejects_undeclared_template_slot(self) -> None:
+        manifest = json.loads(TRANSLATION_PACK.read_text(encoding="utf-8"))
+        dialogue = json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8"))
+        chest = next(
+            record for record in dialogue["records"]
+            if record["id"] == "chr-fc-35e7"
+        )
+        chest["runtimeComposition"]["template"] = "發現了{UNKNOWN}。"
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "database").mkdir()
+            (root / "generated").mkdir()
+            for key, source in {
+                "game-database.json": DATABASE,
+                "character-map.json": CHARACTER_MAP,
+                "vocabulary-translations.json": VOCABULARY_TRANSLATIONS,
+            }.items():
+                (root / "database" / key).write_bytes(source.read_bytes())
+            (root / "database/dialogue-translations.json").write_text(
+                json.dumps(dialogue), encoding="utf-8"
+            )
+            catalog = ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+            (root / "generated/prg-dictionary-catalog.json").write_bytes(
+                catalog.read_bytes()
+            )
+            dialogue_catalog = (
+                ROOT / "Research/dragon-quest-jp/generated/dialogue-catalog-validated.json"
+            )
+            (root / "generated/dialogue-catalog-validated.json").write_bytes(
+                dialogue_catalog.read_bytes()
+            )
+            manifest_path = root / "translation-pack.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(DatabaseError, "template slots"):
+                load_translation_pack(manifest_path)
+
     def test_message_instances_separate_repeated_record_lifecycles(self) -> None:
         tracker = MessageInstanceTracker()
         first = tracker.begin("dq.npc.king", frame=10)
