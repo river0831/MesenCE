@@ -509,3 +509,25 @@ Every emitted snapshot also includes a diagnostic `delta` with stable unit IDs
 that appeared, changed, or disappeared since the previous snapshot. Renderers
 do not need this field; it exists so visibility and overlap bugs can be traced
 without inferring lifecycle changes from screenshots.
+
+## Broad ROM text inventory
+
+`output/text-catalog.zh.md` is the human-readable inventory of every extracted
+CHR `$FC` record and every PRG dictionary entry. The matching JSON preserves
+all 686 records, including raw bytes, ROM offsets, unresolved controls, and
+low-confidence candidates that may actually be graphics. Translation status is
+kept independent from extraction status: reviewed runtime text, draft Chinese,
+and pending candidates are explicitly distinguished.
+
+Rebuild both outputs after changing an extractor or translation draft:
+
+```sh
+python3 -m Tools.NesTranslation.bulk_text_catalog \
+  --dialogue-catalog Research/dragon-quest-jp/generated/dialogue-catalog-validated.json \
+  --dictionary-catalog Research/dragon-quest-jp/generated/prg-dictionary-catalog.json \
+  --dialogue-translations Research/dragon-quest-jp/database/dialogue-translations.json \
+  --vocabulary-translations Research/dragon-quest-jp/database/vocabulary-translations.json \
+  --draft-translations Research/dragon-quest-jp/database/bulk-text-translations.zh.json \
+  --json-output Research/dragon-quest-jp/output/text-catalog.zh.json \
+  --markdown-output Research/dragon-quest-jp/output/text-catalog.zh.md
+```
