@@ -46,6 +46,11 @@ from Tools.NesTranslation.text_run_state import (
 )
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
 from Tools.NesTranslation.live import parse_trace_line, parse_trace_payload
+from Tools.NesTranslation.message_instances import (
+    GlyphComponent,
+    InstanceState,
+    MessageInstanceTracker,
+)
 from Tools.NesTranslation.overlay import build_overlay_script
 from Tools.NesTranslation.provenance import build_provenance_script
 from Tools.NesTranslation.replay import replay
@@ -96,6 +101,56 @@ def read_event(prg_offset: int, frame: int = 1) -> RomReadEvent:
 
 
 class DatabaseTests(unittest.TestCase):
+    def test_message_instances_separate_repeated_record_lifecycles(self) -> None:
+        tracker = MessageInstanceTracker()
+        first = tracker.begin("dq.npc.king", frame=10)
+        first.close(frame=20)
+        second = tracker.begin("dq.npc.king", frame=100)
+        self.assertEqual(first.record_id, second.record_id)
+        self.assertNotEqual(first.id, second.id)
+        self.assertEqual(first.state, InstanceState.CLOSED)
+        self.assertEqual(second.state, InstanceState.ACTIVE)
+
+    def test_message_instance_keeps_noncontiguous_source_trace(self) -> None:
+        instance = MessageInstanceTracker().begin("shared-suffix", frame=1)
+        for address in (0xA2C4, 0xA2C5, 0xB180, 0xB181):
+            role = "template" if address < 0xB000 else "shared"
+            instance.add_source_byte(address, bank=2, role=role)
+        self.assertEqual(
+            [(span.start, span.end_exclusive, span.role)
+             for span in instance.source_spans],
+            [(0xA2C4, 0xA2C6, "template"),
+             (0xB180, 0xB182, "shared")],
+        )
+
+    def test_runtime_parameter_belongs_to_parent_message_instance(self) -> None:
+        instance = MessageInstanceTracker().begin("found-item", frame=8)
+        instance.ensure_parameter("ITEM", value_id=3)
+        first = instance.add_character(
+            "か", source_offset=None, source_type="parameter",
+            parameter_slot="ITEM", frame=9,
+        )
+        second = instance.add_character(
+            "ぎ", source_offset=None, source_type="parameter",
+            parameter_slot="ITEM",
+            components=(
+                GlyphComponent(0x24, "base"),
+                GlyphComponent(0xF8, "mark"),
+            ), frame=9,
+        )
+        parameter = instance.parameters["ITEM"]
+        self.assertEqual(parameter.value_id, 3)
+        self.assertEqual(parameter.source_text, "かぎ")
+        self.assertEqual(parameter.character_ids, [first.id, second.id])
+        self.assertEqual(first.instance_id, instance.id)
+        self.assertEqual(second.components[1].role, "mark")
+
+    def test_closed_instance_rejects_more_runtime_output(self) -> None:
+        instance = MessageInstanceTracker().begin("dialogue", frame=1)
+        instance.close(frame=2)
+        with self.assertRaisesRegex(ValueError, "already closed"):
+            instance.add_character("あ", source_offset=0)
+
     def test_capture_script_can_start_immediately_with_longer_limit(self) -> None:
         script = build_capture_script(
             "print('trace')", start_immediately=True, frame_limit=18000
