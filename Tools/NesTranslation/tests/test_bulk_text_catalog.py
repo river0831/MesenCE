@@ -1,6 +1,10 @@
 import unittest
 
-from Tools.NesTranslation.bulk_text_catalog import build_catalog, classify_dialogue
+from Tools.NesTranslation.bulk_text_catalog import (
+    assess_display_difficulty,
+    build_catalog,
+    classify_dialogue,
+)
 
 
 class BulkTextCatalogTest(unittest.TestCase):
@@ -11,6 +15,29 @@ class BulkTextCatalogTest(unittest.TestCase):
         )
         self.assertEqual(
             classify_dialogue("スライムの こうげき！", "medium")[0], "battle"
+        )
+
+    def test_marks_fixed_text_easy_and_runtime_templates_hard(self) -> None:
+        self.assertEqual(
+            assess_display_difficulty(
+                "ここには かいだんが ない<4F><END>", "high", [0x4F],
+                kind="chr-record", source_offset=0x2140,
+            )[0],
+            "easy",
+        )
+        self.assertEqual(
+            assess_display_difficulty(
+                "{PLAYER_NAME}は <FD>を みつけた<END>", "high", [],
+                kind="chr-record", source_offset=0x35E7,
+            )[0],
+            "hard",
+        )
+        self.assertEqual(
+            assess_display_difficulty(
+                "かなにみえるがタイルデータ<END>", "high", [],
+                kind="chr-record", source_offset=0x5700,
+            )[0],
+            "hard",
         )
 
     def test_preserves_every_dialogue_and_dictionary_record(self) -> None:

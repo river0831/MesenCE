@@ -519,6 +519,13 @@ low-confidence candidates that may actually be graphics. Translation status is
 kept independent from extraction status: reviewed runtime text, draft Chinese,
 and pending candidates are explicitly distinguished.
 
+Each record also has a `displayDifficulty` assessment. `easy` means a short,
+fixed CHR record with no runtime player/object/number substitution and no
+unresolved non-layout control. `medium` is fixed but long or multi-page.
+`hard` requires dynamic composition, still has unresolved encoding, or comes
+from the late CHR range that behaves like tile/graphics data. The Markdown
+report collects translated `easy` CHR records into a priority integration list.
+
 Rebuild both outputs after changing an extractor or translation draft:
 
 ```sh

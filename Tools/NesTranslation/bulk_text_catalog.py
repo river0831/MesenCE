@@ -11,6 +11,7 @@ import argparse
 from collections import Counter
 import json
 from pathlib import Path
+import re
 from typing import Any
 
 
@@ -49,6 +50,35 @@ def classify_dialogue(text: str, likelihood: str) -> tuple[str, str]:
     return "system-or-unknown", "no stronger semantic heuristic"
 
 
+SAFE_LAYOUT_CODES = {"4F", "50", "52", "57", "60", "6C", "FB", "FF", "END"}
+
+
+def assess_display_difficulty(
+    text: str, likelihood: str, unknown_bytes: list[int], *, kind: str,
+    source_offset: int | None = None,
+) -> tuple[str, str]:
+    """Estimate overlay difficulty from source mechanics, never from semantics."""
+    if likelihood == "low":
+        return "hard", "low-confidence extraction may be CHR graphics"
+    if kind == "chr-record" and source_offset is not None and source_offset >= 0x5000:
+        return "hard", "late CHR range behaves like tiles/graphics rather than dialogue"
+    if kind == "prg-dictionary-entry":
+        if unknown_bytes or not text:
+            return "hard", "dictionary entry is empty or contains unresolved bytes"
+        return "easy", "fixed dictionary text with a stable token"
+    if any(marker in text for marker in ("{PLAYER_NAME}", "<FD>", "<F3>")):
+        return "hard", "contains a runtime-substituted name, object, enemy, or number"
+    codes = set(re.findall(r"<([0-9A-F]{2}|END)>", text))
+    unresolved = sorted(codes - SAFE_LAYOUT_CODES)
+    if unresolved:
+        return "hard", "contains unresolved source bytes or non-layout controls"
+    visible = re.sub(r"<[^>]+>|[＊「／\n]", "", text)
+    page_breaks = text.count("<57>") + text.count("<FF>")
+    if len(visible) > 72 or page_breaks > 1:
+        return "medium", "fixed text, but long or split across several dialogue pages"
+    return "easy", "short fixed text with only understood layout controls"
+
+
 def build_catalog(
     dialogue: dict[str, Any],
     dictionary: dict[str, Any],
@@ -58,6 +88,11 @@ def build_catalog(
     for source in dialogue.get("records", []):
         likelihood = source.get("evidence", {}).get("likelihood", "unknown")
         category, reason = classify_dialogue(str(source.get("decoded", "")), likelihood)
+        difficulty, difficulty_reason = assess_display_difficulty(
+            str(source.get("decoded", "")), likelihood,
+            source.get("unknownBytes", []), kind="chr-record",
+            source_offset=source.get("source", {}).get("chrStart"),
+        )
         translated = translations.get(str(source.get("id")))
         records.append({
             "id": source.get("id"),
@@ -69,6 +104,8 @@ def build_catalog(
             "translationStatus": (
                 translated.get("translationStatus", "reviewed") if translated else "pending"
             ),
+            "displayDifficulty": difficulty,
+            "displayDifficultyReason": difficulty_reason,
             "staticLikelihood": likelihood,
             "unknownBytes": source.get("unknownBytes", []),
             "source": source.get("source"),
@@ -76,6 +113,11 @@ def build_catalog(
         })
     for source in dictionary.get("entries", []):
         translated = translations.get(str(source.get("id")))
+        difficulty, difficulty_reason = assess_display_difficulty(
+            str(source.get("normalized", source.get("decoded", ""))),
+            "dictionary-entry", source.get("unknownBytes", []),
+            kind="prg-dictionary-entry",
+        )
         records.append({
             "id": source.get("id"),
             "kind": "prg-dictionary-entry",
@@ -86,6 +128,8 @@ def build_catalog(
             "translationStatus": (
                 translated.get("translationStatus", "reviewed") if translated else "pending"
             ),
+            "displayDifficulty": difficulty,
+            "displayDifficultyReason": difficulty_reason,
             "staticLikelihood": "dictionary-entry",
             "unknownBytes": source.get("unknownBytes", []),
             "source": {
@@ -98,6 +142,7 @@ def build_catalog(
         })
     counts = Counter(str(record["category"]) for record in records)
     statuses = Counter(str(record["translationStatus"]) for record in records)
+    difficulties = Counter(str(record["displayDifficulty"]) for record in records)
     return {
         "formatVersion": 1,
         "language": "zh-Hans",
@@ -113,6 +158,7 @@ def build_catalog(
             "dictionaryEntryCount": len(dictionary.get("entries", [])),
             "byCategory": dict(sorted(counts.items())),
             "byTranslationStatus": dict(sorted(statuses.items())),
+            "byDisplayDifficulty": dict(sorted(difficulties.items())),
         },
         "records": records,
     }
@@ -136,6 +182,29 @@ def render_markdown(catalog: dict[str, Any]) -> str:
     lines.extend(["", "## 翻译进度", ""])
     for status, count in summary["byTranslationStatus"].items():
         lines.append(f"- `{status}`：{count}")
+    lines.extend(["", "## 游戏显示难度", ""])
+    for difficulty, count in summary["byDisplayDifficulty"].items():
+        lines.append(f"- `{difficulty}`：{count}")
+    lines.extend([
+        "",
+        "`easy` 表示固定短文本、无动态变量和未解析字节；适合优先接入游戏。",
+        "`medium` 通常只是较长或跨页；`hard` 则含动态对象、玩家名、数字或未解析编码。",
+    ])
+    easy_ready = [
+        record for record in catalog["records"]
+        if record["displayDifficulty"] == "easy"
+        and record["translationStatus"] != "pending"
+        and record["kind"] == "chr-record"
+    ]
+    lines.extend([
+        "",
+        f"## 建议优先接入游戏的固定文本（{len(easy_ready)} 条）",
+        "",
+        "这些记录已有中文，而且不依赖玩家名、敌人名、道具名或运行时数字。",
+        "",
+    ])
+    for record in easy_ready:
+        lines.append(f"- `{record['id']}`：{record['translation']}")
     lines.extend(["", "## 可读文本（高/中可信 CHR 与全部 PRG 词典）", ""])
     for record in catalog["records"]:
         if record["kind"] == "chr-record" and record["staticLikelihood"] == "low":
@@ -148,11 +217,12 @@ def render_markdown(catalog: dict[str, Any]) -> str:
         translation = record["translation"] or "（待翻译/待确认）"
         text = str(record["sourceText"]).rstrip().replace("\n", " / ")
         lines.extend([
-            f"### {record['id']} · `{record['category']}` · `{record['translationStatus']}`",
+            f"### {record['id']} · `{record['category']}` · `{record['translationStatus']}` · display `{record['displayDifficulty']}`",
             "",
             f"- 位置：{location}",
             f"- 原文：{text}",
             f"- 中文：{translation}",
+            f"- 显示判断：{record['displayDifficultyReason']}",
             "",
         ])
     lines.extend([
