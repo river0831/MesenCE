@@ -584,16 +584,30 @@ class ReadAnalysisTests(unittest.TestCase):
         final = {"frame": 20, "items": [{"unitId": "new"}]}
         self.assertIsNone(buffer.observe("DQMENU {}", first))
         self.assertIsNone(buffer.observe("DQGLYPH {}", final))
-        self.assertIs(buffer.observe(
+        published = buffer.observe(
             'DQFRAME {"type":"end","frame":20}', None
-        ), final)
+        )
+        assert published is not None
+        self.assertEqual(published["items"], final["items"])
+        self.assertEqual(published["delta"], {
+            "appeared": ["new"], "updated": [], "disappeared": [],
+        })
+        changed = {"frame": 21, "items": [{"unitId": "new", "text": "新"}]}
+        buffer.observe("DQGLYPH {}", changed)
+        second = buffer.observe('DQFRAME {"type":"end","frame":21}', None)
+        assert second is not None
+        self.assertEqual(second["delta"], {
+            "appeared": [], "updated": ["new"], "disappeared": [],
+        })
         self.assertIsNone(buffer.finish())
 
     def test_frame_snapshot_buffer_flushes_last_state_at_process_end(self) -> None:
         buffer = FrameSnapshotBuffer()
         state = {"frame": 21, "items": []}
         self.assertIsNone(buffer.observe("DQGLYPH {}", state))
-        self.assertIs(buffer.finish(), state)
+        published = buffer.finish()
+        assert published is not None
+        self.assertEqual(published["items"], state["items"])
 
     def test_incremental_text_runs_update_only_touched_rows(self) -> None:
         state = NametableTextRunState()

@@ -43,6 +43,25 @@ class FrameSnapshotBuffer:
 
     def __init__(self) -> None:
         self._pending: dict[str, Any] | None = None
+        self._published_items: dict[str, dict[str, Any]] = {}
+
+    def _publish(self) -> dict[str, Any] | None:
+        if self._pending is None:
+            return None
+        ready = dict(self._pending)
+        current = {item["unitId"]: item for item in ready.get("items", [])}
+        ready["delta"] = {
+            "appeared": sorted(current.keys() - self._published_items.keys()),
+            "updated": sorted(
+                unit_id
+                for unit_id in current.keys() & self._published_items.keys()
+                if current[unit_id] != self._published_items[unit_id]
+            ),
+            "disappeared": sorted(self._published_items.keys() - current.keys()),
+        }
+        self._published_items = current
+        self._pending = None
+        return ready
 
     def observe(
         self, line: str, state: dict[str, Any] | None
@@ -51,14 +70,10 @@ class FrameSnapshotBuffer:
             self._pending = state
         if not line.startswith("DQFRAME "):
             return None
-        ready = self._pending
-        self._pending = None
-        return ready
+        return self._publish()
 
     def finish(self) -> dict[str, Any] | None:
-        ready = self._pending
-        self._pending = None
-        return ready
+        return self._publish()
 
 
 def logical_glyphs(
