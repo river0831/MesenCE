@@ -1150,7 +1150,7 @@ class ReadAnalysisTests(unittest.TestCase):
             "dialogue:chr-fc-35e7", (("chr-fc-35e7#glyph-0-7", 7),)
         ))
         self.assertEqual([item["text"] for item in dialogue["items"]], [
-            "發現了物品。"
+            "鑰匙", "發現了物品。"
         ])
         restored = router.apply_visibility(VisibilityUpdate(
             "dialogue:chr-fc-35e7", ()
@@ -1687,6 +1687,8 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertNotIn("screenTilePixel(candidate.ppuAddress)", script)
         self.assertIn("Tile values are not identities", script)
         self.assertNotIn("oldLayout and oldLayout.value == value", script)
+        self.assertIn("A source read authorizes one producer-buffer write", script)
+        self.assertGreaterEqual(script.count("staticLayoutSource = nil"), 2)
         self.assertIn("local function physicalNametableAddress", script)
         self.assertIn("return ppuAddress % 0x800", script)
         self.assertIn(

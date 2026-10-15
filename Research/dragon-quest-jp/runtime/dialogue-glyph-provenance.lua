@@ -270,6 +270,13 @@ local function onBufferWrite(address, value)
     if layoutSource.dynamic then
       dynamicLayoutSource = nil
       dynamicLayoutSourceValue = nil
+    else
+      -- A source read authorizes one producer-buffer write. Keeping this
+      -- context latched would assign every later menu/map write to the last
+      -- record read, even after that record's window has disappeared.
+      staticLayoutSource = nil
+      staticLayoutSourceValue = nil
+      staticLayoutSourceLabelIndex = nil
     end
   end
 end
