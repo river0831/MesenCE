@@ -944,9 +944,9 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         assert shown is not None
         self.assertEqual([item["text"] for item in shown["items"]], [
-            "發現了火把。"
+            "火把", "發現了火把。"
         ])
-        self.assertEqual(shown["items"][0]["ppuBounds"], {
+        self.assertEqual(shown["items"][1]["ppuBounds"], {
             "x": 88, "y": 160, "width": 80, "height": 24,
         })
         cleared = router.consume(
@@ -1358,9 +1358,9 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         assert shown is not None
         self.assertEqual([item["text"] for item in shown["items"]], [
-            "發現了鑰匙。"
+            "鑰匙", "發現了鑰匙。"
         ])
-        item = shown["items"][0]
+        item = shown["items"][1]
         self.assertEqual(item["parameters"]["ITEM"], {
             "recordId": "dict-a1",
             "sourceText": "かぎ",
@@ -1419,8 +1419,11 @@ class ReadAnalysisTests(unittest.TestCase):
         key_scene = router.consume('DQRUN {"type":"writes","frame":4,"runs":['
                                    '{"row":22,"startColumn":11,"hex":"291b1219"}]}')
         assert key_scene is not None
-        self.assertEqual(key_scene["items"][0]["text"], "發現了鑰匙。")
-        self.assertEqual(key_scene["items"][0]["instanceId"], "msg-1")
+        self.assertEqual(
+            [item["text"] for item in key_scene["items"]],
+            ["鑰匙", "發現了鑰匙。"],
+        )
+        self.assertEqual(key_scene["items"][1]["instanceId"], "msg-1")
         router.consume('DQRUN {"type":"writes","frame":5,"runs":['
                        '{"row":20,"startColumn":17,"hex":"5f5f5f"},'
                        '{"row":22,"startColumn":11,"hex":"5f5f5f5f"}]}')
@@ -1433,10 +1436,13 @@ class ReadAnalysisTests(unittest.TestCase):
         torch_scene = router.consume('DQRUN {"type":"writes","frame":103,"runs":['
                                      '{"row":22,"startColumn":11,"hex":"291b1219"}]}')
         assert torch_scene is not None
-        self.assertEqual(torch_scene["items"][0]["text"], "發現了火把。")
-        self.assertEqual(torch_scene["items"][0]["instanceId"], "msg-2")
         self.assertEqual(
-            torch_scene["items"][0]["parameters"]["ITEM"]["sourceText"],
+            [item["text"] for item in torch_scene["items"]],
+            ["火把", "發現了火把。"],
+        )
+        self.assertEqual(torch_scene["items"][1]["instanceId"], "msg-2")
+        self.assertEqual(
+            torch_scene["items"][1]["parameters"]["ITEM"]["sourceText"],
             "たいまつ",
         )
 

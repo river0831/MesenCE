@@ -285,28 +285,11 @@ class SubtitleEventRouter:
 
     def _scene_state(self) -> dict[str, Any]:
         items = []
-        consumed_vocabulary = {
-            str(parameter["recordId"])
-            for parameters in self._runtime_parameters.values()
-            for parameter in parameters.values()
-            if isinstance(parameter, dict)
-            and isinstance(parameter.get("recordId"), str)
-        }
-        if isinstance(self._dynamic_item, dict):
-            dynamic_parameters = self._dynamic_item.get("parameters", {})
-            if isinstance(dynamic_parameters, dict):
-                consumed_vocabulary.update(
-                    str(parameter["recordId"])
-                    for parameter in dynamic_parameters.values()
-                    if isinstance(parameter, dict)
-                    and isinstance(parameter.get("recordId"), str)
-                )
         layout_units = sorted(
             (
                 self._units_by_id[unit_id]
                 for unit_id in self._visible_units
                 if self._units_by_id[unit_id].kind in ("label", "vocabulary")
-                and self._units_by_id[unit_id].record_id not in consumed_vocabulary
             ),
             # Static menu labels describe the base window.  Vocabulary terms
             # are discovered from the current Nametable contents and may be
