@@ -10,6 +10,18 @@ from .database import DatabaseError
 
 
 _DYNAMIC_MARKER = re.compile(r"\{[^}]+\}|<[0-9A-Fa-f]{2}>")
+_FIXED_TEXT_REASONS = frozenset((
+    "short fixed text with only understood layout controls",
+    "fixed text, but long or split across several dialogue pages",
+    # These records contain game-specific dictionary/control bytes that the
+    # generic extractor cannot name, but their complete ROM byte sequence is
+    # still stable and therefore safe to bind with static-exact matching.
+    "contains unresolved source bytes or non-layout controls",
+))
+
+
+def _is_fixed_candidate(candidate: dict[str, Any]) -> bool:
+    return candidate.get("displayDifficultyReason") in _FIXED_TEXT_REASONS
 
 
 def _wrap_translation(text: str, width: int = 18) -> list[str]:
@@ -38,11 +50,13 @@ def integrate_static_texts(
     inventory: dict[str, Any],
     character_map: dict[int, dict[str, Any]],
 ) -> dict[str, Any]:
-    """Add fixed, single-message, easy translations absent from dialogue.
+    """Add translated, fixed messages absent from the reviewed dialogue set.
 
     Exact raw-byte agreement binds the human-facing inventory row to the
-    runtime catalog record.  Complex containers and dynamic templates stay out
-    of this generic tier.
+    runtime catalog record. Complex containers and runtime-substituted
+    templates stay out of this generic tier. Extraction difficulty alone does
+    not exclude stable bytes: a game-specific control byte can be opaque to the
+    generic extractor while remaining an exact and reliable runtime key.
     """
     result = deepcopy(dialogue)
     records = result.setdefault("records", [])
@@ -108,7 +122,7 @@ def integrate_static_texts(
             raise DatabaseError(f"static text bytes disagree with runtime catalog: {record_id}")
         if (
             record_id not in existing
-            and candidate.get("displayDifficulty") == "easy"
+            and _is_fixed_candidate(candidate)
             and candidate.get("messageUnitCount") == 1
             and isinstance(translation, str) and translation.strip()
             and not _DYNAMIC_MARKER.search(translation)
@@ -134,7 +148,7 @@ def integrate_static_texts(
             runtime_unit = runtime_units.get(unit_id)
             if (
                 not isinstance(unit_id, str) or unit_id in existing
-                or unit.get("displayDifficulty") != "easy"
+                or not _is_fixed_candidate(unit)
                 or not isinstance(unit_translation, str) or not unit_translation.strip()
                 or _DYNAMIC_MARKER.search(unit_translation)
                 or runtime_unit is None
@@ -153,7 +167,7 @@ def integrate_static_texts(
                 ),
             )
     result["staticIntegration"] = {
-        "policy": "easy-fixed-message-units",
+        "policy": "exact-fixed-message-units",
         "recordCount": len(promoted),
         "recordIds": promoted,
     }

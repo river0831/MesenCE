@@ -186,7 +186,7 @@ class DatabaseTests(unittest.TestCase):
         )
         self.assertGreater(
             package.dialogue_translations["staticIntegration"]["recordCount"],
-            75,
+            130,
         )
         split_dialogue = next(
             record for record in package.dialogue_translations["records"]
