@@ -6,7 +6,9 @@ import argparse
 from collections import Counter, defaultdict
 import json
 from pathlib import Path
+import re
 from typing import Any, Iterable
+import unicodedata
 
 from .snapshot_replay import load_snapshots
 from .text_review import load_character_map
@@ -40,6 +42,16 @@ def _decoded_sequences(
     if len(text.replace(" ", "")) >= 2:
         sequences.append(text)
     return tuple(sequences)
+
+
+def _normalized_text(value: str) -> str:
+    """Compare partial screen writes without depending on dakuten timing."""
+    value = re.sub(r"<[^>]+>", "", value)
+    decomposed = unicodedata.normalize("NFKD", value)
+    return "".join(
+        character for character in decomposed
+        if not character.isspace() and unicodedata.category(character) != "Mn"
+    )
 
 
 def load_text_run_events(path: Path) -> list[dict[str, Any]]:
@@ -86,6 +98,7 @@ def build_playtest_report(
     discovery_events: Iterable[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     snapshots = list(snapshots)
+    discovery_events = list(discovery_events)
     translated_dialogue = {
         str(record["id"]) for record in translations.get("records", [])
     }
@@ -101,9 +114,21 @@ def build_playtest_report(
         str(record["id"]): record
         for record in (dialogue_catalog or {}).get("records", [])
     }
+    discovered_ids = {
+        str(event["recordId"])
+        for event in discovery_events if isinstance(event.get("recordId"), str)
+    }
+    known_catalog_ids = translated_dialogue | discovered_ids | {
+        record_id for record_id, record in catalog_by_id.items()
+        if record.get("runtime", {}).get("status") == "runtime-confirmed"
+    }
     known_sources.update(
         str(catalog_by_id[record_id].get("decoded", "")).strip()
-        for record_id in translated_dialogue if record_id in catalog_by_id
+        for record_id in known_catalog_ids if record_id in catalog_by_id
+    )
+    normalized_sources = tuple(
+        normalized for source in known_sources
+        if (normalized := _normalized_text(source))
     )
 
     record_frames: dict[str, set[int]] = defaultdict(set)
@@ -144,11 +169,8 @@ def build_playtest_report(
                 })
 
     def is_known(text: str) -> bool:
-        compact = text.replace(" ", "")
-        return any(
-            compact and compact in source.replace(" ", "")
-            for source in known_sources
-        )
+        compact = _normalized_text(text)
+        return any(compact and compact in source for source in normalized_sources)
 
     candidates = [
         {

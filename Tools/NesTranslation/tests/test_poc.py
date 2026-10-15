@@ -651,6 +651,22 @@ class ReadAnalysisTests(unittest.TestCase):
             report["catalogDiscoveries"][0]["recordId"], "new-dialogue"
         )
 
+    def test_playtest_report_treats_devoiced_partial_writes_as_known(self) -> None:
+        report = build_playtest_report(
+            [], [{
+                "type": "writes", "frame": 11,
+                "runs": [{"row": 20, "startColumn": 2, "hex": "0a0b"}],
+            }],
+            {0x0A: {"type": "glyph", "display": "か"},
+             0x0B: {"type": "glyph", "display": "き"}},
+            {"records": [{"id": "dialogue"}]},
+            {"records": []},
+            {"records": [{"id": "dialogue", "decoded": "＊「かぎは"}]},
+        )
+        self.assertEqual(
+            report["textCandidates"][0]["classification"], "known-source"
+        )
+
     def test_frame_snapshot_buffer_publishes_only_final_state(self) -> None:
         buffer = FrameSnapshotBuffer()
         first = {"frame": 20, "items": [{"unitId": "old"}]}

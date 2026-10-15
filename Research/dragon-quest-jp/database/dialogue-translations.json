@@ -214,6 +214,18 @@
       "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
     },
     {
+      "id": "chr-fc-2688",
+      "sourceText": "ラダトームの城へようこそ！",
+      "translation": "欢迎来到拉达托姆城堡！",
+      "pages": [
+        { "lines": ["歡迎來到拉達托姆城堡！"] }
+      ],
+      "segments": [
+        { "sourceStart": 0, "sourceEndExclusive": 13, "lines": ["歡迎來到拉達托姆城堡！"] }
+      ],
+      "box": { "x": 52, "y": 150, "width": 152, "height": 66, "lineHeight": 15 }
+    },
+    {
       "id": "chr-fc-2eb7",
       "sourceText": "洞窟に入るときは、たいまつを持って行けよ。",
       "translation": "进入洞窟时，记得带上火把。",
