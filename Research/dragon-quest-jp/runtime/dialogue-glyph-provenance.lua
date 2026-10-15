@@ -491,27 +491,44 @@ local function snapshotCells()
   untaggedWrites = {}
 end
 
-local function emitLayoutGroups()
+local function projectedPhysicalCell(address, projection)
+  local physicalPage = math.floor(address / 0x400)
+  local within = address % 0x400
+  for verticalPage = 0, 1 do
+    local logicalPage = physicalPage + verticalPage * 2
+    local ppuAddress = 0x2000 + logicalPage * 0x400 + within
+    local x, y = screenTilePixel(ppuAddress, projection)
+    if x and y then return x, y end
+  end
+  return nil, nil
+end
+
+local function emitLayoutGroups(projection)
   for recordId, _ in pairs(layoutDirty) do
     local count = 0
     local labelCounts = {}
     local labelBounds = {}
-    for _, owner in pairs(layoutCells) do
+    for address, owner in pairs(layoutCells) do
       if owner.recordId == recordId then
         count = count + 1
         if owner.labelIndex then
           labelCounts[owner.labelIndex] = (labelCounts[owner.labelIndex] or 0) + 1
-          if owner.x and owner.y then
+          -- A window is often assembled on the offscreen Nametable page and
+          -- scrolled into view afterwards.  Project the retained physical
+          -- cell now instead of freezing a missing/stale position at write
+          -- time.
+          local x, y = projectedPhysicalCell(address, projection)
+          if x and y then
             local bounds = labelBounds[owner.labelIndex]
             if not bounds then
-              bounds = { minX = owner.x, minY = owner.y,
-                maxX = owner.x + 8, maxY = owner.y + 8 }
+              bounds = { minX = x, minY = y,
+                maxX = x + 8, maxY = y + 8 }
               labelBounds[owner.labelIndex] = bounds
             else
-              bounds.minX = math.min(bounds.minX, owner.x)
-              bounds.minY = math.min(bounds.minY, owner.y)
-              bounds.maxX = math.max(bounds.maxX, owner.x + 8)
-              bounds.maxY = math.max(bounds.maxY, owner.y + 8)
+              bounds.minX = math.min(bounds.minX, x)
+              bounds.minY = math.min(bounds.minY, y)
+              bounds.maxX = math.max(bounds.maxX, x + 8)
+              bounds.maxY = math.max(bounds.maxY, y + 8)
             end
           end
         end
@@ -642,7 +659,7 @@ local function onEndFrame()
   local textProjectionChanged = projectVisibleText(projection)
   local frameHasSnapshotEvents = changed or next(layoutDirty) ~= nil
     or sourceProjectionChanged or textProjectionChanged
-  emitLayoutGroups()
+  emitLayoutGroups(projection)
   emitTextRuns()
   if changed or sourceProjectionChanged then
     emitVisibleRanges()

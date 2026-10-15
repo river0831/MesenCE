@@ -1646,6 +1646,9 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         self.assertIn('state["ppu.tmpVideoRamAddr"]', script)
         self.assertIn('state["ppu.xScroll"]', script)
+        self.assertIn("local function projectedPhysicalCell", script)
+        self.assertIn("emitLayoutGroups(projection)", script)
+        self.assertIn("local x, y = projectedPhysicalCell(address, projection)", script)
         self.assertIn("local function physicalNametableAddress", script)
         self.assertIn("return ppuAddress % 0x800", script)
         self.assertIn(
