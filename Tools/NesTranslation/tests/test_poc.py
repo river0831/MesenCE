@@ -42,7 +42,7 @@ from Tools.NesTranslation.dialogue_glyph_provenance import (
     SubtitleEventRouter,
     validate_segments,
 )
-from Tools.NesTranslation.text_units import VisibilityUpdate, build_text_units
+from Tools.NesTranslation.text_units import PpuBounds, VisibilityUpdate, build_text_units
 from Tools.NesTranslation.text_run_state import (
     NametableTextMatcher,
     NametableTextRunState,
@@ -1120,6 +1120,9 @@ class ReadAnalysisTests(unittest.TestCase):
         router = SubtitleEventRouter(
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
             load_database(DATABASE), vocabulary,
+            json.loads((
+                ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+            ).read_text(encoding="utf-8")),
         )
         shown = router.consume(
             'DQMENU {"type":"group","frame":9,"recordId":"dict-a1",'
@@ -1147,6 +1150,34 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         assert hidden is not None
         self.assertFalse(hidden["visible"])
+
+    def test_visible_vocabulary_renders_above_overlapping_menu_label(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE), vocabulary, catalog,
+        )
+        router.apply_visibility(VisibilityUpdate(
+            "label:dq.menu.main",
+            (("dq.menu.main#label-6", 10),),
+            (("dq.menu.main#label-6", PpuBounds(168, 64, 48, 16)),),
+        ))
+        shown = router.consume(
+            'DQRUN {"type":"writes","frame":9,"runs":['
+            '{"row":8,"startColumn":22,"hex":"0f99"}]}'
+        )
+        assert shown is not None
+        self.assertEqual(
+            [item["text"] for item in shown["items"]],
+            ["調査", "鑰匙"],
+        )
+        self.assertEqual(
+            shown["items"][-1]["ppuBounds"],
+            {"x": 176, "y": 64, "width": 16, "height": 8},
+        )
 
     def test_vocabulary_visibility_rejects_single_cell_fragments(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))

@@ -299,7 +299,12 @@ class SubtitleEventRouter:
                     and self._units_by_id[unit_id].kind == "vocabulary"
                 )
             ),
-            key=lambda unit: unit.id,
+            # Static menu labels describe the base window.  Vocabulary terms
+            # are discovered from the current Nametable contents and may be
+            # drawn by a child window over the same PPU cells.  Render those
+            # live matches last so the base label cannot cover them in the
+            # external subtitle companion.
+            key=lambda unit: (0 if unit.kind == "label" else 1, unit.id),
         )
         for unit in layout_units:
             items.append(unit.snapshot_item(
