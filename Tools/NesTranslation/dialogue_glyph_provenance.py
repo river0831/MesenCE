@@ -524,7 +524,12 @@ class SubtitleEventRouter:
                         candidate for candidate in (label_counts or [])
                         if isinstance(candidate, dict) and candidate.get("index") == index
                     ), None)
-                    if item is not None and all(
+                    # Declarative menu labels have stable reviewed bounds.
+                    # During window construction or occlusion, the runtime
+                    # cells may cover only part of a label; using their tight
+                    # bounding box clips translated text.  Vocabulary terms
+                    # have no fixed position, so only they use live bounds.
+                    if unit.kind == "vocabulary" and item is not None and all(
                         isinstance(item.get(key), int)
                         for key in ("x", "y", "width", "height")
                     ):

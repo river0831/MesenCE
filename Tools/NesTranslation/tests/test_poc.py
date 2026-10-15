@@ -1225,6 +1225,22 @@ class ReadAnalysisTests(unittest.TestCase):
         assert hidden is not None
         self.assertFalse(hidden["visible"])
 
+    def test_partial_menu_cells_do_not_shrink_reviewed_label_bounds(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+        )
+        shown = router.consume(
+            'DQMENU {"type":"group","recordId":"dq.menu.main",'
+            '"cellCount":2,"labels":[{"index":8,"cellCount":2,'
+            '"x":176,"y":80,"width":16,"height":8}]}'
+        )
+        assert shown is not None
+        self.assertEqual(shown["items"][0]["text"], "拿取")
+        self.assertEqual(shown["items"][0]["ppuBounds"], {
+            "x": 174, "y": 80, "width": 40, "height": 12,
+        })
+
     def test_subtitle_router_filters_individual_visible_menu_labels(self) -> None:
         router = SubtitleEventRouter(
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
