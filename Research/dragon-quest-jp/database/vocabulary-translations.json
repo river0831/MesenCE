@@ -24,7 +24,7 @@
     { "id": "dict-9b", "token": 155, "category": "shield", "sourceText": "みかがみのたて", "translation": "水镜盾", "display": "水鏡盾", "confidence": "semantic-probable" },
 
     { "id": "dict-a0", "token": 160, "category": "item", "sourceText": "やくそう", "translation": "药草", "display": "藥草", "confidence": "semantic-probable" },
-    { "id": "dict-a1", "token": 161, "category": "item", "sourceText": "かぎ", "translation": "钥匙", "display": "鑰匙", "confidence": "semantic-probable" },
+    { "id": "dict-a1", "token": 161, "category": "item", "sourceText": "かぎ", "translation": "钥匙", "display": "鑰匙", "confidence": "semantic-probable", "tileAlternatives": { "1": [153] } },
     { "id": "dict-a2", "token": 162, "category": "item", "sourceText": "たいまつ", "translation": "火把", "display": "火把", "confidence": "semantic-probable" },
     { "id": "dict-a3", "token": 163, "category": "item", "sourceText": "せいすい", "translation": "圣水", "display": "聖水", "confidence": "semantic-probable" },
     { "id": "dict-a4", "token": 164, "category": "item", "sourceText": "キメラのつばさ", "translation": "奇美拉之翼", "display": "奇美拉之翼", "confidence": "semantic-probable" },

@@ -158,6 +158,9 @@ class NametableTextMatcher:
             )
             candidate["pattern"] = pattern
             candidate["variablePositions"] = variable_positions
+            candidate["tileAlternatives"] = self._tile_alternatives(
+                candidate, pattern, variable_positions
+            )
             if not pattern:
                 continue
             self._lexemes.append(candidate)
@@ -170,6 +173,9 @@ class NametableTextMatcher:
             )
             candidate["pattern"] = pattern
             candidate["variablePositions"] = variable_positions
+            candidate["tileAlternatives"] = self._tile_alternatives(
+                candidate, pattern, variable_positions
+            )
             if not pattern:
                 continue
             self._lexemes.append(candidate)
@@ -191,17 +197,36 @@ class NametableTextMatcher:
         return tuple(pattern), frozenset(variable_positions)
 
     @staticmethod
+    def _tile_alternatives(
+        candidate: dict[str, Any], pattern: tuple[int, ...],
+        variable_positions: frozenset[int],
+    ) -> dict[int, frozenset[int]]:
+        """Resolve pack-reviewed alternatives for glyphs followed by modifiers.
+
+        A modifier means that the visible tile may differ from the source byte;
+        it must not turn that position into an unrestricted wildcard.
+        """
+        configured = candidate.get("tileAlternatives", {})
+        result = {}
+        for position in variable_positions:
+            values = configured.get(str(position), configured.get(position, []))
+            result[position] = frozenset((pattern[position], *map(int, values)))
+        return result
+
+    @staticmethod
     def _locations(
         row: tuple[int | None, ...], pattern: tuple[int, ...],
-        variable_positions: frozenset[int] = frozenset(),
+        tile_alternatives: dict[int, frozenset[int]] | None = None,
     ) -> tuple[int, ...]:
+        tile_alternatives = tile_alternatives or {}
         return tuple(
             column for column in range(len(row) - len(pattern) + 1)
             if all(
                 row[column + offset] is not None
                 and (
-                    offset in variable_positions
-                    or row[column + offset] == expected
+                    row[column + offset] in tile_alternatives[offset]
+                    if offset in tile_alternatives
+                    else row[column + offset] == expected
                 )
                 for offset, expected in enumerate(pattern)
             )
@@ -217,7 +242,7 @@ class NametableTextMatcher:
             )
             for lexeme in self._variable_lexemes:
                 for column in self._locations(
-                    row, lexeme["pattern"], lexeme["variablePositions"]
+                    row, lexeme["pattern"], lexeme["tileAlternatives"]
                 ):
                     visible.append((lexeme, row_index, column))
         return visible

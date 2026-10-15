@@ -82,12 +82,21 @@ class SubtitleController(NSObject):
         bounds = self.window.contentView().bounds()
         scale_x = bounds.size.width / 256.0
         scale_y = bounds.size.height / 240.0
-        x = ppu_bounds["x"] * scale_x
+        source_width = ppu_bounds["width"]
+        # A two-tile NES word can be narrower than two AppKit CJK glyphs once
+        # normal text-field padding is included. Expand only the presentation
+        # rectangle, while retaining the source rectangle's centre.
+        display_width = max(source_width, len(text) * (font_size + 4.0))
+        display_x = max(
+            0.0, min(256.0 - display_width,
+                     ppu_bounds["x"] - (display_width - source_width) / 2.0)
+        )
+        x = display_x * scale_x
         y = bounds.size.height - (
             ppu_bounds["y"] + ppu_bounds["height"]
         ) * scale_y
         field = NSTextField.alloc().initWithFrame_(NSMakeRect(
-            x, y, ppu_bounds["width"] * scale_x,
+            x, y, display_width * scale_x,
             ppu_bounds["height"] * scale_y,
         ))
         field.setEditable_(False)

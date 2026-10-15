@@ -835,6 +835,18 @@ class ReadAnalysisTests(unittest.TestCase):
         assert match is not None
         self.assertEqual(match.text, "發現了鑰匙。")
 
+    def test_incremental_matcher_rejects_unreviewed_voicing_tile(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
+        matcher = NametableTextMatcher(vocabulary, catalog)
+        matcher.apply({
+            "type": "writes",
+            "runs": [{"row": 21, "startColumn": 10, "hex": "0f25"}],
+        })
+        self.assertEqual(matcher.visible_lexemes, ())
+
     def test_incremental_matcher_does_not_fuzz_unmodified_glyphs(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
         catalog = json.loads((
