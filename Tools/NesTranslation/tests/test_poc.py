@@ -1680,6 +1680,11 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("local function projectedPhysicalCell", script)
         self.assertIn("emitLayoutGroups(projection)", script)
         self.assertIn("local x, y = projectedPhysicalCell(address, projection)", script)
+        self.assertIn("local layoutRecordsById = {}", script)
+        self.assertIn("layoutRecordsById[record.id] = record", script)
+        self.assertIn("local labelIndex = owner.labelIndex", script)
+        self.assertIn("if not labelIndex and not owner.dynamic and x and y then", script)
+        self.assertNotIn("screenTilePixel(candidate.ppuAddress)", script)
         self.assertIn("local function physicalNametableAddress", script)
         self.assertIn("return ppuAddress % 0x800", script)
         self.assertIn(

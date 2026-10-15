@@ -44,6 +44,7 @@ local previousProjectionKey = nil
 local previousSourceProjectionKey = nil
 local discoveryNode = 1
 local recordsByFirstByte = {}
+local layoutRecordsById = {}
 
 for _, record in ipairs(records) do
   maxPrefixLength = math.max(maxPrefixLength, #record.matchPrefix)
@@ -55,6 +56,7 @@ for _, record in ipairs(records) do
 end
 
 for _, record in ipairs(layoutRecords) do
+  layoutRecordsById[record.id] = record
   emu.addMemoryCallback(function(address, value)
     if record.dynamic and address == record.startAddress then
       print(string.format(
@@ -258,23 +260,11 @@ local function onBufferWrite(address, value)
     ((not layoutSource.dynamic and not layoutSourceLabelIndex)
       or candidate.value == layoutSourceValue)
   if layoutMatches then
-    local x, y = screenTilePixel(candidate.ppuAddress)
     local labelIndex = layoutSource.dynamic and 1 or layoutSourceLabelIndex
-    if not layoutSource.dynamic and not labelIndex then
-      for _, label in ipairs(layoutSource.labels) do
-        if x and y and x < label.endX and x + 8 > label.startX
-            and y < label.endY and y + 8 > label.startY then
-          labelIndex = label.index
-          break
-        end
-      end
-    end
     layoutPending[physicalNametableAddress(candidate.ppuAddress)] = {
       recordId = layoutSource.id,
       labelIndex = labelIndex,
       value = value,
-      x = x,
-      y = y,
       dynamic = layoutSource.dynamic,
     }
     if layoutSource.dynamic then
@@ -526,19 +516,32 @@ local function emitLayoutGroups(projection)
     for address, owner in pairs(layoutCells) do
       if owner.recordId == recordId then
         count = count + 1
-        if owner.labelIndex then
-          labelCounts[owner.labelIndex] = (labelCounts[owner.labelIndex] or 0) + 1
-          -- A window is often assembled on the offscreen Nametable page and
-          -- scrolled into view afterwards.  Project the retained physical
-          -- cell now instead of freezing a missing/stale position at write
-          -- time.
-          local x, y = projectedPhysicalCell(address, projection)
+        -- A window is often assembled on the offscreen Nametable page and
+        -- scrolled into view afterwards. Resolve rectangle-only labels from
+        -- the retained physical cell after applying the current projection;
+        -- classifying them when written would use the previously visible page.
+        local x, y = projectedPhysicalCell(address, projection)
+        local labelIndex = owner.labelIndex
+        if not labelIndex and not owner.dynamic and x and y then
+          local record = layoutRecordsById[recordId]
+          if record then
+            for _, label in ipairs(record.labels) do
+              if x < label.endX and x + 8 > label.startX
+                  and y < label.endY and y + 8 > label.startY then
+                labelIndex = label.index
+                break
+              end
+            end
+          end
+        end
+        if labelIndex then
+          labelCounts[labelIndex] = (labelCounts[labelIndex] or 0) + 1
           if x and y then
-            local bounds = labelBounds[owner.labelIndex]
+            local bounds = labelBounds[labelIndex]
             if not bounds then
               bounds = { minX = x, minY = y,
                 maxX = x + 8, maxY = y + 8 }
-              labelBounds[owner.labelIndex] = bounds
+              labelBounds[labelIndex] = bounds
             else
               bounds.minX = math.min(bounds.minX, x)
               bounds.minY = math.min(bounds.minY, y)
