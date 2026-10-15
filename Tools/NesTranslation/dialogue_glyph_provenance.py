@@ -418,6 +418,7 @@ class SubtitleEventRouter:
                 dynamic_item = {
                     "unitId": f"ppu-message:{match.action_id}",
                     "recordId": match.action_id,
+                    "kind": "dynamic",
                     "text": match.text,
                     "ppuBounds": {
                         "x": match.left * 8, "y": match.top * 8,
@@ -936,6 +937,7 @@ def run(
     font_source_path: Path | None,
     external_subtitles: bool,
     subtitle_companion_path: Path | None,
+    subtitle_debug_regions: bool = False,
     snapshot_trace_path: Path | None = None,
     text_run_trace_path: Path | None = None,
     discovery_trace_path: Path | None = None,
@@ -1012,8 +1014,13 @@ def run(
         with ExitStack() as stack:
             companion = None
             if external_subtitles:
+                companion_command = [
+                    "/usr/bin/python3", str(subtitle_companion_path)
+                ]
+                if subtitle_debug_regions:
+                    companion_command.append("--debug-regions")
                 companion = stack.enter_context(subprocess.Popen(
-                    ["/usr/bin/python3", str(subtitle_companion_path)],
+                    companion_command,
                     stdin=subprocess.PIPE,
                     text=True,
                 ))
@@ -1092,6 +1099,10 @@ def main() -> None:
     parser.add_argument("--font-source", type=Path)
     parser.add_argument("--external-subtitles", action="store_true")
     parser.add_argument("--subtitle-companion", type=Path)
+    parser.add_argument(
+        "--subtitle-debug-regions", action="store_true",
+        help="outline recognized translation groups in the companion window",
+    )
     parser.add_argument("--dictionary-catalog", type=Path)
     parser.add_argument("--vocabulary", type=Path)
     parser.add_argument(
@@ -1135,6 +1146,7 @@ def main() -> None:
         args.translations, args.character_map,
         args.display_segments, args.font_source,
         args.external_subtitles, args.subtitle_companion,
+        args.subtitle_debug_regions,
         args.snapshot_trace, args.text_run_trace, args.discovery_trace,
         args.dictionary_catalog, args.vocabulary,
         translations_override,

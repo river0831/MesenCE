@@ -47,6 +47,7 @@ class TextUnit:
         item: dict[str, Any] = {
             "unitId": self.id,
             "recordId": self.record_id,
+            "kind": self.kind,
             "text": self.text,
             "ppuBounds": (ppu_bounds or self.ppu_bounds).as_dict(),
             "visibleCount": visible_count,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import threading
@@ -113,6 +114,39 @@ class SubtitleController(NSObject):
         self.drawFields.append(field)
 
     @python_method
+    def _debug_region(self, item):
+        ppu_bounds = item["ppuBounds"]
+        bounds = self.window.contentView().bounds()
+        scale_x = bounds.size.width / 256.0
+        scale_y = bounds.size.height / 240.0
+        x = ppu_bounds["x"] * scale_x
+        y = bounds.size.height - (
+            ppu_bounds["y"] + ppu_bounds["height"]
+        ) * scale_y
+        field = NSTextField.alloc().initWithFrame_(NSMakeRect(
+            x, y, max(ppu_bounds["width"] * scale_x, 24.0),
+            max(ppu_bounds["height"] * scale_y, 12.0),
+        ))
+        field.setEditable_(False)
+        field.setSelectable_(False)
+        field.setBezeled_(False)
+        field.setDrawsBackground_(False)
+        field.setTextColor_(NSColor.systemGreenColor())
+        field.setFont_(NSFont.monospacedSystemFontOfSize_weight_(
+            max(7.0, 3.5 * scale_y), 0.0
+        ))
+        field.setWantsLayer_(True)
+        field.layer().setBorderWidth_(2.0)
+        field.layer().setBorderColor_(NSColor.systemGreenColor().CGColor())
+        ratio = float(item.get("visibleRatio", 1.0))
+        field.setStringValue_(
+            f"{item.get('recordId', '?')} [{item.get('kind', '?')}] "
+            f"{ratio:.0%}"
+        )
+        self.window.contentView().addSubview_(field)
+        self.drawFields.append(field)
+
+    @python_method
     def _render(self):
         for field in self.drawFields:
             field.removeFromSuperview()
@@ -122,6 +156,9 @@ class SubtitleController(NSObject):
             return
         for item in command.get("items", []):
             self._field(item["text"], item["ppuBounds"], item["fontSize"])
+        if DEBUG_REGIONS:
+            for item in command.get("items", []):
+                self._debug_region(item)
         self.window.orderFrontRegardless()
 
     def finish_(self, value):
@@ -130,6 +167,11 @@ class SubtitleController(NSObject):
 
 
 def main() -> None:
+    global DEBUG_REGIONS
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--debug-regions", action="store_true")
+    args = parser.parse_args()
+    DEBUG_REGIONS = args.debug_regions
     app = NSApplication.sharedApplication()
     app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
     controller = SubtitleController.alloc().init()
