@@ -294,9 +294,10 @@ local function onNametableWrite(address, value)
     if oldLayout and oldLayout.recordId ~= newLayout.recordId then
       layoutDirty[oldLayout.recordId] = true
     end
-  elseif oldLayout and oldLayout.value == value then
-    -- A redraw of the same tile does not change what the Nametable cell means.
   elseif oldLayout then
+    -- Tile values are not identities: a map/background redraw can write the
+    -- same numeric tile that a former window used. Without a matching queued
+    -- provenance owner, this later write ends the old cell's lifecycle.
     layoutCells[address] = nil
     layoutDirty[oldLayout.recordId] = true
   end

@@ -1685,6 +1685,8 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("local labelIndex = owner.labelIndex", script)
         self.assertIn("if not labelIndex and not owner.dynamic and x and y then", script)
         self.assertNotIn("screenTilePixel(candidate.ppuAddress)", script)
+        self.assertIn("Tile values are not identities", script)
+        self.assertNotIn("oldLayout and oldLayout.value == value", script)
         self.assertIn("local function physicalNametableAddress", script)
         self.assertIn("return ppuAddress % 0x800", script)
         self.assertIn(
