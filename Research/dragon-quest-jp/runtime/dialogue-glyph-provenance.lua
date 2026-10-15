@@ -70,7 +70,7 @@ for _, record in ipairs(layoutRecords) do
       end
     end
     layoutSourceExpires = record.dynamic and frame or
-      (frame + layoutSourceTtlFrames)
+      (frame + (record.ttlFrames or layoutSourceTtlFrames))
   end, emu.callbackType.read, record.startAddress, record.endAddress,
     emu.cpuType.nes, emu.memType.nesMemory)
 end

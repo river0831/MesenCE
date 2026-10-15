@@ -1634,6 +1634,11 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn('id = "chr-fc-38a7#4"', script)
         self.assertIn('id = "dq.menu.yes-no"', script)
         self.assertIn(
+            'id = "dq.menu.strength", startAddress = 33551, '
+            'endAddress = 33781, ttlFrames = 12',
+            script,
+        )
+        self.assertIn(
             "sourceStartAddress = 34512, sourceEndAddress = 34513", script
         )
         self.assertIn(
