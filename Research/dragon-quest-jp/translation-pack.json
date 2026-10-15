@@ -11,6 +11,7 @@
     "characterMap": "database/character-map.json",
     "dialogueCatalog": "generated/dialogue-catalog-validated.json",
     "dialogueTranslations": "database/dialogue-translations.json",
+    "bulkTextCatalog": "output/text-catalog.zh.json",
     "vocabularyTranslations": "database/vocabulary-translations.json",
     "dictionaryCatalog": "generated/prg-dictionary-catalog.json"
   }

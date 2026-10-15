@@ -40,9 +40,15 @@ local textCellsDirty = false
 local previousProjectionKey = nil
 local previousSourceProjectionKey = nil
 local discoveryNode = 1
+local recordsByFirstByte = {}
 
 for _, record in ipairs(records) do
   maxPrefixLength = math.max(maxPrefixLength, #record.matchPrefix)
+  local first = record.matchPrefix[1]
+  if first then
+    recordsByFirstByte[first] = recordsByFirstByte[first] or {}
+    table.insert(recordsByFirstByte[first], record)
+  end
 end
 
 for _, record in ipairs(layoutRecords) do
@@ -167,7 +173,8 @@ local function consumeSourceByte(value)
   observeCatalogByte(value)
   table.insert(stream, value)
   if #stream > maxPrefixLength or activeRecord then return end
-  for _, record in ipairs(records) do
+  local candidates = recordsByFirstByte[stream[1]] or {}
+  for _, record in ipairs(candidates) do
     if prefixMatches(record.matchPrefix) then activateRecord(record); return end
   end
 end

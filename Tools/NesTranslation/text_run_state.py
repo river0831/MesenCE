@@ -27,6 +27,14 @@ class VisibleTextMatch:
     object_category: str | None = None
 
 
+@dataclass(frozen=True)
+class VisibleLexemeMatch:
+    record_id: str
+    row: int
+    column: int
+    length: int
+
+
 class NametableTextRunState:
     """Apply sparse writes without ever rescanning or rereading the PPU."""
 
@@ -92,6 +100,7 @@ class NametableTextMatcher:
         self.state = NametableTextRunState()
         self._lexemes = []
         self._actions = {}
+        self._visible_lexeme_matches: tuple[VisibleLexemeMatch, ...] = ()
         for record in vocabulary.get("records", []):
             entry = entries.get(record.get("id"))
             if entry is None:
@@ -179,6 +188,14 @@ class NametableTextMatcher:
         # cheap and lets an unrelated write preserve the current match while a
         # clearing write naturally removes it.
         visible = self._visible_lexemes(range(30))
+        self._visible_lexeme_matches = tuple(
+            VisibleLexemeMatch(
+                record_id=str(lexeme["id"]), row=row, column=column,
+                length=len(lexeme["pattern"]),
+            )
+            for lexeme, row, column in visible
+            if lexeme["id"] not in self._actions
+        )
         actions = [item for item in visible if item[0]["id"] in self._actions]
         for action, action_row, action_column in sorted(
             actions, key=lambda item: (item[1], item[2]), reverse=True
@@ -243,3 +260,8 @@ class NametableTextMatcher:
                 ),
             )
         return None
+
+    @property
+    def visible_lexemes(self) -> tuple[VisibleLexemeMatch, ...]:
+        """All translated vocabulary terms currently present in the shadow grid."""
+        return self._visible_lexeme_matches

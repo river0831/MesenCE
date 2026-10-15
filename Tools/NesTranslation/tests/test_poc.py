@@ -184,6 +184,34 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(
             chest["runtimeComposition"]["template"], "發現了{ITEM}。"
         )
+        self.assertGreater(
+            package.dialogue_translations["staticIntegration"]["recordCount"],
+            75,
+        )
+        split_dialogue = next(
+            record for record in package.dialogue_translations["records"]
+            if record["id"] == "chr-fc-2014-u2"
+        )
+        self.assertEqual(split_dialogue["integrationMode"], "static-exact-unit")
+        runtime_script = build_glyph_provenance_script(
+            json.loads(package.paths["dialogueCatalog"].read_text(encoding="utf-8")),
+            package.dialogue_translations,
+            package.character_map,
+            (ROOT / "Research/dragon-quest-jp/runtime/dialogue-glyph-provenance.lua")
+            .read_text(encoding="utf-8"),
+            database=package.database,
+            dictionary_catalog=package.dictionary_catalog,
+            vocabulary=package.vocabulary_translations,
+        )
+        self.assertIn('id = "chr-fc-2014-u2"', runtime_script)
+        yes_no_followup = next(
+            record for record in package.dialogue_translations["records"]
+            if record["id"] == "chr-fc-233e"
+        )
+        self.assertEqual(yes_no_followup["integrationMode"], "static-exact")
+        self.assertEqual(
+            yes_no_followup["segments"][0]["lines"], ["这样可以吗？"]
+        )
 
     def test_translation_pack_rejects_undeclared_template_slot(self) -> None:
         manifest = json.loads(TRANSLATION_PACK.read_text(encoding="utf-8"))
@@ -197,6 +225,7 @@ class DatabaseTests(unittest.TestCase):
             root = Path(folder)
             (root / "database").mkdir()
             (root / "generated").mkdir()
+            (root / "output").mkdir()
             for key, source in {
                 "game-database.json": DATABASE,
                 "character-map.json": CHARACTER_MAP,
@@ -215,6 +244,10 @@ class DatabaseTests(unittest.TestCase):
             )
             (root / "generated/dialogue-catalog-validated.json").write_bytes(
                 dialogue_catalog.read_bytes()
+            )
+            bulk_catalog = ROOT / "Research/dragon-quest-jp/output/text-catalog.zh.json"
+            (root / "output/text-catalog.zh.json").write_bytes(
+                bulk_catalog.read_bytes()
             )
             manifest_path = root / "translation-pack.json"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
@@ -311,6 +344,19 @@ class DatabaseTests(unittest.TestCase):
             ["北", "西", "東", "南"],
         )
         self.assertEqual(direction.return_to_record_id, "dq.menu.main")
+        yes_no = next(record for record in database.records
+                      if record.id == "dq.menu.yes-no")
+        self.assertEqual(yes_no.prg_start, 0x06D0)
+        self.assertEqual(yes_no.prg_end_exclusive, 0x06E2)
+        self.assertEqual(
+            [label.text for label in yes_no.presentation.labels],
+            ["是", "否"],
+        )
+        self.assertEqual(
+            [(label.source_start, label.source_end_exclusive)
+             for label in yes_no.presentation.labels],
+            [(0, 2), (10, 13)],
+        )
         assert database.ppu_update_buffer is not None
         self.assertEqual(database.ppu_update_buffer.ram_start, 0x0300)
         self.assertEqual(database.ppu_update_buffer.ram_end_exclusive, 0x03C0)
@@ -814,10 +860,12 @@ class ReadAnalysisTests(unittest.TestCase):
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
             load_database(DATABASE), vocabulary, dictionary_catalog=catalog,
         )
-        self.assertIsNone(router.consume(
+        first = router.consume(
             'DQRUN {"type":"writes","frame":1,"runs":['
             '{"row":20,"startColumn":17,"hex":"190b281b"}]}'
-        ))
+        )
+        assert first is not None
+        self.assertEqual(first["items"][0]["text"], "火把")
         shown = router.consume(
             'DQRUN {"type":"writes","frame":2,"runs":['
             '{"row":22,"startColumn":11,"hex":"291b1219"}]}'
@@ -1179,10 +1227,12 @@ class ReadAnalysisTests(unittest.TestCase):
             'DQGLYPH {"type":"record","frame":10,'
             '"recordId":"chr-fc-35e7"}'
         ))
-        self.assertIsNone(router.consume(
+        partial = router.consume(
             'DQRUN {"type":"writes","frame":11,"runs":['
             '{"row":20,"startColumn":17,"hex":"0f9936"}]}'
-        ))
+        )
+        assert partial is not None
+        self.assertEqual(partial["items"][0]["text"], "鑰匙")
         shown = router.consume(
             'DQRUN {"type":"writes","frame":12,"runs":['
             '{"row":22,"startColumn":11,"hex":"291b1219"}]}'
@@ -1463,8 +1513,17 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("expandedIndex = 0", script)
         self.assertIn("endExclusive = 90", script)
         self.assertIn('id = "chr-fc-38a7#4"', script)
+        self.assertIn('id = "dq.menu.yes-no"', script)
+        self.assertIn(
+            "sourceStartAddress = 34512, sourceEndAddress = 34513", script
+        )
+        self.assertIn(
+            "sourceStartAddress = 34522, sourceEndAddress = 34524", script
+        )
         self.assertIn("emptyGraceFrames = 20", script)
         self.assertIn("local nextInstanceNumber = 1", script)
+        self.assertIn("local recordsByFirstByte = {}", script)
+        self.assertIn("recordsByFirstByte[stream[1]] or {}", script)
         self.assertIn('activeInstanceId = "msg-"', script)
         self.assertIn("characterId = activeInstanceId", script)
         self.assertIn('\\"type\\":\\"instance-begin\\"', script)

@@ -76,6 +76,43 @@
       }
     },
     {
+      "id": "dq.menu.yes-no",
+      "kind": "choice-menu",
+      "prgRange": {
+        "start": 1744,
+        "endExclusive": 1762
+      },
+      "rawHex": "23 0b f7 04 5f 5b ff 3c 5f 5f 0b 0b 0d 5f 5f 5f 5b ff",
+      "sourceText": "はい\nいいえ",
+      "translation": "是\n否",
+      "confidence": "screen-and-rom-confirmed",
+      "presentation": {
+        "mode": "label-overlay",
+        "labels": [
+          {
+            "text": "是",
+            "sourceStart": 0,
+            "sourceEndExclusive": 2,
+            "x": 56,
+            "y": 34,
+            "clear": { "x": 48, "y": 32, "width": 32, "height": 12 }
+          },
+          {
+            "text": "否",
+            "sourceStart": 10,
+            "sourceEndExclusive": 13,
+            "x": 56,
+            "y": 50,
+            "clear": { "x": 48, "y": 48, "width": 32, "height": 12 }
+          }
+        ]
+      },
+      "deactivation": {
+        "dismissInputMask": 1,
+        "confidence": "screen-observed"
+      }
+    },
+    {
       "id": "dq.menu.strength",
       "kind": "status-menu",
       "prgRange": {

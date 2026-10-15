@@ -11,6 +11,7 @@ from typing import Any
 from .database import DatabaseError, GameDatabase, load_database
 from .text_review import load_character_map
 from .segments import parse_record_segments
+from .static_text_integration import integrate_static_texts
 
 
 SLOT_PATTERN = re.compile(r"\{([A-Z][A-Z0-9_]*)\}")
@@ -118,7 +119,7 @@ def load_translation_pack(path: Path) -> TranslationPack:
         for key in (
             "gameDatabase", "characterMap", "dialogueCatalog",
             "dialogueTranslations", "vocabularyTranslations",
-            "dictionaryCatalog",
+            "dictionaryCatalog", "bulkTextCatalog",
         )
     }
     database = load_database(resolved_paths["gameDatabase"])
@@ -132,6 +133,15 @@ def load_translation_pack(path: Path) -> TranslationPack:
     dialogue = _load_json(
         resolved_paths["dialogueTranslations"],
         "dialogue translations",
+    )
+    dialogue_catalog = _load_json(
+        resolved_paths["dialogueCatalog"], "dialogue catalog"
+    )
+    bulk_text_catalog = _load_json(
+        resolved_paths["bulkTextCatalog"], "bulk text catalog"
+    )
+    dialogue = integrate_static_texts(
+        dialogue, dialogue_catalog, bulk_text_catalog, character_map
     )
     vocabulary = _load_json(
         resolved_paths["vocabularyTranslations"],

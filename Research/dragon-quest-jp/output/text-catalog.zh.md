@@ -27,15 +27,15 @@
 
 ## 翻译进度
 
-- `container-summary`：1
-- `draft`：236
+- `container-summary`：2
+- `draft`：235
 - `pending`：402
 - `reviewed`：47
 
 消息单元翻译状态：
 
-- `draft`：176
-- `pending`：732
+- `draft`：178
+- `pending`：730
 - `reviewed`：8
 
 ## 游戏显示难度
@@ -154,28 +154,28 @@
 - 中文：（待翻译/待确认）
 - 显示判断：contains unresolved source bytes or non-layout controls
 
-### chr-fc-2014 · `npc-dialogue` · `draft` · display `hard`
+### chr-fc-2014 · `npc-dialogue` · `container-summary` · display `hard`
 
 - 位置：CHR `$2014` / file `$A024`
 - 原文：＊「そなたは もう じゅう<E8>んに / つよい！ なぜに まだ / りゅうおうを たおせぬのか<60> / <57><FF>＊「たびをいちど やめたいときは / おうにあい ふっかつのじゅもんを / きいておくことだな<4F><END>
-- 中文：你已经足够强大了！为什么还没有打倒龙王？如果想暂时结束旅程，就去见国王，记下复活咒文。
+- 中文：此容器包含国王的两段独立对话。
 - 显示判断：contains unresolved source bytes or non-layout controls
 
 - 注意：这是 `$FC` 容器概览；实际重新提取为 2 个 `$FF` 分隔消息：
 
-#### chr-fc-2014-u1 · `pending` · display `hard`
+#### chr-fc-2014-u1 · `draft` · display `hard`
 
 - CHR：`$2014-$203B`
 - 原文：＊「そなたは もう じゅう<E8>んに / つよい！ なぜに まだ / りゅうおうを たおせぬのか<60>
-- 中文：（待翻译/待确认）
+- 中文：你已经足够强大了！为什么还没有打倒龙王？
 - 后置分隔字节：`fe 57 ff`
 - 边界置信度：`static-ff-boundary`
 
-#### chr-fc-2014-u2 · `pending` · display `easy`
+#### chr-fc-2014-u2 · `draft` · display `easy`
 
 - CHR：`$203E-$2066`
 - 原文：＊「たびをいちど やめたいときは / おうにあい ふっかつのじゅもんを / きいておくことだな<4F>
-- 中文：（待翻译/待确认）
+- 中文：如果想暂时结束旅程，就去见国王，记下复活咒文。
 - 后置分隔字节：`FC container end`
 - 边界置信度：`container-terminator`
 

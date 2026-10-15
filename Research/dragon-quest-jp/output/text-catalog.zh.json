@@ -14,8 +14,8 @@
     "messageUnitCount": 916,
     "multiUnitContainerCount": 133,
     "messageUnitsByTranslationStatus": {
-      "draft": 176,
-      "pending": 732,
+      "draft": 178,
+      "pending": 730,
       "reviewed": 8
     },
     "byCategory": {
@@ -37,8 +37,8 @@
       "weapon": 7
     },
     "byTranslationStatus": {
-      "container-summary": 1,
-      "draft": 236,
+      "container-summary": 2,
+      "draft": 235,
       "pending": 402,
       "reviewed": 47
     },
@@ -9956,8 +9956,8 @@
       "category": "npc-dialogue",
       "categoryEvidence": "long story/ending vocabulary",
       "sourceText": "＊「そなたは もう じゅう<E8>んに\nつよい！ なぜに まだ\nりゅうおうを たおせぬのか<60>\n<57><FF>＊「たびをいちど やめたいときは\nおうにあい ふっかつのじゅもんを\nきいておくことだな<4F><END>",
-      "translation": "你已经足够强大了！为什么还没有打倒龙王？如果想暂时结束旅程，就去见国王，记下复活咒文。",
-      "translationStatus": "draft",
+      "translation": "此容器包含国王的两段独立对话。",
+      "translationStatus": "container-summary",
       "displayDifficulty": "hard",
       "displayDifficultyReason": "contains unresolved source bytes or non-layout controls",
       "staticLikelihood": "high",
@@ -9984,8 +9984,8 @@
           "category": "npc-dialogue",
           "categoryEvidence": "speaker marker",
           "sourceText": "＊「そなたは もう じゅう<E8>んに\nつよい！ なぜに まだ\nりゅうおうを たおせぬのか<60>",
-          "translation": null,
-          "translationStatus": "pending",
+          "translation": "你已经足够强大了！为什么还没有打倒龙王？",
+          "translationStatus": "draft",
           "displayDifficulty": "hard",
           "displayDifficultyReason": "contains unresolved source bytes or non-layout controls",
           "source": {
@@ -10005,8 +10005,8 @@
           "category": "npc-dialogue",
           "categoryEvidence": "speaker marker",
           "sourceText": "＊「たびをいちど やめたいときは\nおうにあい ふっかつのじゅもんを\nきいておくことだな<4F>",
-          "translation": null,
-          "translationStatus": "pending",
+          "translation": "如果想暂时结束旅程，就去见国王，记下复活咒文。",
+          "translationStatus": "draft",
           "displayDifficulty": "easy",
           "displayDifficultyReason": "short fixed text with only understood layout controls",
           "source": {

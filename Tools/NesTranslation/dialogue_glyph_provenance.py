@@ -193,6 +193,7 @@ class SubtitleEventRouter:
             vocabulary or {}, dictionary_catalog or {}
         )
         self._dynamic_item: dict[str, Any] | None = None
+        self._screen_vocabulary_matches: dict[str, tuple[tuple[int, int, int], ...]] = {}
         self._source_fallback_records: set[str] = set()
         self._active_source_record: str | None = None
         self._source_terms: list[tuple[int, str]] = []
@@ -435,7 +436,39 @@ class SubtitleEventRouter:
                         "text": match.object_text,
                         "category": match.object_category,
                     }}
-            if dynamic_item == self._dynamic_item:
+            visible_terms: dict[str, list[Any]] = {}
+            for visible in self._text_matcher.visible_lexemes:
+                if visible.record_id in self._vocabulary_units:
+                    visible_terms.setdefault(visible.record_id, []).append(visible)
+            signatures = {
+                record_id: tuple(sorted(
+                    (item.row, item.column, item.length) for item in matches
+                ))
+                for record_id, matches in visible_terms.items()
+            }
+            vocabulary_changed = signatures != self._screen_vocabulary_matches
+            for record_id in set(visible_terms) | set(self._screen_vocabulary_matches):
+                unit = self._vocabulary_units[record_id]
+                matches = visible_terms.get(record_id, [])
+                if matches:
+                    left = min(item.column for item in matches)
+                    top = min(item.row for item in matches)
+                    right = max(item.column + item.length for item in matches)
+                    bottom = max(item.row + 1 for item in matches)
+                    self.apply_visibility(VisibilityUpdate(
+                        scope_id=f"vocabulary:{record_id}",
+                        unit_counts=((unit.id, unit.total_count),),
+                        unit_bounds=((unit.id, PpuBounds(
+                            left * 8, top * 8,
+                            (right - left) * 8, (bottom - top) * 8,
+                        )),),
+                    ))
+                else:
+                    self.apply_visibility(VisibilityUpdate(
+                        scope_id=f"vocabulary:{record_id}", unit_counts=(),
+                    ))
+            self._screen_vocabulary_matches = signatures
+            if dynamic_item == self._dynamic_item and not vocabulary_changed:
                 return None
             self._dynamic_item = dynamic_item
             return self._scene_state()
@@ -689,6 +722,13 @@ def build_config(
 ) -> str:
     records_by_id = {record["id"]: record for record in catalog.get("records", [])}
     all_raw = [bytes.fromhex(record["rawHex"]) for record in catalog.get("records", [])]
+    all_raw.extend(
+        bytes.fromhex(unit["rawHex"])
+        for record in catalog.get("records", [])
+        for unit in record.get("messageUnits", [])
+        if isinstance(unit, dict) and unit.get("rawHex")
+        and int(unit.get("ordinal", 1)) > 1
+    )
     runtime = translations.get("runtime")
     if not isinstance(runtime, dict):
         raise DatabaseError("dialogue translation runtime must be an object")
@@ -785,12 +825,26 @@ def build_config(
     ])
     for translation in translations.get("records", []):
         record_id = translation.get("id")
-        record = records_by_id.get(record_id)
+        catalog_record_id = translation.get("catalogRecordId", record_id)
+        record = records_by_id.get(catalog_record_id)
         if record is None:
             raise DatabaseError(f"translation references unknown catalog record: {record_id}")
-        if record.get("runtime", {}).get("status") != "runtime-confirmed":
+        if translation.get("integrationMode") == "static-exact-unit":
+            record = next((
+                unit for unit in record.get("messageUnits", [])
+                if unit.get("id") == record_id
+            ), None)
+            if record is None:
+                raise DatabaseError(f"translation references unknown message unit: {record_id}")
+        runtime_confirmed = (
+            record.get("runtime", {}).get("status") == "runtime-confirmed"
+        )
+        static_exact = translation.get("integrationMode") in (
+            "static-exact", "static-exact-unit"
+        )
+        if not runtime_confirmed and not static_exact:
             raise DatabaseError(f"dialogue record is not runtime-confirmed: {record_id}")
-        raw = bytes.fromhex(record["rawHex"])
+        raw = bytes.fromhex(translation.get("matchRawHex", record["rawHex"]))
         prefix = shortest_unique_prefix(raw, all_raw)
         glyphs = logical_glyphs(record, character_map)
         if not glyphs:
@@ -877,6 +931,7 @@ def run(
     discovery_trace_path: Path | None = None,
     dictionary_catalog_path: Path | None = None,
     vocabulary_path: Path | None = None,
+    translations_override: dict[str, Any] | None = None,
 ) -> int:
     if display_segments and external_subtitles:
         raise ValueError("choose either in-game or external segment display")
@@ -885,7 +940,11 @@ def run(
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     if catalog.get("romSha256") != database.rom_sha256:
         raise DatabaseError("dialogue catalog does not match the bound ROM")
-    translations = json.loads(translations_path.read_text(encoding="utf-8"))
+    translations = (
+        translations_override
+        if translations_override is not None
+        else json.loads(translations_path.read_text(encoding="utf-8"))
+    )
     if (dictionary_catalog_path is None) != (vocabulary_path is None):
         raise ValueError("dictionary catalog and vocabulary must be provided together")
     dictionary_catalog = (
@@ -1038,6 +1097,7 @@ def main() -> None:
         help="write statically cataloged runtime text discoveries as JSONL",
     )
     args = parser.parse_args()
+    translations_override = None
     if args.translation_pack is not None:
         if any(value is not None for value in (
             args.game_database, args.catalog, args.translations,
@@ -1053,6 +1113,7 @@ def main() -> None:
         args.character_map = package.paths["characterMap"]
         args.dictionary_catalog = package.paths["dictionaryCatalog"]
         args.vocabulary = package.paths["vocabularyTranslations"]
+        translations_override = package.dialogue_translations
     elif any(value is None for value in (
         args.game_database, args.catalog, args.translations, args.character_map,
     )):
@@ -1066,6 +1127,7 @@ def main() -> None:
         args.external_subtitles, args.subtitle_companion,
         args.snapshot_trace, args.text_run_trace, args.discovery_trace,
         args.dictionary_catalog, args.vocabulary,
+        translations_override,
     ))
 
 

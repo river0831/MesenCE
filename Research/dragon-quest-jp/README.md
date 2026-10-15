@@ -566,6 +566,16 @@ unresolved non-layout control. `medium` is fixed but long or multi-page.
 from the late CHR range that behaves like tile/graphics data. The Markdown
 report collects translated `easy` CHR records into a priority integration list.
 
+The translation package also consumes that inventory at startup. It
+automatically promotes translated `easy` records only when they contain one
+fixed message, have no runtime placeholder, and their raw bytes exactly match
+the runtime catalog. Explicit dialogue records take precedence. This
+`static-exact` tier lets newly reviewed fixed text enter the game without a
+second hand-authored runtime record, while multi-message containers and
+dynamic templates remain opt-in. Runtime matching indexes candidates by their
+first source byte so expanding the safe static set does not require scanning
+every translation for every decoded byte.
+
 Rebuild both outputs after changing an extractor or translation draft:
 
 ```sh
