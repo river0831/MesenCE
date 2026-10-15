@@ -851,6 +851,66 @@ class ReadAnalysisTests(unittest.TestCase):
         })
         self.assertIsNone(match)
 
+    def test_visible_lexemes_keep_multiple_inventory_rows(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
+        matcher = NametableTextMatcher(vocabulary, catalog)
+        matcher.apply({
+            "type": "writes", "runs": [
+                {"row": 8, "startColumn": 12, "hex": "0f99"},
+                {"row": 9, "startColumn": 12, "hex": "190b281b"},
+            ],
+        })
+        self.assertEqual(
+            [(item.record_id, item.row, item.column, item.length)
+             for item in matcher.visible_lexemes],
+            [("dict-a1", 8, 12, 2), ("dict-a2", 9, 12, 4)],
+        )
+
+    def test_visible_lexemes_choose_optimal_longest_coverage(self) -> None:
+        vocabulary = {"records": [
+            {"id": "long", "display": "完整", "category": "item"},
+            {"id": "left", "display": "左", "category": "item"},
+            {"id": "right", "display": "右", "category": "item"},
+        ]}
+        catalog = {"entries": [
+            {"id": "long", "rawHex": "010203"},
+            {"id": "left", "rawHex": "0102"},
+            {"id": "right", "rawHex": "03"},
+        ]}
+        matcher = NametableTextMatcher(vocabulary, catalog)
+        matcher.apply({
+            "type": "writes",
+            "runs": [{"row": 4, "startColumn": 7, "hex": "010203"}],
+        })
+        self.assertEqual(
+            [(item.record_id, item.column, item.length)
+             for item in matcher.visible_lexemes],
+            [("long", 7, 3)],
+        )
+
+    def test_visible_lexemes_preserve_adjacent_non_overlapping_words(self) -> None:
+        vocabulary = {"records": [
+            {"id": "first", "display": "甲", "category": "item"},
+            {"id": "second", "display": "乙", "category": "item"},
+        ]}
+        catalog = {"entries": [
+            {"id": "first", "rawHex": "0102"},
+            {"id": "second", "rawHex": "0304"},
+        ]}
+        matcher = NametableTextMatcher(vocabulary, catalog)
+        matcher.apply({
+            "type": "writes",
+            "runs": [{"row": 4, "startColumn": 7, "hex": "01020304"}],
+        })
+        self.assertEqual(
+            [(item.record_id, item.column, item.length)
+             for item in matcher.visible_lexemes],
+            [("first", 7, 2), ("second", 9, 2)],
+        )
+
     def test_router_projects_and_clears_incremental_message(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
         catalog = json.loads((

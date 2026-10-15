@@ -762,3 +762,20 @@ resolver. It must not be assumed to mean “hide” for another record or game.
   compact fixtures cover gradual completion, numeric currency, PPU-derived
   bounds, and clearing behavior in 71 tests. Runtime display validation is the
   remaining step.
+
+### Visible-text candidate optimization
+
+- Fixed vocabulary patterns without modifier wildcards are indexed in an
+  Aho-Corasick automaton. One pass over each shadow Nametable row produces all
+  exact candidates; reviewed dakuten/handakuten variants remain in a small
+  wildcard fallback set.
+- Candidate matches are optimized independently per row with weighted interval
+  scheduling. The quadratic length score makes one complete phrase beat a
+  partition into shorter contained words, while adjacent non-overlapping item
+  names remain separate matches.
+- Equal-score records claiming the exact same cells are rejected when their
+  translations differ. This deliberately prefers a missed translation over an
+  arbitrary homograph choice.
+- Composition matching retains the complete candidate set, so a longer visible
+  message can still bind contained item/currency parameters even when only the
+  optimal standalone vocabulary matches are projected as subtitles.

@@ -435,6 +435,12 @@ currently tagged Nametable cells, so inventory rows are not assigned fixed
 screen coordinates. A later overwrite removes the corresponding unit through
 the same complete-snapshot path used by menus and dialogue.
 
+Exact visible vocabulary is indexed as a multi-pattern automaton rather than
+testing every translated word at every cell. When a row contains overlapping
+matches, weighted non-overlapping selection prefers a complete longer phrase
+over shorter contained fragments while preserving adjacent inventory entries.
+Dakuten and handakuten patterns use the reviewed modifier-aware fallback.
+
 Replay a capture without starting Mesen or loading the ROM:
 
 ```sh

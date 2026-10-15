@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections import deque
 from typing import Any
 
 
@@ -33,6 +34,52 @@ class VisibleLexemeMatch:
     row: int
     column: int
     length: int
+
+
+class _ExactPatternIndex:
+    """Aho-Corasick index for fixed tile patterns."""
+
+    def __init__(self, lexemes: list[dict[str, Any]]):
+        self._edges: list[dict[int, int]] = [{}]
+        self._fail = [0]
+        self._outputs: list[list[dict[str, Any]]] = [[]]
+        for lexeme in lexemes:
+            if lexeme["variablePositions"]:
+                continue
+            node = 0
+            for value in lexeme["pattern"]:
+                node = self._edges[node].setdefault(value, len(self._edges))
+                if node == len(self._edges):
+                    self._edges.append({})
+                    self._fail.append(0)
+                    self._outputs.append([])
+            self._outputs[node].append(lexeme)
+        queue = deque(self._edges[0].values())
+        while queue:
+            node = queue.popleft()
+            for value, target in self._edges[node].items():
+                queue.append(target)
+                fallback = self._fail[node]
+                while fallback and value not in self._edges[fallback]:
+                    fallback = self._fail[fallback]
+                self._fail[target] = self._edges[fallback].get(value, 0)
+                self._outputs[target].extend(self._outputs[self._fail[target]])
+
+    def search(
+        self, row: tuple[int | None, ...]
+    ) -> list[tuple[dict[str, Any], int]]:
+        result = []
+        node = 0
+        for column, value in enumerate(row):
+            if value is None:
+                node = 0
+                continue
+            while node and value not in self._edges[node]:
+                node = self._fail[node]
+            node = self._edges[node].get(value, 0)
+            for lexeme in self._outputs[node]:
+                result.append((lexeme, column - len(lexeme["pattern"]) + 1))
+        return result
 
 
 class NametableTextRunState:
@@ -111,6 +158,8 @@ class NametableTextMatcher:
             )
             candidate["pattern"] = pattern
             candidate["variablePositions"] = variable_positions
+            if not pattern:
+                continue
             self._lexemes.append(candidate)
             if isinstance(candidate.get("composition"), dict):
                 self._actions[candidate["id"]] = candidate
@@ -121,7 +170,13 @@ class NametableTextMatcher:
             )
             candidate["pattern"] = pattern
             candidate["variablePositions"] = variable_positions
+            if not pattern:
+                continue
             self._lexemes.append(candidate)
+        self._exact_index = _ExactPatternIndex(self._lexemes)
+        self._variable_lexemes = [
+            item for item in self._lexemes if item["variablePositions"]
+        ]
 
     @classmethod
     def _pattern(cls, values: bytes) -> tuple[tuple[int, ...], frozenset[int]]:
@@ -156,12 +211,81 @@ class NametableTextMatcher:
         visible = []
         for row_index in rows:
             row = self.state.row(row_index)
-            for lexeme in self._lexemes:
+            visible.extend(
+                (lexeme, row_index, column)
+                for lexeme, column in self._exact_index.search(row)
+            )
+            for lexeme in self._variable_lexemes:
                 for column in self._locations(
                     row, lexeme["pattern"], lexeme["variablePositions"]
                 ):
                     visible.append((lexeme, row_index, column))
         return visible
+
+    @staticmethod
+    def _candidate_score(item: tuple[dict[str, Any], int, int]) -> int:
+        lexeme, _, _ = item
+        length = len(lexeme["pattern"])
+        # Squaring length makes one complete phrase beat a partition into
+        # shorter contained words with the same total coverage.
+        exact_count = length - len(lexeme["variablePositions"])
+        return length * length * 100 + exact_count
+
+    @classmethod
+    def _best_non_overlapping(
+        cls, candidates: list[tuple[dict[str, Any], int, int]]
+    ) -> list[tuple[dict[str, Any], int, int]]:
+        """Choose maximum-score non-overlapping matches independently per row."""
+        selected = []
+        rows: dict[int, list[tuple[dict[str, Any], int, int]]] = {}
+        for item in candidates:
+            rows.setdefault(item[1], []).append(item)
+        for row_candidates in rows.values():
+            by_interval: dict[tuple[int, int], list[tuple[dict[str, Any], int, int]]] = {}
+            for item in row_candidates:
+                start = item[2]
+                by_interval.setdefault(
+                    (start, start + len(item[0]["pattern"])), []
+                ).append(item)
+            unambiguous = []
+            for same_interval in by_interval.values():
+                same_interval.sort(key=lambda item: str(item[0]["id"]))
+                best_score = max(map(cls._candidate_score, same_interval))
+                best = [
+                    item for item in same_interval
+                    if cls._candidate_score(item) == best_score
+                ]
+                displays = {str(item[0].get("display", "")) for item in best}
+                if len(best) == 1 or len(displays) == 1:
+                    unambiguous.append(best[0])
+            ordered = sorted(
+                unambiguous,
+                key=lambda item: (
+                    item[2] + len(item[0]["pattern"]), item[2],
+                    -len(item[0]["pattern"]), str(item[0]["id"]),
+                ),
+            )
+            ends = [item[2] + len(item[0]["pattern"]) for item in ordered]
+            previous = []
+            for index, item in enumerate(ordered):
+                start = item[2]
+                predecessor = index - 1
+                while predecessor >= 0 and ends[predecessor] > start:
+                    predecessor -= 1
+                previous.append(predecessor)
+            scores = [0]
+            paths: list[list[int]] = [[]]
+            for index, item in enumerate(ordered):
+                take_from = previous[index] + 1
+                take_score = scores[take_from] + cls._candidate_score(item)
+                if take_score > scores[-1]:
+                    scores.append(take_score)
+                    paths.append(paths[take_from] + [index])
+                else:
+                    scores.append(scores[-1])
+                    paths.append(paths[-1])
+            selected.extend(ordered[index] for index in paths[-1])
+        return sorted(selected, key=lambda item: (item[1], item[2]))
 
     def _object_rank(
         self, item: tuple[dict[str, Any], int, int], action_row: int,
@@ -188,13 +312,15 @@ class NametableTextMatcher:
         # cheap and lets an unrelated write preserve the current match while a
         # clearing write naturally removes it.
         visible = self._visible_lexemes(range(30))
+        standalone = self._best_non_overlapping([
+            item for item in visible if item[0]["id"] not in self._actions
+        ])
         self._visible_lexeme_matches = tuple(
             VisibleLexemeMatch(
                 record_id=str(lexeme["id"]), row=row, column=column,
                 length=len(lexeme["pattern"]),
             )
-            for lexeme, row, column in visible
-            if lexeme["id"] not in self._actions
+            for lexeme, row, column in standalone
         )
         actions = [item for item in visible if item[0]["id"] in self._actions]
         for action, action_row, action_column in sorted(
