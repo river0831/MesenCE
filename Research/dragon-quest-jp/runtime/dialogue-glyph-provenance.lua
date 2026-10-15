@@ -25,14 +25,17 @@ local emptySinceFrame = nil
 local emptyGraceFrames = 20
 local foreground = 0xFFFFFF
 local background = 0x000000
-local layoutSource = nil
-local layoutSourceValue = nil
-local layoutSourceLabelIndex = nil
-local layoutSourceExpires = -1
+-- Stable layout records and one-shot dictionary terms are separate provenance
+-- lanes. Nested dictionary reads must not replace the parent menu/message
+-- source that owns the surrounding write transaction.
+local staticLayoutSource = nil
+local staticLayoutSourceValue = nil
+local staticLayoutSourceLabelIndex = nil
+local dynamicLayoutSource = nil
+local dynamicLayoutSourceValue = nil
 local layoutPending = {}
 local layoutCells = {}
 local layoutDirty = {}
-local layoutSourceTtlFrames = 3
 local textRunWrites = {}
 local textCells = {}
 local previousProjectedText = {}
@@ -59,18 +62,21 @@ for _, record in ipairs(layoutRecords) do
         frame, string.format("%q", record.id)
       ))
     end
-    layoutSource = record
-    layoutSourceValue = value
-    layoutSourceLabelIndex = nil
-    for _, label in ipairs(record.labels) do
-      if label.sourceStartAddress and address >= label.sourceStartAddress
-          and address <= label.sourceEndAddress then
-        layoutSourceLabelIndex = label.index
-        break
+    if record.dynamic then
+      dynamicLayoutSource = record
+      dynamicLayoutSourceValue = value
+    else
+      staticLayoutSource = record
+      staticLayoutSourceValue = value
+      staticLayoutSourceLabelIndex = nil
+      for _, label in ipairs(record.labels) do
+        if label.sourceStartAddress and address >= label.sourceStartAddress
+            and address <= label.sourceEndAddress then
+          staticLayoutSourceLabelIndex = label.index
+          break
+        end
       end
     end
-    layoutSourceExpires = record.dynamic and frame or
-      (frame + (record.ttlFrames or layoutSourceTtlFrames))
   end, emu.callbackType.read, record.startAddress, record.endAddress,
     emu.cpuType.nes, emu.memType.nesMemory)
 end
@@ -237,7 +243,18 @@ local function onBufferWrite(address, value)
   else
     table.insert(pendingBeforeMatch, candidate)
   end
-  local layoutMatches = layoutSource and frame <= layoutSourceExpires and
+  local layoutSource = staticLayoutSource
+  local layoutSourceValue = staticLayoutSourceValue
+  local layoutSourceLabelIndex = staticLayoutSourceLabelIndex
+  -- A dictionary term is a one-write child source. It takes precedence only
+  -- when the queued tile is the value that was actually read; an unrelated
+  -- dictionary scan therefore cannot block its stable parent source.
+  if dynamicLayoutSource and candidate.value == dynamicLayoutSourceValue then
+    layoutSource = dynamicLayoutSource
+    layoutSourceValue = dynamicLayoutSourceValue
+    layoutSourceLabelIndex = nil
+  end
+  local layoutMatches = layoutSource and
     ((not layoutSource.dynamic and not layoutSourceLabelIndex)
       or candidate.value == layoutSourceValue)
   if layoutMatches then
@@ -261,10 +278,8 @@ local function onBufferWrite(address, value)
       dynamic = layoutSource.dynamic,
     }
     if layoutSource.dynamic then
-      layoutSource = nil
-      layoutSourceValue = nil
-      layoutSourceLabelIndex = nil
-      layoutSourceExpires = -1
+      dynamicLayoutSource = nil
+      dynamicLayoutSourceValue = nil
     end
   end
 end
@@ -717,10 +732,6 @@ local function onEndFrame()
     ))
   end
   frame = frame + 1
-  if layoutSource and frame > layoutSourceExpires then
-    layoutSource = nil
-    layoutSourceLabelIndex = nil
-  end
 end
 
 emu.addMemoryCallback(onChrStreamSelector, emu.callbackType.exec,

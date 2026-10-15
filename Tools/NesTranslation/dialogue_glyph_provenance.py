@@ -767,13 +767,11 @@ def build_config(
             if record.presentation is None:
                 continue
             lines.extend([
-                "  { id = %s, startAddress = %d, endAddress = %d, "
-                "ttlFrames = %d, labels = {"
+                "  { id = %s, startAddress = %d, endAddress = %d, labels = {"
                 % (
                     _lua_string(record.id),
                     database.cpu_address_base + record.prg_start,
                     database.cpu_address_base + record.prg_end_exclusive - 1,
-                    max(3, len(record.presentation.labels) + 2),
                 ),
             ])
             for index, label in enumerate(record.presentation.labels, 1):

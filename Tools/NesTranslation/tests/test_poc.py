@@ -1633,11 +1633,9 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("endExclusive = 90", script)
         self.assertIn('id = "chr-fc-38a7#4"', script)
         self.assertIn('id = "dq.menu.yes-no"', script)
-        self.assertIn(
-            'id = "dq.menu.strength", startAddress = 33551, '
-            'endAddress = 33781, ttlFrames = 12',
-            script,
-        )
+        self.assertIn("local staticLayoutSource = nil", script)
+        self.assertIn("local dynamicLayoutSource = nil", script)
+        self.assertNotIn("layoutSourceTtlFrames", script)
         self.assertIn(
             "sourceStartAddress = 34512, sourceEndAddress = 34513", script
         )
