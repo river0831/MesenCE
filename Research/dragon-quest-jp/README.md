@@ -1,5 +1,15 @@
 # Dragon Quest translation proof of concept
 
+## 快速启动翻译测试
+
+在仓库根目录双击 `run-translation-test.command`，或在终端运行：
+
+```sh
+./run-translation-test.command
+```
+
+该入口会启动 Mesen、加载测试 ROM 和翻译包，并开启识别区域调试框及运行日志。
+
 This study is bound to one exact ROM and proves the path from a physical PRG
 read to a translated display command. It does not modify or redistribute ROM
 bytes outside the small reviewable text records in the database.

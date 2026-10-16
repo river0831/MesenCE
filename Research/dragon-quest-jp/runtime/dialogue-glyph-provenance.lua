@@ -31,8 +31,6 @@ local background = 0x000000
 local staticLayoutSource = nil
 local staticLayoutSourceValue = nil
 local staticLayoutSourceLabelIndex = nil
-local dynamicLayoutSource = nil
-local dynamicLayoutSourceValue = nil
 local layoutPending = {}
 local layoutCells = {}
 local layoutDirty = {}
@@ -64,10 +62,7 @@ for _, record in ipairs(layoutRecords) do
         frame, string.format("%q", record.id)
       ))
     end
-    if record.dynamic then
-      dynamicLayoutSource = record
-      dynamicLayoutSourceValue = value
-    else
+    if not record.dynamic then
       staticLayoutSource = record
       staticLayoutSourceValue = value
       staticLayoutSourceLabelIndex = nil
@@ -248,36 +243,21 @@ local function onBufferWrite(address, value)
   local layoutSource = staticLayoutSource
   local layoutSourceValue = staticLayoutSourceValue
   local layoutSourceLabelIndex = staticLayoutSourceLabelIndex
-  -- A dictionary term is a one-write child source. It takes precedence only
-  -- when the queued tile is the value that was actually read; an unrelated
-  -- dictionary scan therefore cannot block its stable parent source.
-  if dynamicLayoutSource and candidate.value == dynamicLayoutSourceValue then
-    layoutSource = dynamicLayoutSource
-    layoutSourceValue = dynamicLayoutSourceValue
-    layoutSourceLabelIndex = nil
-  end
   local layoutMatches = layoutSource and
-    ((not layoutSource.dynamic and not layoutSourceLabelIndex)
-      or candidate.value == layoutSourceValue)
+    (not layoutSourceLabelIndex or candidate.value == layoutSourceValue)
   if layoutMatches then
-    local labelIndex = layoutSource.dynamic and 1 or layoutSourceLabelIndex
+    local labelIndex = layoutSourceLabelIndex
     layoutPending[physicalNametableAddress(candidate.ppuAddress)] = {
       recordId = layoutSource.id,
       labelIndex = labelIndex,
       value = value,
-      dynamic = layoutSource.dynamic,
     }
-    if layoutSource.dynamic then
-      dynamicLayoutSource = nil
-      dynamicLayoutSourceValue = nil
-    else
-      -- A source read authorizes one producer-buffer write. Keeping this
-      -- context latched would assign every later menu/map write to the last
-      -- record read, even after that record's window has disappeared.
-      staticLayoutSource = nil
-      staticLayoutSourceValue = nil
-      staticLayoutSourceLabelIndex = nil
-    end
+    -- A source read authorizes one producer-buffer write. Keeping this
+    -- context latched would assign every later menu/map write to the last
+    -- record read, even after that record's window has disappeared.
+    staticLayoutSource = nil
+    staticLayoutSourceValue = nil
+    staticLayoutSourceLabelIndex = nil
   end
 end
 
@@ -395,10 +375,12 @@ local function projectVisibleText(projection)
       local x, y = screenTilePixel(ppuAddress, projection)
       if x and y then
         local screenAddress = math.floor(y / 8) * 32 + math.floor(x / 8)
-        if screenAddress >= visibilityStart
-            and screenAddress < visibilityEndExclusive then
-          projected[screenAddress] = value
-        end
+        -- Content matching follows the whole visible PPU viewport.  The
+        -- visibilityStart/End range belongs to the original dialogue-source
+        -- tracer and deliberately covers only the lower dialogue window;
+        -- applying it here silently drops menus and shop lists in the upper
+        -- part of the screen.
+        projected[screenAddress] = value
       end
     end
   end
@@ -530,7 +512,7 @@ local function emitLayoutGroups(projection)
         -- classifying them when written would use the previously visible page.
         local x, y = projectedPhysicalCell(address, projection)
         local labelIndex = owner.labelIndex
-        if not labelIndex and not owner.dynamic and x and y then
+        if not labelIndex and x and y then
           local record = layoutRecordsById[recordId]
           if record then
             for _, label in ipairs(record.labels) do

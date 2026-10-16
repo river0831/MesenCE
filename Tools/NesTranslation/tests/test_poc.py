@@ -1640,7 +1640,7 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn('id = "chr-fc-38a7#4"', script)
         self.assertIn('id = "dq.menu.yes-no"', script)
         self.assertIn("local staticLayoutSource = nil", script)
-        self.assertIn("local dynamicLayoutSource = nil", script)
+        self.assertNotIn("local dynamicLayoutSource = nil", script)
         self.assertNotIn("layoutSourceTtlFrames", script)
         self.assertIn(
             "sourceStartAddress = 34512, sourceEndAddress = 34513", script
@@ -1665,6 +1665,12 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("local function currentProjection()", script)
         self.assertEqual(script.count("emu.getState()"), 1)
         self.assertIn("projectVisibleText(projection)", script)
+        self.assertIn("Content matching follows the whole visible PPU viewport", script)
+        text_projection = script.split(
+            "local function projectVisibleText(projection)", 1
+        )[1].split("local function emitTextRuns()", 1)[0]
+        self.assertNotIn("screenAddress >= visibilityStart", text_projection)
+        self.assertNotIn("screenAddress < visibilityEndExclusive", text_projection)
         self.assertIn("projectVisibleCells(projection)", script)
         self.assertIn("for address, cell in pairs(visibleCells)", script)
         self.assertIn("previousProjectedText[address] ~= value", script)
@@ -1689,7 +1695,7 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("local layoutRecordsById = {}", script)
         self.assertIn("layoutRecordsById[record.id] = record", script)
         self.assertIn("local labelIndex = owner.labelIndex", script)
-        self.assertIn("if not labelIndex and not owner.dynamic and x and y then", script)
+        self.assertIn("if not labelIndex and x and y then", script)
         self.assertNotIn("screenTilePixel(candidate.ppuAddress)", script)
         self.assertIn("Tile values are not identities", script)
         self.assertNotIn("oldLayout and oldLayout.value == value", script)
