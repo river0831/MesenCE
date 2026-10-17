@@ -167,6 +167,7 @@ class SubtitleEventRouter:
         database: GameDatabase | None = None,
         vocabulary: dict[str, Any] | None = None,
         dictionary_catalog: dict[str, Any] | None = None,
+        dialogue_catalog: dict[str, Any] | None = None,
         activation_coverage: float = 0.25,
     ):
         if not 0 < activation_coverage <= 1:
@@ -190,10 +191,14 @@ class SubtitleEventRouter:
             unit.record_id: unit for unit in units if unit.kind == "vocabulary"
         }
         self._text_matcher = NametableTextMatcher(
-            vocabulary or {}, dictionary_catalog or {}
+            vocabulary or {}, dictionary_catalog or {},
+            translations, dialogue_catalog or {},
         )
         self._dynamic_item: dict[str, Any] | None = None
+        self._content_text_items: list[dict[str, Any]] = []
+        self._screen_text_matches: tuple[tuple[Any, ...], ...] = ()
         self._screen_vocabulary_matches: dict[str, tuple[tuple[int, int, int], ...]] = {}
+        self._source_cells_by_scope: dict[str, frozenset[tuple[int, int]]] = {}
         self._source_fallback_records: set[str] = set()
         self._active_source_record: str | None = None
         self._source_terms: list[tuple[int, str]] = []
@@ -342,6 +347,11 @@ class SubtitleEventRouter:
                 next_y += item_height
         if self._dynamic_item is not None:
             items.append(self._dynamic_item)
+        # Content matching has already excluded only those exact Nametable
+        # cells that carry stable source provenance. Geometry is deliberately
+        # not involved: source-less text beside or inside the same window must
+        # remain eligible for the generic fallback.
+        items.extend(self._content_text_items)
         current_items = {item["unitId"]: item for item in items}
         appeared = sorted(current_items.keys() - self._last_snapshot_items.keys())
         disappeared = sorted(self._last_snapshot_items.keys() - current_items.keys())
@@ -362,6 +372,115 @@ class SubtitleEventRouter:
                 "disappeared": disappeared,
             },
         }
+
+    def _set_source_cell_scope(self, scope: str, addresses: Any) -> None:
+        cells = frozenset(
+            (address // 32, address % 32)
+            for address in addresses
+            if isinstance(address, int) and 0 <= address < 32 * 30
+        )
+        if cells:
+            self._source_cells_by_scope[scope] = cells
+        else:
+            self._source_cells_by_scope.pop(scope, None)
+
+    def _refresh_content_matches(
+        self, match: Any | None = None
+    ) -> dict[str, Any] | None:
+        sourced = set().union(*self._source_cells_by_scope.values()) \
+            if self._source_cells_by_scope else set()
+        if match is None:
+            match = self._text_matcher.set_sourced_cells(sourced)
+        dynamic_item = None
+        if match is not None:
+            dynamic_item = {
+                "unitId": f"ppu-message:{match.action_id}",
+                "recordId": match.action_id,
+                "kind": "dynamic",
+                "text": match.text,
+                "ppuBounds": {
+                    "x": match.left * 8, "y": match.top * 8,
+                    "width": (match.right - match.left) * 8,
+                    "height": (match.bottom - match.top) * 8,
+                },
+                "visibleCount": 1, "totalCount": 1,
+                "visibleRatio": 1.0, "fontSize": 8.5,
+            }
+            active_instance = None
+            if self._active_source_record is not None:
+                active_instance = self._active_dialogue_instances.get(
+                    self._active_source_record
+                )
+            if active_instance is not None:
+                dynamic_item["instanceId"] = active_instance
+            if match.object_id is not None:
+                dynamic_item["parameters"] = {"ITEM": {
+                    "recordId": match.object_id,
+                    "sourceText": match.object_source_text,
+                    "text": match.object_text,
+                    "category": match.object_category,
+                }}
+        visible_terms: dict[str, list[Any]] = {}
+        for visible in self._text_matcher.visible_lexemes:
+            if visible.record_id in self._vocabulary_units:
+                visible_terms.setdefault(visible.record_id, []).append(visible)
+        signatures = {
+            record_id: tuple(sorted(
+                (item.row, item.column, item.length) for item in matches
+            ))
+            for record_id, matches in visible_terms.items()
+        }
+        vocabulary_changed = signatures != self._screen_vocabulary_matches
+        for record_id in set(visible_terms) | set(self._screen_vocabulary_matches):
+            unit = self._vocabulary_units[record_id]
+            matches = visible_terms.get(record_id, [])
+            if matches:
+                left = min(item.column for item in matches)
+                top = min(item.row for item in matches)
+                right = max(item.column + item.length for item in matches)
+                bottom = max(item.row + 1 for item in matches)
+                self.apply_visibility(VisibilityUpdate(
+                    scope_id=f"vocabulary:{record_id}",
+                    unit_counts=((unit.id, unit.total_count),),
+                    unit_bounds=((unit.id, PpuBounds(
+                        left * 8, top * 8,
+                        (right - left) * 8, (bottom - top) * 8,
+                    )),),
+                ))
+            else:
+                self.apply_visibility(VisibilityUpdate(
+                    scope_id=f"vocabulary:{record_id}", unit_counts=(),
+                ))
+        self._screen_vocabulary_matches = signatures
+        screen_text_signatures = tuple(
+            (item.record_id, item.left, item.top, item.right, item.bottom)
+            for item in self._text_matcher.visible_screen_texts
+        )
+        content_changed = screen_text_signatures != self._screen_text_matches
+        self._screen_text_matches = screen_text_signatures
+        self._content_text_items = [
+            {
+                "unitId": f"screen-text:{item.record_id}",
+                "recordId": item.record_id,
+                "kind": "content",
+                "text": item.text,
+                "ppuBounds": {
+                    "x": item.left * 8, "y": item.top * 8,
+                    "width": (item.right - item.left) * 8,
+                    "height": (item.bottom - item.top) * 8,
+                },
+                "visibleCount": len(item.cells),
+                "totalCount": len(item.cells),
+                "visibleRatio": 1.0,
+                "fontSize": 8.5,
+            }
+            for item in self._text_matcher.visible_screen_texts
+        ]
+        if (dynamic_item == self._dynamic_item and not vocabulary_changed
+                and not content_changed):
+            return None
+        self._dynamic_item = dynamic_item
+        return self._scene_state()
 
     def consume(self, line: str) -> dict[str, Any] | None:
         glyph_marker = "DQGLYPH "
@@ -400,76 +519,15 @@ class SubtitleEventRouter:
                 return None
             changed = self._compose_source_dialogue(self._active_source_record)
             return self._scene_state() if changed else None
+        if marker == glyph_marker and event.get("type") == "visible-ranges":
+            self._set_source_cell_scope("dialogue", event.get("cells", []))
+            return self._refresh_content_matches()
         if marker == run_marker:
             try:
                 match = self._text_matcher.apply(event)
             except ValueError:
                 return None
-            dynamic_item = None
-            if match is not None:
-                dynamic_item = {
-                    "unitId": f"ppu-message:{match.action_id}",
-                    "recordId": match.action_id,
-                    "kind": "dynamic",
-                    "text": match.text,
-                    "ppuBounds": {
-                        "x": match.left * 8, "y": match.top * 8,
-                        "width": (match.right - match.left) * 8,
-                        "height": (match.bottom - match.top) * 8,
-                    },
-                    "visibleCount": 1, "totalCount": 1,
-                    "visibleRatio": 1.0, "fontSize": 8.5,
-                }
-                active_instance = None
-                if self._active_source_record is not None:
-                    active_instance = self._active_dialogue_instances.get(
-                        self._active_source_record
-                    )
-                if active_instance is not None:
-                    dynamic_item["instanceId"] = active_instance
-                if match.object_id is not None:
-                    dynamic_item["parameters"] = {"ITEM": {
-                        "recordId": match.object_id,
-                        "sourceText": match.object_source_text,
-                        "text": match.object_text,
-                        "category": match.object_category,
-                    }}
-            visible_terms: dict[str, list[Any]] = {}
-            for visible in self._text_matcher.visible_lexemes:
-                if visible.record_id in self._vocabulary_units:
-                    visible_terms.setdefault(visible.record_id, []).append(visible)
-            signatures = {
-                record_id: tuple(sorted(
-                    (item.row, item.column, item.length) for item in matches
-                ))
-                for record_id, matches in visible_terms.items()
-            }
-            vocabulary_changed = signatures != self._screen_vocabulary_matches
-            for record_id in set(visible_terms) | set(self._screen_vocabulary_matches):
-                unit = self._vocabulary_units[record_id]
-                matches = visible_terms.get(record_id, [])
-                if matches:
-                    left = min(item.column for item in matches)
-                    top = min(item.row for item in matches)
-                    right = max(item.column + item.length for item in matches)
-                    bottom = max(item.row + 1 for item in matches)
-                    self.apply_visibility(VisibilityUpdate(
-                        scope_id=f"vocabulary:{record_id}",
-                        unit_counts=((unit.id, unit.total_count),),
-                        unit_bounds=((unit.id, PpuBounds(
-                            left * 8, top * 8,
-                            (right - left) * 8, (bottom - top) * 8,
-                        )),),
-                    ))
-                else:
-                    self.apply_visibility(VisibilityUpdate(
-                        scope_id=f"vocabulary:{record_id}", unit_counts=(),
-                    ))
-            self._screen_vocabulary_matches = signatures
-            if dynamic_item == self._dynamic_item and not vocabulary_changed:
-                return None
-            self._dynamic_item = dynamic_item
-            return self._scene_state()
+            return self._refresh_content_matches(match)
         if marker == menu_marker:
             if event.get("type") != "group":
                 return None
@@ -478,6 +536,16 @@ class SubtitleEventRouter:
             if record_id not in self._layouts and vocabulary_unit is None:
                 return None
             label_counts = event.get("labels")
+            menu_cells = [
+                address
+                for item in (label_counts or []) if isinstance(item, dict)
+                for address in item.get("cells", [])
+            ]
+            self._set_source_cell_scope(f"menu:{record_id}", menu_cells)
+            # Re-evaluate fallback candidates immediately against the new
+            # exact-cell mask. The layout update below emits the combined
+            # final scene for this event.
+            self._refresh_content_matches()
             if isinstance(label_counts, list):
                 visible = {
                     int(item["index"]): int(item.get("cellCount", 0))
@@ -579,6 +647,8 @@ class SubtitleEventRouter:
             self._runtime_parameters.pop(record_id, None)
             if self._active_source_record == record_id:
                 self._active_source_record = None
+            self._set_source_cell_scope("dialogue", ())
+            self._refresh_content_matches()
             for unit_id in self._scope_units.get(f"dialogue:{record_id}", ()):
                 self._dialogue_text_overrides.pop(unit_id, None)
             scope_id = f"dialogue:{record_id}"
@@ -994,7 +1064,9 @@ def run(
         if external_subtitles and subtitle_companion_path is None:
             raise ValueError("external subtitles require a companion path")
         router = SubtitleEventRouter(
-            translations, database, vocabulary, dictionary_catalog=dictionary_catalog
+            translations, database, vocabulary,
+            dictionary_catalog=dictionary_catalog,
+            dialogue_catalog=catalog,
         )
         frame_buffer = FrameSnapshotBuffer()
         if snapshot_trace_path is not None:

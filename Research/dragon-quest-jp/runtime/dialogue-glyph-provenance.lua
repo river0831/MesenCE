@@ -40,6 +40,7 @@ local previousProjectedText = {}
 local textCellsDirty = false
 local previousProjectionKey = nil
 local previousSourceProjectionKey = nil
+local previousLayoutProjectionKey = nil
 local discoveryNode = 1
 local recordsByFirstByte = {}
 local layoutRecordsById = {}
@@ -499,10 +500,17 @@ local function projectedPhysicalCell(address, projection)
 end
 
 local function emitLayoutGroups(projection)
+  if projection.key ~= previousLayoutProjectionKey then
+    previousLayoutProjectionKey = projection.key
+    for _, owner in pairs(layoutCells) do
+      layoutDirty[owner.recordId] = true
+    end
+  end
   for recordId, _ in pairs(layoutDirty) do
     local count = 0
     local labelCounts = {}
     local labelBounds = {}
+    local labelCells = {}
     for address, owner in pairs(layoutCells) do
       if owner.recordId == recordId then
         count = count + 1
@@ -527,6 +535,9 @@ local function emitLayoutGroups(projection)
         if labelIndex then
           labelCounts[labelIndex] = (labelCounts[labelIndex] or 0) + 1
           if x and y then
+            labelCells[labelIndex] = labelCells[labelIndex] or {}
+            table.insert(labelCells[labelIndex],
+              math.floor(y / 8) * 32 + math.floor(x / 8))
             local bounds = labelBounds[labelIndex]
             if not bounds then
               bounds = { minX = x, minY = y,
@@ -545,12 +556,17 @@ local function emitLayoutGroups(projection)
     local labels = {}
     for index, labelCount in pairs(labelCounts) do
       local bounds = labelBounds[index]
+      local cellsJson = {}
+      table.sort(labelCells[index] or {})
+      for _, address in ipairs(labelCells[index] or {}) do
+        table.insert(cellsJson, tostring(address))
+      end
       if bounds then
         table.insert(labels, string.format(
           "{\"index\":%d,\"cellCount\":%d,\"x\":%d,\"y\":%d," ..
-          "\"width\":%d,\"height\":%d}", index, labelCount,
+          "\"width\":%d,\"height\":%d,\"cells\":[%s]}", index, labelCount,
           bounds.minX, bounds.minY, bounds.maxX - bounds.minX,
-          bounds.maxY - bounds.minY
+          bounds.maxY - bounds.minY, table.concat(cellsJson, ",")
         ))
       else
         table.insert(labels, string.format(
@@ -584,6 +600,13 @@ local function emitVisibleRanges()
     item.count = item.count + 1
   end
   local parts = {}
+  local screenCells = {}
+  for address, _ in pairs(visibleCells) do table.insert(screenCells, address) end
+  table.sort(screenCells)
+  local cellParts = {}
+  for _, address in ipairs(screenCells) do
+    table.insert(cellParts, tostring(address))
+  end
   for _, item in pairs(rows) do
     table.insert(parts, string.format(
       "{\"recordId\":%s,\"instanceId\":%s,\"row\":%d,\"start\":%d," ..
@@ -593,8 +616,9 @@ local function emitVisibleRanges()
     ))
   end
   print(string.format(
-    "DQGLYPH {\"type\":\"visible-ranges\",\"frame\":%d,\"rows\":[%s]}",
-    frame, table.concat(parts, ",")
+    "DQGLYPH {\"type\":\"visible-ranges\",\"frame\":%d," ..
+    "\"cells\":[%s],\"rows\":[%s]}", frame,
+    table.concat(cellParts, ","), table.concat(parts, ",")
   ))
 end
 

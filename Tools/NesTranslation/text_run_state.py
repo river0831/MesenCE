@@ -36,6 +36,17 @@ class VisibleLexemeMatch:
     length: int
 
 
+@dataclass(frozen=True)
+class VisibleScreenTextMatch:
+    record_id: str
+    text: str
+    left: int
+    top: int
+    right: int
+    bottom: int
+    cells: frozenset[tuple[int, int]]
+
+
 class _ExactPatternIndex:
     """Aho-Corasick index for fixed tile patterns."""
 
@@ -142,12 +153,18 @@ class NametableTextMatcher:
 
     _MODIFIERS = frozenset((0xF8, 0xF9))
 
-    def __init__(self, vocabulary: dict[str, Any], catalog: dict[str, Any]):
+    def __init__(
+        self, vocabulary: dict[str, Any], catalog: dict[str, Any],
+        dialogue_translations: dict[str, Any] | None = None,
+        dialogue_catalog: dict[str, Any] | None = None,
+    ):
         entries = {entry["id"]: entry for entry in catalog.get("entries", [])}
         self.state = NametableTextRunState()
         self._lexemes = []
         self._actions = {}
         self._visible_lexeme_matches: tuple[VisibleLexemeMatch, ...] = ()
+        self._visible_screen_text_matches: tuple[VisibleScreenTextMatch, ...] = ()
+        self._sourced_cells: frozenset[tuple[int, int]] = frozenset()
         for record in vocabulary.get("records", []):
             entry = entries.get(record.get("id"))
             if entry is None:
@@ -183,6 +200,108 @@ class NametableTextMatcher:
         self._variable_lexemes = [
             item for item in self._lexemes if item["variablePositions"]
         ]
+        self._screen_texts = self._build_screen_texts(
+            dialogue_translations or {}, dialogue_catalog or {}
+        )
+
+    @classmethod
+    def _build_screen_texts(
+        cls, translations: dict[str, Any], catalog: dict[str, Any]
+    ) -> tuple[dict[str, Any], ...]:
+        """Compile fixed translated records into final-screen row patterns."""
+        catalog_by_id = {item["id"]: item for item in catalog.get("records", [])}
+        result = []
+        for record in translations.get("records", []):
+            source = catalog_by_id.get(record.get("catalogRecordId", record.get("id")))
+            text = record.get("translation")
+            if source is None or not isinstance(text, str) or not text:
+                continue
+            try:
+                values = bytes.fromhex(str(source.get("expandedHex", "")))
+            except ValueError:
+                continue
+            # FD and FF are substitutions/message branches, so they are not
+            # fixed final-screen text and must remain source-driven.
+            if not values or 0xFD in values or 0xFF in values:
+                continue
+            rows: list[tuple[int, ...]] = []
+            current: list[int] = []
+            for value in values:
+                if value == 0xFC:
+                    break
+                if value == 0xFE:
+                    if current:
+                        rows.append(tuple(current))
+                        current = []
+                    continue
+                if value not in cls._MODIFIERS:
+                    current.append(value)
+            if current:
+                rows.append(tuple(current))
+            if rows:
+                result.append({"id": str(record["id"]), "text": text,
+                               "rows": tuple(rows)})
+        return tuple(result)
+
+    def _visible_screen_texts(self) -> list[VisibleScreenTextMatch]:
+        def screen_locations(
+            row: tuple[int | None, ...], pattern: tuple[int, ...]
+        ) -> tuple[int, ...]:
+            # A cleared window cell can remain unwritten. Visually it is the
+            # same blank tile as 0x5F, so fixed text containing spaces must
+            # accept either representation without relaxing non-space glyphs.
+            return tuple(
+                column for column in range(len(row) - len(pattern) + 1)
+                if all(
+                    row[column + offset] == expected
+                    or (expected == 0x5F and row[column + offset] is None)
+                    for offset, expected in enumerate(pattern)
+                )
+            )
+
+        candidates = []
+        for spec in self._screen_texts:
+            patterns = spec["rows"]
+            for top in range(30 - (len(patterns) - 1) * 2):
+                locations = [screen_locations(self.state.row(top), patterns[0])]
+                if not locations[0]:
+                    continue
+                for offset, pattern in enumerate(patterns[1:], 1):
+                    locations.append(screen_locations(
+                        self.state.row(top + offset * 2), pattern
+                    ))
+                if any(not item for item in locations):
+                    continue
+                # Lines may use different indentation. Pick the occurrence
+                # closest to the first line; the final selection below still
+                # rejects overlapping competing records by total coverage.
+                columns = [locations[0][0]]
+                columns.extend(min(item, key=lambda value: abs(value - columns[0]))
+                               for item in locations[1:])
+                cells = frozenset(
+                    (top + row_offset * 2, column + glyph_offset)
+                    for row_offset, (column, pattern) in enumerate(
+                        zip(columns, patterns)
+                    )
+                    for glyph_offset in range(len(pattern))
+                )
+                if not cells.isdisjoint(self._sourced_cells):
+                    continue
+                candidates.append(VisibleScreenTextMatch(
+                    record_id=spec["id"], text=spec["text"],
+                    left=min(columns), top=top,
+                    right=max(column + len(pattern) for column, pattern in
+                              zip(columns, patterns)),
+                    bottom=top + (len(patterns) - 1) * 2 + 1,
+                    cells=cells,
+                ))
+        selected: list[VisibleScreenTextMatch] = []
+        occupied: set[tuple[int, int]] = set()
+        for item in sorted(candidates, key=lambda value: (-len(value.cells), value.record_id)):
+            if occupied.isdisjoint(item.cells):
+                selected.append(item)
+                occupied.update(item.cells)
+        return sorted(selected, key=lambda item: (item.top, item.left))
 
     @classmethod
     def _pattern(cls, values: bytes) -> tuple[tuple[int, ...], frozenset[int]]:
@@ -245,7 +364,13 @@ class NametableTextMatcher:
                     row, lexeme["pattern"], lexeme["tileAlternatives"]
                 ):
                     visible.append((lexeme, row_index, column))
-        return visible
+        return [
+            item for item in visible
+            if all(
+                (item[1], item[2] + offset) not in self._sourced_cells
+                for offset in range(len(item[0]["pattern"]))
+            )
+        ]
 
     @staticmethod
     def _candidate_score(item: tuple[dict[str, Any], int, int]) -> int:
@@ -333,6 +458,19 @@ class NametableTextMatcher:
         changed = self.state.apply(event)
         if not changed:
             return None
+        return self._refresh_matches()
+
+    def set_sourced_cells(
+        self, cells: set[tuple[int, int]] | frozenset[tuple[int, int]]
+    ) -> VisibleTextMatch | None:
+        """Replace the exact cells owned by stable semantic provenance."""
+        incoming = frozenset(cells)
+        if incoming == self._sourced_cells:
+            return None
+        self._sourced_cells = incoming
+        return self._refresh_matches()
+
+    def _refresh_matches(self) -> VisibleTextMatch | None:
         # The shadow grid is already in memory; scanning its 30 short rows is
         # cheap and lets an unrelated write preserve the current match while a
         # clearing write naturally removes it.
@@ -340,6 +478,16 @@ class NametableTextMatcher:
         standalone = self._best_non_overlapping([
             item for item in visible if item[0]["id"] not in self._actions
         ])
+        screen_texts = self._visible_screen_texts()
+        screen_cells = set().union(*(item.cells for item in screen_texts)) \
+            if screen_texts else set()
+        standalone = [
+            item for item in standalone
+            if all(
+                (item[1], item[2] + offset) not in screen_cells
+                for offset in range(len(item[0]["pattern"]))
+            )
+        ]
         self._visible_lexeme_matches = tuple(
             VisibleLexemeMatch(
                 record_id=str(lexeme["id"]), row=row, column=column,
@@ -347,6 +495,7 @@ class NametableTextMatcher:
             )
             for lexeme, row, column in standalone
         )
+        self._visible_screen_text_matches = tuple(screen_texts)
         actions = [item for item in visible if item[0]["id"] in self._actions]
         for action, action_row, action_column in sorted(
             actions, key=lambda item: (item[1], item[2]), reverse=True
@@ -416,3 +565,7 @@ class NametableTextMatcher:
     def visible_lexemes(self) -> tuple[VisibleLexemeMatch, ...]:
         """All translated vocabulary terms currently present in the shadow grid."""
         return self._visible_lexeme_matches
+
+    @property
+    def visible_screen_texts(self) -> tuple[VisibleScreenTextMatch, ...]:
+        return self._visible_screen_text_matches

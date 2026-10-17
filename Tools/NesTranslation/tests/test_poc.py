@@ -1163,7 +1163,7 @@ class ReadAnalysisTests(unittest.TestCase):
         assert hidden is not None
         self.assertFalse(hidden["visible"])
 
-    def test_visible_vocabulary_renders_above_overlapping_menu_label(self) -> None:
+    def test_stable_source_suppresses_only_its_exact_fallback_cells(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
         catalog = json.loads((
             ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
@@ -1172,23 +1172,71 @@ class ReadAnalysisTests(unittest.TestCase):
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
             load_database(DATABASE), vocabulary, catalog,
         )
-        router.apply_visibility(VisibilityUpdate(
-            "label:dq.menu.main",
-            (("dq.menu.main#label-6", 10),),
-            (("dq.menu.main#label-6", PpuBounds(168, 64, 48, 16)),),
-        ))
+        router.consume(
+            'DQMENU {"type":"group","frame":8,"recordId":"dq.menu.main",'
+            '"cellCount":10,"labels":[{"index":6,"cellCount":10,'
+            '"x":168,"y":64,"width":48,"height":16,'
+            '"cells":[278,279]}]}'
+        )
         shown = router.consume(
             'DQRUN {"type":"writes","frame":9,"runs":['
             '{"row":8,"startColumn":22,"hex":"0f99"}]}'
         )
-        assert shown is not None
+        shown = shown or router._scene_state()
         self.assertEqual(
             [item["text"] for item in shown["items"]],
+            ["調査"],
+        )
+        adjacent = router.consume(
+            'DQRUN {"type":"writes","frame":10,"runs":['
+            '{"row":8,"startColumn":24,"hex":"0f99"}]}'
+        )
+        assert adjacent is not None
+        self.assertEqual(
+            [item["text"] for item in adjacent["items"]],
             ["調査", "鑰匙"],
         )
+
+    def test_ppu_lexemes_are_automatically_renderable_from_the_pack(self) -> None:
+        vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
+        catalog = json.loads((
+            ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
+        ).read_text(encoding="utf-8"))
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE), vocabulary, catalog,
+        )
+        scene = router.consume(
+            'DQRUN {"type":"writes","frame":1,"runs":['
+            '{"row":6,"startColumn":14,"hex":"2c22360f0b1f1019"},'
+            '{"row":8,"startColumn":14,"hex":"2c22360c311f1019"}]}'
+        )
+        assert scene is not None
         self.assertEqual(
-            shown["items"][-1]["ppuBounds"],
-            {"x": 176, "y": 64, "width": 16, "height": 8},
+            [item["text"] for item in scene["items"]],
+            ["購買物品", "出售物品"],
+        )
+
+    def test_multiline_screen_text_is_a_generic_content_fallback(self) -> None:
+        matcher = NametableTextMatcher(
+            {}, {},
+            {"records": [{"id": "message", "translation": "完整译文"}]},
+            {"records": [{
+                "id": "message", "expandedHex": "0102fe0304fc",
+            }]},
+        )
+        matcher.apply({
+            "type": "writes",
+            "runs": [
+                {"row": 4, "startColumn": 7, "hex": "0102"},
+                {"row": 6, "startColumn": 9, "hex": "0304"},
+            ],
+        })
+        self.assertEqual(
+            [(item.record_id, item.text, item.left, item.top,
+              item.right, item.bottom)
+             for item in matcher.visible_screen_texts],
+            [("message", "完整译文", 7, 4, 11, 7)],
         )
 
     def test_vocabulary_visibility_rejects_single_cell_fragments(self) -> None:
@@ -1661,6 +1709,7 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn("local textCells = {}", script)
         self.assertIn("local visibleCells = {}", script)
         self.assertIn("local previousProjectedText = {}", script)
+        self.assertIn("local previousLayoutProjectionKey = nil", script)
         self.assertIn("local textCellsDirty = false", script)
         self.assertIn("local function currentProjection()", script)
         self.assertEqual(script.count("emu.getState()"), 1)
@@ -1691,6 +1740,8 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIn('state["ppu.xScroll"]', script)
         self.assertIn("local function projectedPhysicalCell", script)
         self.assertIn("emitLayoutGroups(projection)", script)
+        self.assertIn("layoutDirty[owner.recordId] = true", script)
+        self.assertIn('\\"cells\\":[%s]', script)
         self.assertIn("local x, y = projectedPhysicalCell(address, projection)", script)
         self.assertIn("local layoutRecordsById = {}", script)
         self.assertIn("layoutRecordsById[record.id] = record", script)

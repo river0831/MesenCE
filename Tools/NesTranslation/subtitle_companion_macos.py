@@ -14,6 +14,7 @@ from AppKit import (
     NSBackingStoreBuffered,
     NSColor,
     NSFont,
+    NSLineBreakByCharWrapping,
     NSMakeRect,
     NSMakeSize,
     NSScreen,
@@ -83,21 +84,16 @@ class SubtitleController(NSObject):
         bounds = self.window.contentView().bounds()
         scale_x = bounds.size.width / 256.0
         scale_y = bounds.size.height / 240.0
-        source_width = ppu_bounds["width"]
-        # A two-tile NES word can be narrower than two AppKit CJK glyphs once
-        # normal text-field padding is included. Expand only the presentation
-        # rectangle, while retaining the source rectangle's centre.
-        display_width = max(source_width, len(text) * (font_size + 4.0))
-        display_x = max(
-            0.0, min(256.0 - display_width,
-                     ppu_bounds["x"] - (display_width - source_width) / 2.0)
-        )
-        x = display_x * scale_x
+        # Source coordinates are authoritative. Expanding a field around its
+        # centre makes long translations drift, and a field near the right
+        # edge can then extend beyond both its debug box and the viewport.
+        # Keep the exact source rectangle and wrap inside it instead.
+        x = ppu_bounds["x"] * scale_x
         y = bounds.size.height - (
             ppu_bounds["y"] + ppu_bounds["height"]
         ) * scale_y
         field = NSTextField.alloc().initWithFrame_(NSMakeRect(
-            x, y, display_width * scale_x,
+            x, y, ppu_bounds["width"] * scale_x,
             ppu_bounds["height"] * scale_y,
         ))
         field.setEditable_(False)
@@ -107,8 +103,10 @@ class SubtitleController(NSObject):
         field.setBackgroundColor_(NSColor.blackColor())
         field.setTextColor_(NSColor.whiteColor())
         field.setFont_(NSFont.systemFontOfSize_(font_size * scale_y))
-        field.setAlignment_(1)
+        field.setAlignment_(0)
         field.setMaximumNumberOfLines_(0)
+        field.cell().setWraps_(True)
+        field.cell().setLineBreakMode_(NSLineBreakByCharWrapping)
         field.setStringValue_(text)
         self.window.contentView().addSubview_(field)
         self.drawFields.append(field)

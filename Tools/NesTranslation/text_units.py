@@ -147,17 +147,27 @@ def build_text_units(
                 line_count=len(lines),
                 line_height=box["lineHeight"],
             ))
-    for record in (vocabulary or {}).get("records", []):
+    vocabulary_records = list((vocabulary or {}).get("records", []))
+    vocabulary_records.extend((vocabulary or {}).get("ppuLexemes", []))
+    for record in vocabulary_records:
         if record.get("category") == "system-template":
             continue
         source_text = str(record.get("sourceText", ""))
+        source_hex = str(record.get("sourceHex", ""))
+        try:
+            tile_count = sum(
+                value not in (0xF8, 0xF9)
+                for value in bytes.fromhex(source_hex)
+            )
+        except ValueError:
+            tile_count = 0
         units.append(TextUnit(
             id=f"{record['id']}#vocabulary",
             record_id=record["id"],
             kind="vocabulary",
             text=record["display"],
             ppu_bounds=PpuBounds(0, 0, 8, 8),
-            total_count=max(len(source_text), 1),
+            total_count=max(len(source_text), tile_count, 1),
             font_size=7.5,
         ))
     ids = [unit.id for unit in units]

@@ -48,6 +48,8 @@
     { "id": "dict-bb", "token": 187, "category": "system-template", "sourceText": "みつけた", "translation": "发现了", "display": "發現了", "confidence": "semantic-probable", "composition": { "objectCategories": ["item", "weapon", "armor", "shield"], "maxRowDistance": 3, "format": "發現了{object}。" } }
   ],
   "ppuLexemes": [
-    { "id": "currency-gold", "category": "currency", "sourceHex": "45 f8 4e 43 42", "display": "金幣", "confidence": "runtime-confirmed" }
+    { "id": "currency-gold", "category": "currency", "sourceHex": "45 f8 4e 43 42", "display": "金幣", "confidence": "runtime-confirmed" },
+    { "id": "shop-buy", "category": "menu-choice", "sourceHex": "2c 22 36 0f 0b 1f 10 19", "display": "購買物品", "confidence": "runtime-confirmed" },
+    { "id": "shop-sell", "category": "menu-choice", "sourceHex": "2c 22 36 0c 31 1f 10 19", "display": "出售物品", "confidence": "runtime-confirmed" }
   ]
 }
