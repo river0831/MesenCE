@@ -53,6 +53,9 @@ class SubtitleController(NSObject):
         self.window.setDelegate_(self)
         self.drawFields = []
         self.latestCommand = {"visible": False}
+        self.pendingCommand = None
+        self.commandScheduled = False
+        self.commandLock = threading.Lock()
         self.window.orderFrontRegardless()
         threading.Thread(target=self._read_commands, daemon=True).start()
 
@@ -63,16 +66,31 @@ class SubtitleController(NSObject):
                 command = json.loads(line)
             except (ValueError, TypeError):
                 continue
-            payload = json.dumps(command, ensure_ascii=False)
-            self.performSelectorOnMainThread_withObject_waitUntilDone_(
-                "applyState:", payload, False
-            )
+            # The emulator can publish faster than AppKit can rebuild the
+            # debug view. Keep only the newest not-yet-rendered snapshot so
+            # the UI never replays a growing queue of obsolete game states.
+            with self.commandLock:
+                self.pendingCommand = command
+                should_schedule = not self.commandScheduled
+                if should_schedule:
+                    self.commandScheduled = True
+            if should_schedule:
+                self.performSelectorOnMainThread_withObject_waitUntilDone_(
+                    "applyPendingState:", None, False
+                )
         self.performSelectorOnMainThread_withObject_waitUntilDone_(
             "finish:", None, False
         )
 
-    def applyState_(self, payload):  # noqa: N802
-        self.latestCommand = json.loads(payload)
+    def applyPendingState_(self, value):  # noqa: N802
+        del value
+        with self.commandLock:
+            command = self.pendingCommand
+            self.pendingCommand = None
+            self.commandScheduled = False
+        if command is None or command == self.latestCommand:
+            return
+        self.latestCommand = command
         self._render()
 
     def windowDidResize_(self, notification):  # noqa: N802
@@ -114,6 +132,11 @@ class SubtitleController(NSObject):
     @python_method
     def _debug_region(self, item):
         ppu_bounds = item["ppuBounds"]
+        fallback = item.get("kind") in ("content", "vocabulary", "dynamic")
+        debug_color = (
+            NSColor.systemRedColor() if fallback
+            else NSColor.systemGreenColor()
+        )
         bounds = self.window.contentView().bounds()
         scale_x = bounds.size.width / 256.0
         scale_y = bounds.size.height / 240.0
@@ -129,17 +152,17 @@ class SubtitleController(NSObject):
         field.setSelectable_(False)
         field.setBezeled_(False)
         field.setDrawsBackground_(False)
-        field.setTextColor_(NSColor.systemGreenColor())
+        field.setTextColor_(debug_color)
         field.setFont_(NSFont.monospacedSystemFontOfSize_weight_(
             max(7.0, 3.5 * scale_y), 0.0
         ))
         field.setWantsLayer_(True)
         field.layer().setBorderWidth_(2.0)
-        field.layer().setBorderColor_(NSColor.systemGreenColor().CGColor())
+        field.layer().setBorderColor_(debug_color.CGColor())
         ratio = float(item.get("visibleRatio", 1.0))
         field.setStringValue_(
             f"{item.get('recordId', '?')} [{item.get('kind', '?')}] "
-            f"{ratio:.0%}"
+            f"{'fallback' if fallback else 'source'} {ratio:.0%}"
         )
         self.window.contentView().addSubview_(field)
         self.drawFields.append(field)

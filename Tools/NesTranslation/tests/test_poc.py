@@ -1031,6 +1031,160 @@ class ReadAnalysisTests(unittest.TestCase):
             {"start": 6, "endExclusive": 8},
         ])
 
+    def test_dialogue_instances_use_their_own_live_cell_bounds(self) -> None:
+        spec = {"records": [
+            {
+                "id": "opening",
+                "box": {"x": 52, "y": 150, "width": 152, "height": 66,
+                        "lineHeight": 15},
+                "segments": [{"id": "opening#all", "sourceStart": 0,
+                              "sourceEndExclusive": 4, "lines": ["开场"]}],
+            },
+            {
+                "id": "prompt",
+                "box": {"x": 52, "y": 150, "width": 152, "height": 66,
+                        "lineHeight": 15},
+                "segments": [{"id": "prompt#all", "sourceStart": 0,
+                              "sourceEndExclusive": 4, "lines": ["提示"]}],
+            },
+        ]}
+        router = SubtitleEventRouter(spec)
+        router.consume('DQGLYPH {"type":"record","frame":1,'
+                       '"recordId":"opening","instanceId":"msg-1"}')
+        router.consume('DQGLYPH {"type":"record","frame":2,'
+                       '"recordId":"prompt","instanceId":"msg-2"}')
+        router.consume(
+            'DQGLYPH {"type":"visible-ranges","frame":3,'
+            '"cells":[641,642,705,706],"rows":[],"instances":['
+            '{"recordId":"opening","instanceId":"msg-1",'
+            '"x":8,"y":160,"width":16,"height":8,"cells":[641,642]},'
+            '{"recordId":"prompt","instanceId":"msg-2",'
+            '"x":8,"y":176,"width":16,"height":8,"cells":[705,706]}]}'
+        )
+        router.consume(
+            'DQGLYPH {"type":"coverage","frame":3,'
+            '"recordId":"opening","instanceId":"msg-1","segments":['
+            '{"segmentId":"opening#all","visibleCount":4}]}'
+        )
+        scene = router.consume(
+            'DQGLYPH {"type":"coverage","frame":3,'
+            '"recordId":"prompt","instanceId":"msg-2","segments":['
+            '{"segmentId":"prompt#all","visibleCount":4}]}'
+        )
+        assert scene is not None
+        bounds = {
+            item["recordId"]: item["ppuBounds"] for item in scene["items"]
+        }
+        self.assertEqual(bounds["opening"]["y"], 160)
+        self.assertEqual(bounds["prompt"]["y"], 176)
+
+    def test_visible_source_ranges_group_fragmented_instances_and_project_text(self) -> None:
+        spec = {"records": [{
+            "id": "long-message",
+            "box": {"x": 52, "y": 150, "width": 152, "height": 66,
+                    "lineHeight": 15},
+            "segments": [{"id": "long-message#all", "sourceStart": 0,
+                          "sourceEndExclusive": 10,
+                          "lines": ["甲乙丙丁戊己庚辛壬癸"]}],
+        }]}
+        router = SubtitleEventRouter(spec)
+        scene = router.consume(
+            'DQGLYPH {"type":"visible-ranges","frame":3,'
+            '"cells":[641,642,643,644],"glyphs":['
+            '{"recordId":"long-message","instanceId":"msg-1",'
+            '"index":2,"cell":641},'
+            '{"recordId":"long-message","instanceId":"msg-1",'
+            '"index":3,"cell":642},'
+            '{"recordId":"long-message","instanceId":"msg-2",'
+            '"index":4,"cell":643},'
+            '{"recordId":"long-message","instanceId":"msg-2",'
+            '"index":5,"cell":644}],"rows":['
+            '{"recordId":"long-message","instanceId":"msg-1",'
+            '"row":20,"start":2,"endExclusive":4,"cellCount":2},'
+            '{"recordId":"long-message","instanceId":"msg-2",'
+            '"row":20,"start":4,"endExclusive":6,"cellCount":2}],'
+            '"instances":['
+            '{"recordId":"long-message","instanceId":"msg-1",'
+            '"x":8,"y":160,"width":16,"height":8,"cells":[641,642]},'
+            '{"recordId":"long-message","instanceId":"msg-2",'
+            '"x":24,"y":160,"width":16,"height":8,"cells":[643,644]}]}'
+        )
+        assert scene is not None
+        self.assertEqual(len(scene["items"]), 1)
+        item = scene["items"][0]
+        self.assertEqual(item["text"], "丙丁戊己")
+        self.assertEqual(item["visibleCount"], 4)
+        self.assertEqual(item["ppuBounds"]["x"], 8)
+        self.assertEqual(item["ppuBounds"]["width"], 32)
+
+    def test_visible_source_ranges_split_occluded_dialogue_into_blocks(self) -> None:
+        spec = {"records": [{
+            "id": "occluded-message",
+            "box": {"x": 52, "y": 150, "width": 152, "height": 66,
+                    "lineHeight": 15},
+            "segments": [{"id": "occluded-message#all", "sourceStart": 0,
+                          "sourceEndExclusive": 10,
+                          "lines": ["甲乙丙丁戊己庚辛壬癸"]}],
+        }]}
+        router = SubtitleEventRouter(spec)
+        scene = router.consume(
+            'DQGLYPH {"type":"visible-ranges","frame":3,'
+            '"cells":[641,642,643,649,650,651],"glyphs":['
+            '{"recordId":"occluded-message","instanceId":"msg-1",'
+            '"index":0,"cell":641},'
+            '{"recordId":"occluded-message","instanceId":"msg-1",'
+            '"index":1,"cell":642},'
+            '{"recordId":"occluded-message","instanceId":"msg-1",'
+            '"index":2,"cell":643},'
+            '{"recordId":"occluded-message","instanceId":"msg-1",'
+            '"index":7,"cell":705},'
+            '{"recordId":"occluded-message","instanceId":"msg-1",'
+            '"index":8,"cell":706},'
+            '{"recordId":"occluded-message","instanceId":"msg-1",'
+            '"index":9,"cell":707}],"rows":[],"instances":[]}'
+        )
+        assert scene is not None
+        blocks = [
+            item for item in scene["items"]
+            if item["recordId"] == "occluded-message"
+        ]
+        self.assertEqual([item["text"] for item in blocks], ["甲乙丙", "辛壬癸"])
+        self.assertEqual(
+            [(item["sourceStart"], item["sourceEndExclusive"]) for item in blocks],
+            [(0, 3), (7, 10)],
+        )
+        self.assertEqual([item["ppuBounds"]["y"] for item in blocks], [160, 176])
+
+    def test_source_index_holes_do_not_split_one_visible_text_row(self) -> None:
+        spec = {"records": [{
+            "id": "fragmented-line",
+            "box": {"x": 52, "y": 150, "width": 152, "height": 66,
+                    "lineHeight": 15},
+            "segments": [{"id": "fragmented-line#all", "sourceStart": 0,
+                          "sourceEndExclusive": 6,
+                          "lines": ["要买什么？"]}],
+        }]}
+        router = SubtitleEventRouter(spec)
+        scene = router.consume(
+            'DQGLYPH {"type":"visible-ranges","frame":3,'
+            '"cells":[641,642,644,645],"glyphs":['
+            '{"recordId":"fragmented-line","instanceId":"msg-1",'
+            '"index":0,"cell":641},'
+            '{"recordId":"fragmented-line","instanceId":"msg-1",'
+            '"index":1,"cell":642},'
+            '{"recordId":"fragmented-line","instanceId":"msg-2",'
+            '"index":4,"cell":644},'
+            '{"recordId":"fragmented-line","instanceId":"msg-2",'
+            '"index":5,"cell":645}],"rows":[],"instances":[]}'
+        )
+        assert scene is not None
+        blocks = [
+            item for item in scene["items"]
+            if item["recordId"] == "fragmented-line"
+        ]
+        self.assertEqual(len(blocks), 1)
+        self.assertEqual(blocks[0]["text"], "要买什么？")
+
     def test_subtitle_router_maps_segment_and_reset_events(self) -> None:
         spec = json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8"))
         router = SubtitleEventRouter(spec, load_database(DATABASE))
@@ -1449,6 +1603,43 @@ class ReadAnalysisTests(unittest.TestCase):
         assert hidden is not None
         self.assertFalse(hidden["visible"])
 
+    def test_consecutive_shop_records_have_independent_lifecycles(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+        )
+        opening = router.consume(
+            'DQGLYPH {"type":"record","frame":10,'
+            '"recordId":"chr-fc-35c8","instanceId":"msg-1"}'
+        )
+        assert opening is not None
+        farewell = router.consume(
+            'DQGLYPH {"type":"record","frame":11,'
+            '"recordId":"chr-fc-38a7","instanceId":"msg-2"}'
+        )
+        assert farewell is not None
+        self.assertEqual(
+            {item["recordId"] for item in farewell["items"]},
+            {"chr-fc-35c8", "chr-fc-38a7"},
+        )
+        router.consume(
+            'DQGLYPH {"type":"visible-ranges","frame":12,'
+            '"cells":[33,34],"rows":[]}'
+        )
+        after_old_reset = router.consume(
+            'DQGLYPH {"type":"reset","frame":13,'
+            '"recordId":"chr-fc-35c8","instanceId":"msg-1"}'
+        )
+        assert after_old_reset is not None
+        self.assertIn(
+            "chr-fc-38a7",
+            {item["recordId"] for item in after_old_reset["items"]},
+        )
+        self.assertEqual(
+            router._source_cells_by_scope["dialogue"],
+            frozenset({(1, 1), (1, 2)}),
+        )
+
     def test_runtime_item_parameter_is_resolved_for_each_instance(self) -> None:
         router = SubtitleEventRouter(
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
@@ -1529,7 +1720,7 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         self.assertEqual(fitted[-1], units[2])
 
-    def test_new_overlapping_dialogue_record_replaces_old_record(self) -> None:
+    def test_overlapping_dialogue_records_keep_independent_lifecycles(self) -> None:
         router = SubtitleEventRouter(
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
             load_database(DATABASE),
@@ -1555,7 +1746,7 @@ class ReadAnalysisTests(unittest.TestCase):
         scene = router.apply_visibility(VisibilityUpdate(
             f"dialogue:{overlapping.record_id}", ((overlapping.id, 1),)
         ))
-        self.assertNotIn(first.id, {item["unitId"] for item in scene["items"]})
+        self.assertIn(first.id, {item["unitId"] for item in scene["items"]})
         self.assertIn(overlapping.id, {item["unitId"] for item in scene["items"]})
 
     def test_snapshot_trace_load_and_timed_replay(self) -> None:
@@ -1698,9 +1889,14 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         self.assertIn("emptyGraceFrames = 20", script)
         self.assertIn("local nextInstanceNumber = 1", script)
+        self.assertIn("local activeInstances = {}", script)
         self.assertIn("local recordsByFirstByte = {}", script)
         self.assertIn("recordsByFirstByte[stream[1]] or {}", script)
         self.assertIn('activeInstanceId = "msg-"', script)
+        self.assertNotIn("or activeRecord then return", script)
+        self.assertIn("for instanceId, instance in pairs(activeInstances)", script)
+        self.assertIn("if cell.instanceId == instanceId", script)
+        self.assertIn('\\"instances\\":[%s]', script)
         self.assertIn("characterId = activeInstanceId", script)
         self.assertIn('\\"type\\":\\"instance-begin\\"', script)
         self.assertIn('\\"type\\":\\"instance-end\\"', script)

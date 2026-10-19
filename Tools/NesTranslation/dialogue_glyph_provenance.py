@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 from contextlib import ExitStack
 import json
+import math
+import re
 import subprocess
 import sys
 import tempfile
@@ -204,6 +206,9 @@ class SubtitleEventRouter:
         self._source_terms: list[tuple[int, str]] = []
         self._dialogue_text_overrides: dict[str, str] = {}
         self._active_dialogue_instances: dict[str, str] = {}
+        self._dialogue_instance_bounds: dict[str, PpuBounds] = {}
+        self._source_range_records: set[str] = set()
+        self._source_block_items: list[dict[str, Any]] = []
         self._runtime_parameters: dict[str, dict[str, dict[str, Any]]] = {}
         self._vocabulary_records = {
             record["id"]: record for record in (vocabulary or {}).get("records", [])
@@ -239,25 +244,10 @@ class SubtitleEventRouter:
         for unit_id in scope_units:
             self._visible_units.pop(unit_id, None)
             self._visible_bounds.pop(unit_id, None)
-        incoming_dialogue = [
-            self._units_by_id[unit_id]
-            for unit_id in counts
-            if self._units_by_id[unit_id].kind == "dialogue"
-        ]
-        if incoming_dialogue:
-            incoming_boxes = [unit.ppu_bounds for unit in incoming_dialogue]
-            for unit_id in tuple(self._visible_units):
-                visible = self._units_by_id[unit_id]
-                if (
-                    visible.kind == "dialogue"
-                    and visible.record_id != incoming_dialogue[0].record_id
-                    and any(
-                        self._bounds_overlap(visible.ppu_bounds, box)
-                        for box in incoming_boxes
-                    )
-                ):
-                    self._visible_units.pop(unit_id, None)
-                    self._visible_bounds.pop(unit_id, None)
+        # Visibility belongs to exact source cells, not to a geometric window
+        # guess. Consecutive records may legitimately coexist while one line
+        # scrolls out and the next is decoded into the same dialogue window.
+        # Each record is removed only by its own visibility/lifecycle update.
         self._visible_units.update(counts)
         self._visible_bounds.update(dict(update.unit_bounds))
         return self._scene_state()
@@ -311,14 +301,17 @@ class SubtitleEventRouter:
         dialogue_by_record: dict[str, list[TextUnit]] = {}
         for unit_id in self._visible_units:
             unit = self._units_by_id[unit_id]
-            if unit.kind == "dialogue":
+            if (
+                unit.kind == "dialogue"
+                and unit.record_id not in self._source_range_records
+            ):
                 dialogue_by_record.setdefault(unit.record_id, []).append(unit)
         for record_id in sorted(dialogue_by_record):
             units = sorted(
                 dialogue_by_record[record_id],
                 key=lambda unit: unit.source_start or 0,
             )
-            box = units[0].ppu_bounds
+            box = self._visible_bounds.get(units[0].id, units[0].ppu_bounds)
             if self._dynamic_item is not None:
                 bounds = self._dynamic_item["ppuBounds"]
                 dynamic_box = PpuBounds(
@@ -345,6 +338,7 @@ class SubtitleEventRouter:
                     item["parameters"] = parameters
                 items.append(item)
                 next_y += item_height
+        items.extend(self._source_block_items)
         if self._dynamic_item is not None:
             items.append(self._dynamic_item)
         # Content matching has already excluded only those exact Nametable
@@ -383,6 +377,195 @@ class SubtitleEventRouter:
             self._source_cells_by_scope[scope] = cells
         else:
             self._source_cells_by_scope.pop(scope, None)
+
+    @staticmethod
+    def _translation_atoms(text: str) -> list[str]:
+        """Keep runtime placeholders atomic while slicing translated text."""
+        return re.findall(r"\{[^}]+\}|.", text, flags=re.DOTALL)
+
+    @classmethod
+    def _project_translation(
+        cls, text: str, source_start: int, source_end: int,
+        visible_indices: set[int],
+    ) -> str:
+        """Project the visible source interval proportionally into a translation."""
+        relevant = sorted(
+            index for index in visible_indices
+            if source_start <= index < source_end
+        )
+        if not relevant:
+            return ""
+        atoms = cls._translation_atoms(text)
+        source_length = source_end - source_start
+        if not atoms or source_length <= 0:
+            return text
+        relative_start = relevant[0] - source_start
+        relative_end = relevant[-1] + 1 - source_start
+        target_start = math.floor(relative_start * len(atoms) / source_length)
+        target_end = math.ceil(relative_end * len(atoms) / source_length)
+        target_end = max(target_end, target_start + 1)
+        return "".join(atoms[target_start:target_end])
+
+    def _apply_visible_source_ranges(self, event: dict[str, Any]) -> dict[str, Any]:
+        glyphs_by_record: dict[str, list[tuple[int, int, str | None]]] = {}
+        for glyph in event.get("glyphs", []):
+            if not isinstance(glyph, dict):
+                continue
+            record_id = glyph.get("recordId")
+            index = glyph.get("index")
+            cell = glyph.get("cell")
+            instance_id = glyph.get("instanceId")
+            if (
+                not isinstance(record_id, str) or not record_id
+                or not isinstance(index, int) or index < 0
+                or not isinstance(cell, int) or not 0 <= cell < 32 * 30
+            ):
+                continue
+            glyphs_by_record.setdefault(record_id, []).append((
+                index, cell,
+                instance_id if isinstance(instance_id, str) else None,
+            ))
+
+        bounds_by_record: dict[str, PpuBounds] = {}
+        instance_bounds: dict[str, PpuBounds] = {}
+        for item in event.get("instances", []):
+            if not isinstance(item, dict):
+                continue
+            instance_id = item.get("instanceId")
+            record_id = item.get("recordId")
+            if (
+                not isinstance(instance_id, str) or not instance_id
+                or not isinstance(record_id, str) or not record_id
+                or not all(
+                    isinstance(item.get(key), int) and item[key] >= 0
+                    for key in ("x", "y", "width", "height")
+                )
+                or item["width"] <= 0 or item["height"] <= 0
+            ):
+                continue
+            current = PpuBounds(
+                item["x"], item["y"], item["width"], item["height"]
+            )
+            instance_bounds[instance_id] = current
+            previous = bounds_by_record.get(record_id)
+            if previous is None:
+                bounds_by_record[record_id] = current
+            else:
+                left = min(previous.x, current.x)
+                top = min(previous.y, current.y)
+                right = max(previous.x + previous.width, current.x + current.width)
+                bottom = max(previous.y + previous.height, current.y + current.height)
+                bounds_by_record[record_id] = PpuBounds(
+                    left, top, right - left, bottom - top
+                )
+        self._dialogue_instance_bounds = instance_bounds
+
+        previous_records = self._source_range_records
+        current_records = set(glyphs_by_record)
+        self._source_range_records = current_records
+        self._source_block_items = []
+        for record_id in previous_records | current_records:
+            scope_id = f"dialogue:{record_id}"
+            if scope_id not in self._scope_units:
+                continue
+            # Exact source blocks replace the older segment-level rendering.
+            # Clear it directly; calling apply_visibility here would generate
+            # intermediate snapshots while this single frame is assembled.
+            for unit_id in self._scope_units[scope_id]:
+                self._visible_units.pop(unit_id, None)
+                self._visible_bounds.pop(unit_id, None)
+                self._dialogue_text_overrides.pop(unit_id, None)
+
+        for record_id, glyphs in sorted(glyphs_by_record.items()):
+            units = sorted(
+                (
+                    self._units_by_id[unit_id]
+                    for unit_id in self._scope_units.get(
+                        f"dialogue:{record_id}", ()
+                    )
+                    if self._units_by_id[unit_id].source_start is not None
+                    and self._units_by_id[unit_id].source_end_exclusive is not None
+                ),
+                key=lambda unit: (unit.source_start or 0, unit.id),
+            )
+            if not units:
+                continue
+            by_index: dict[int, list[tuple[int, str | None]]] = {}
+            for index, cell, instance_id in glyphs:
+                by_index.setdefault(index, []).append((cell, instance_id))
+            # A missing logical index does not necessarily mean occlusion.
+            # Dictionary expansion, control handling, or a decoder fragment
+            # can leave holes even though the remaining glyphs form one
+            # ordinary screen line. The exact, threshold-free visual unit is
+            # therefore one source record on one screen tile row. A covering
+            # window that hides whole dialogue lines naturally leaves several
+            # independent row blocks, each with its own bounds and projection.
+            row_blocks: dict[int, set[int]] = {}
+            for index, entries in by_index.items():
+                for cell, _ in entries:
+                    row_blocks.setdefault(cell // 32, set()).add(index)
+            record_start = min(unit.source_start or 0 for unit in units)
+            record_end = max(unit.source_end_exclusive or 0 for unit in units)
+            total_count = max(record_end - record_start, 1)
+            for row, visible_indices in sorted(row_blocks.items()):
+                block_start = min(visible_indices)
+                block_end = max(visible_indices) + 1
+                cells = [
+                    cell for index in visible_indices
+                    for cell, _ in by_index[index]
+                    if cell // 32 == row
+                ]
+                rows = [cell // 32 for cell in cells]
+                columns = [cell % 32 for cell in cells]
+                bounds = PpuBounds(
+                    min(columns) * 8, min(rows) * 8,
+                    (max(columns) - min(columns) + 1) * 8,
+                    (max(rows) - min(rows) + 1) * 8,
+                )
+                snippets = []
+                for unit in units:
+                    assert unit.source_start is not None
+                    assert unit.source_end_exclusive is not None
+                    projected = self._project_translation(
+                        unit.text, unit.source_start,
+                        unit.source_end_exclusive, visible_indices,
+                    )
+                    if projected:
+                        snippets.append(projected)
+                if not snippets:
+                    continue
+                instance_ids = sorted({
+                    instance_id for index in visible_indices
+                    for cell, instance_id in by_index[index]
+                    if cell // 32 == row
+                    if instance_id
+                })
+                item: dict[str, Any] = {
+                    "unitId": (
+                        f"source-block:{record_id}:{block_start}-{block_end}:"
+                        f"row-{row}"
+                    ),
+                    "recordId": record_id,
+                    "kind": "dialogue",
+                    "text": "\n".join(snippets),
+                    "ppuBounds": bounds.as_dict(),
+                    "visibleCount": len(visible_indices),
+                    "totalCount": total_count,
+                    "visibleRatio": min(
+                        len(visible_indices) / total_count, 1.0
+                    ),
+                    "fontSize": 8.5,
+                    "sourceStart": block_start,
+                    "sourceEndExclusive": block_end,
+                    "instanceIds": instance_ids,
+                }
+                if len(instance_ids) == 1:
+                    item["instanceId"] = instance_ids[0]
+                parameters = self._runtime_parameters.get(record_id)
+                if parameters:
+                    item["parameters"] = parameters
+                self._source_block_items.append(item)
+        return self._scene_state()
 
     def _refresh_content_matches(
         self, match: Any | None = None
@@ -521,7 +704,8 @@ class SubtitleEventRouter:
             return self._scene_state() if changed else None
         if marker == glyph_marker and event.get("type") == "visible-ranges":
             self._set_source_cell_scope("dialogue", event.get("cells", []))
-            return self._refresh_content_matches()
+            self._refresh_content_matches()
+            return self._apply_visible_source_ranges(event)
         if marker == run_marker:
             try:
                 match = self._text_matcher.apply(event)
@@ -625,7 +809,7 @@ class SubtitleEventRouter:
             # immediately and let later coverage snapshots refine it.
             segment = parse_record_segments(record)[0]
             unit = self._dialogue_units[(record["id"], segment.id)]
-            self._source_fallback_records = {record["id"]}
+            self._source_fallback_records.add(record["id"])
             self._active_source_record = record["id"]
             self._compose_source_dialogue(record["id"])
             return self.apply_visibility(VisibilityUpdate(
@@ -647,7 +831,15 @@ class SubtitleEventRouter:
             self._runtime_parameters.pop(record_id, None)
             if self._active_source_record == record_id:
                 self._active_source_record = None
-            self._set_source_cell_scope("dialogue", ())
+            if record_id in self._source_range_records:
+                # The current screen still contains glyphs from this record.
+                # A decoder sub-instance ending must not hide their grouped
+                # translation; visible-ranges will remove it when the cells
+                # actually disappear.
+                return None
+            # visible-ranges is the authoritative union of exact sourced
+            # cells. Ending one instance must not clear cells belonging to a
+            # newer instance that is visible at the same time.
             self._refresh_content_matches()
             for unit_id in self._scope_units.get(f"dialogue:{record_id}", ()):
                 self._dialogue_text_overrides.pop(unit_id, None)
@@ -658,6 +850,12 @@ class SubtitleEventRouter:
         if event.get("type") == "coverage":
             record = self._records.get(event.get("recordId"))
             if record is None:
+                return None
+            if record["id"] in self._source_range_records:
+                # Exact visible glyph indices are authoritative. Per-instance
+                # coverage can be fragmented by dictionary expansion or
+                # repeated decoder passes and must not replace the grouped
+                # current-screen view.
                 return None
             instance_id = event.get("instanceId")
             active_instance = self._active_dialogue_instances.get(record["id"])
@@ -677,6 +875,11 @@ class SubtitleEventRouter:
                 for item in event.get("segments", []) if isinstance(item, dict)
             }
             unit_counts = []
+            unit_bounds = []
+            live_bounds = (
+                self._dialogue_instance_bounds.get(instance_id)
+                if isinstance(instance_id, str) else None
+            )
             for segment in parse_record_segments(record):
                 first = segment.ranges[0]
                 item = coverage_by_id.get(segment.id, coverage_by_range.get(
@@ -687,6 +890,8 @@ class SubtitleEventRouter:
                 if total > 0 and visible / total >= self._activation_coverage:
                     unit = self._dialogue_units[(record["id"], segment.id)]
                     unit_counts.append((unit.id, visible))
+                    if live_bounds is not None:
+                        unit_bounds.append((unit.id, live_bounds))
             if not unit_counts and record["id"] in self._source_fallback_records:
                 # Keep the source-record fallback until the Lua lifecycle
                 # emits reset. Partial or variable glyphs must not blank an
@@ -697,6 +902,7 @@ class SubtitleEventRouter:
             return self.apply_visibility(VisibilityUpdate(
                 scope_id=f"dialogue:{record['id']}",
                 unit_counts=tuple(unit_counts),
+                unit_bounds=tuple(unit_bounds),
             ))
         if event.get("type") != "segment":
             return None
@@ -1109,6 +1315,10 @@ def run(
             ))
             assert process.stdout is not None
             for line in process.stdout:
+                structured_event = line.startswith((
+                    "DQRUN ", "DQDISCOVERY ", "DQFRAME ", "DQGLYPH ",
+                    "DQMENU ", "DQTERM ",
+                ))
                 if line.startswith("DQRUN "):
                     if text_run_file is not None:
                         text_run_file.write(line[len("DQRUN "):])
@@ -1117,9 +1327,7 @@ def run(
                     if discovery_file is not None:
                         discovery_file.write(line[len("DQDISCOVERY "):])
                         discovery_file.flush()
-                    sys.stdout.write(line)
-                    sys.stdout.flush()
-                elif not line.startswith("DQFRAME "):
+                if not structured_event:
                     sys.stdout.write(line)
                     sys.stdout.flush()
                 state = router.consume(line)

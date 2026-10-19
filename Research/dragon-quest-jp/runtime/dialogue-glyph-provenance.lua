@@ -11,6 +11,7 @@ local stream = {}
 local maxPrefixLength = 0
 local activeRecord = nil
 local activeInstanceId = nil
+local activeInstances = {}
 local nextInstanceNumber = 1
 local nextGlyph = 1
 local pendingBeforeMatch = {}
@@ -21,7 +22,6 @@ local previousCells = {}
 local untaggedWrites = {}
 local changed = false
 local selectedSegment = nil
-local emptySinceFrame = nil
 local emptyGraceFrames = 20
 local foreground = 0xFFFFFF
 local background = 0x000000
@@ -159,6 +159,11 @@ local function activateRecord(record)
   activeInstanceId = "msg-" .. tostring(nextInstanceNumber)
   nextInstanceNumber = nextInstanceNumber + 1
   nextGlyph = 1
+  selectedSegment = nil
+  activeInstances[activeInstanceId] = {
+    record = record,
+    emptySinceFrame = nil,
+  }
   for _, candidate in ipairs(pendingBeforeMatch) do alignCandidate(candidate, true) end
   pendingBeforeMatch = {}
   print(string.format(
@@ -176,7 +181,7 @@ end
 local function consumeSourceByte(value)
   observeCatalogByte(value)
   table.insert(stream, value)
-  if #stream > maxPrefixLength or activeRecord then return end
+  if #stream > maxPrefixLength then return end
   local candidates = recordsByFirstByte[stream[1]] or {}
   for _, record in ipairs(candidates) do
     if prefixMatches(record.matchPrefix) then activateRecord(record); return end
@@ -184,6 +189,13 @@ local function consumeSourceByte(value)
 end
 
 local function onChrStreamSelector()
+  -- A decoder invocation is a producer transaction, not the lifetime of the
+  -- text it previously placed on screen. Start a fresh source match while
+  -- retaining older instances until their own cells are no longer visible.
+  activeRecord = nil
+  activeInstanceId = nil
+  nextGlyph = 1
+  selectedSegment = nil
   stream = {}
   pendingBeforeMatch = {}
   discoveryNode = 1
@@ -585,8 +597,11 @@ end
 
 local function emitVisibleRanges()
   local rows = {}
+  local instances = {}
+  local glyphParts = {}
   for address, cell in pairs(visibleCells) do
     local row = math.floor(address / 32)
+    local column = address % 32
     local key = cell.instanceId .. ":" .. tostring(row)
     local item = rows[key]
     if not item then
@@ -598,8 +613,27 @@ local function emitVisibleRanges()
     item.start = math.min(item.start, cell.glyphIndex)
     item.finish = math.max(item.finish, cell.glyphIndex)
     item.count = item.count + 1
+    local instance = instances[cell.instanceId]
+    if not instance then
+      instance = { recordId = cell.recordId, instanceId = cell.instanceId,
+        minRow = row, maxRow = row, minColumn = column,
+        maxColumn = column, count = 0, cells = {} }
+      instances[cell.instanceId] = instance
+    end
+    instance.minRow = math.min(instance.minRow, row)
+    instance.maxRow = math.max(instance.maxRow, row)
+    instance.minColumn = math.min(instance.minColumn, column)
+    instance.maxColumn = math.max(instance.maxColumn, column)
+    instance.count = instance.count + 1
+    table.insert(instance.cells, address)
+    table.insert(glyphParts, string.format(
+      "{\"recordId\":%s,\"instanceId\":%s,\"index\":%d,\"cell\":%d}",
+      jsonString(cell.recordId), jsonString(cell.instanceId),
+      cell.glyphIndex, address
+    ))
   end
   local parts = {}
+  local instanceParts = {}
   local screenCells = {}
   for address, _ in pairs(visibleCells) do table.insert(screenCells, address) end
   table.sort(screenCells)
@@ -615,20 +649,39 @@ local function emitVisibleRanges()
       item.start, item.finish + 1, item.count
     ))
   end
+  for _, instance in pairs(instances) do
+    table.sort(instance.cells)
+    local addresses = {}
+    for _, address in ipairs(instance.cells) do
+      table.insert(addresses, tostring(address))
+    end
+    table.insert(instanceParts, string.format(
+      "{\"recordId\":%s,\"instanceId\":%s,\"cellCount\":%d," ..
+      "\"x\":%d,\"y\":%d,\"width\":%d,\"height\":%d," ..
+      "\"cells\":[%s]}", jsonString(instance.recordId),
+      jsonString(instance.instanceId), instance.count,
+      instance.minColumn * 8, instance.minRow * 8,
+      (instance.maxColumn - instance.minColumn + 1) * 8,
+      (instance.maxRow - instance.minRow + 1) * 8,
+      table.concat(addresses, ",")
+    ))
+  end
   print(string.format(
     "DQGLYPH {\"type\":\"visible-ranges\",\"frame\":%d," ..
-    "\"cells\":[%s],\"rows\":[%s]}", frame,
-    table.concat(cellParts, ","), table.concat(parts, ",")
+    "\"cells\":[%s],\"glyphs\":[%s],\"rows\":[%s],\"instances\":[%s]}", frame,
+    table.concat(cellParts, ","), table.concat(glyphParts, ","),
+    table.concat(parts, ","),
+    table.concat(instanceParts, ",")
   ))
 end
 
-local function emitSegmentCoverage()
-  if not activeRecord then return end
+local function emitSegmentCoverage(instanceId, instance)
+  local record = instance.record
   local parts = {}
-  for _, segment in ipairs(activeRecord.segments) do
+  for _, segment in ipairs(record.segments) do
     local visible = 0
     for _, cell in pairs(visibleCells) do
-      if cell.recordId == activeRecord.id then
+      if cell.instanceId == instanceId then
         for _, range in ipairs(segment.ranges) do
           if cell.glyphIndex >= range.start
               and cell.glyphIndex < range.endExclusive then
@@ -646,7 +699,7 @@ local function emitSegmentCoverage()
   print(string.format(
     "DQGLYPH {\"type\":\"coverage\",\"frame\":%d,\"recordId\":%s," ..
     "\"instanceId\":%s,\"segments\":[%s]}",
-    frame, jsonString(activeRecord.id), jsonString(activeInstanceId),
+    frame, jsonString(record.id), jsonString(instanceId),
     table.concat(parts, ",")
   ))
 end
@@ -655,7 +708,7 @@ local function chooseSegment()
   local newest = -1
   local record = nil
   for _, cell in pairs(visibleCells) do
-    if activeRecord and cell.recordId == activeRecord.id
+    if activeRecord and cell.instanceId == activeInstanceId
         and cell.glyphIndex > newest then
       newest = cell.glyphIndex
       record = activeRecord
@@ -695,13 +748,14 @@ local function onEndFrame()
   emitTextRuns()
   if changed or sourceProjectionChanged then
     emitVisibleRanges()
-    emitSegmentCoverage()
+    for instanceId, instance in pairs(activeInstances) do
+      emitSegmentCoverage(instanceId, instance)
+    end
     changed = false
   end
 
   local candidate = chooseSegment()
   if candidate then
-    emptySinceFrame = nil
     if candidate ~= selectedSegment then
       frameHasSnapshotEvents = true
       selectedSegment = candidate
@@ -712,34 +766,60 @@ local function onEndFrame()
         jsonString(selectedSegment.id)
       ))
     end
-  elseif activeRecord then
-    if not emptySinceFrame then emptySinceFrame = frame end
-    if frame - emptySinceFrame >= emptyGraceFrames then
+  end
+
+  -- Each decoded message owns an independent screen lifetime. A later
+  -- decoder transaction may begin while cells from earlier messages are
+  -- still visible (for example, consecutive shop prompts). Do not let the
+  -- older instance block or terminate the newer one.
+  local expiredInstances = {}
+  for instanceId, instance in pairs(activeInstances) do
+    local visible = false
+    for _, cell in pairs(visibleCells) do
+      if cell.instanceId == instanceId then
+        visible = true
+        break
+      end
+    end
+    if visible then
+      instance.emptySinceFrame = nil
+    else
+      if not instance.emptySinceFrame then instance.emptySinceFrame = frame end
+      if frame - instance.emptySinceFrame >= emptyGraceFrames then
+        table.insert(expiredInstances, instanceId)
+      end
+    end
+  end
+  for _, instanceId in ipairs(expiredInstances) do
+      local instance = activeInstances[instanceId]
+      local record = instance.record
       frameHasSnapshotEvents = true
       print(string.format(
         "DQGLYPH {\"type\":\"instance-end\",\"frame\":%d," ..
         "\"recordId\":%s,\"instanceId\":%s," ..
         "\"reason\":\"coverage-timeout\"}",
-        frame, jsonString(activeRecord.id), jsonString(activeInstanceId)
+        frame, jsonString(record.id), jsonString(instanceId)
       ))
       print(string.format(
         "DQGLYPH {\"type\":\"reset\",\"frame\":%d,\"recordId\":%s," ..
         "\"instanceId\":%s," ..
         "\"reason\":\"coverage-timeout\"}",
-        frame, jsonString(activeRecord.id), jsonString(activeInstanceId)
+        frame, jsonString(record.id), jsonString(instanceId)
       ))
-      activeRecord = nil
-      activeInstanceId = nil
-      nextGlyph = 1
-      selectedSegment = nil
-      emptySinceFrame = nil
-      stream = {}
-      pendingBeforeMatch = {}
-      pendingUploads = {}
-      cells = {}
-      visibleCells = {}
-      previousSourceProjectionKey = nil
-    end
+      activeInstances[instanceId] = nil
+      for address, cell in pairs(cells) do
+        if cell.instanceId == instanceId then cells[address] = nil end
+      end
+      for address, cell in pairs(pendingUploads) do
+        if cell.instanceId == instanceId then pendingUploads[address] = nil end
+      end
+      if activeInstanceId == instanceId then
+        activeRecord = nil
+        activeInstanceId = nil
+        nextGlyph = 1
+        selectedSegment = nil
+      end
+      changed = true
   end
   drawSelectedSegment()
   snapshotCells()
