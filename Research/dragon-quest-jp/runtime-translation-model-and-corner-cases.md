@@ -520,6 +520,8 @@ InferredProvenance  = screen fragments + translation package 匹配推断
 
 ## 8.7 已知来源与未知来源的统一算法
 
+本节保留上一轮 provenance-first 方案，用于历史对照和 Case 分析。下一版实现的主线已改为 8.8 节的 Nametable-first 算法。
+
 本节把稳定 provenance 路径与 unknown fallback 路径整合为一个可实现的逐帧算法。核心思想是：**已知来源是固定锚点，未知来源产生候选；两者经过统一约束求解后生成当前 scene。**
 
 ### 8.7.1 输入与输出
@@ -922,6 +924,374 @@ ResolveFrame(frame, packageIndex, previousState):
 - **Case 30 启动时幽灵文字**：启动、换 ROM 和断开连接时必须显式清空 scene 与 tracks。
 
 因此，统一算法实现后的主要剩余缺口是：运行时模板参数、write/copy provenance、布局引擎、record 前处理质量，以及无法消除的短文本歧义。
+
+## 8.8 下一版主算法：Nametable 文本分组与翻译包反向匹配
+
+> 设计决定（2026-10-20）：下一版实现以本节为主线。它不再要求每个屏幕字符都成功传播 `recordId / instanceId`，而是先从当前 Nametable 中确定性解码字符和空间结构，再用翻译包反向判断文本来源。旧 provenance 路径保留为可选的高信度证据和调试信息，不再是能否翻译的前提。
+
+### 8.8.1 目标与基本假设
+
+主规则仍然是：**屏幕上显示什么，就只翻译什么。**
+
+算法依赖三类输入：
+
+1. 当前帧 PPU/Nametable 中的真实 tile、palette、屏幕坐标和解码字符；
+2. 翻译包中的 record、source tokens、换行/空格/控制符和译文；
+3. 可选证据：`recordId`、`instanceId`、`glyphIndex`、写入时间、跨帧 track 和视觉边界。
+
+游戏专属的 decoder 或 provenance 配置可以提升准确度，但基本分组和匹配必须能在它们缺失时工作。
+
+### 8.8.2 总体流程
+
+```text
+当前 PPU/Nametable
+        │
+        ▼
+可见 cell 与确定字符解码
+        │
+        ▼
+同行 TextLine 提取
+        │
+        ▼
+生成连续多行 TextBlock candidates
+        │
+        ├── 每行单独查询 Top-K source ranges
+        ├── 计算相邻行的来源一致性与连续性
+        └── 合并文本再做整体匹配
+        │
+        ▼
+全帧非重叠优化
+        │
+        ├── 翻译包命中 ──► 原文到译文投影
+        └── 无安全命中 ──► 保持原文或进入本地翻译 fallback
+        │
+        ▼
+当前帧 Translation Scene
+```
+
+### 8.8.3 第一阶段：构建 ScreenCell
+
+先根据实时 scroll、mirroring 和屏幕裁切，将物理 Nametable 投影到当前帧。每个可能的文字格子保存：
+
+```text
+ScreenCell {
+  cellId
+  row / column
+  screenX / screenY
+  tileId
+  decodedCharacter?
+  paletteId
+  renderedGlyphMask
+  backgroundSignature
+  recordId? / instanceId? / glyphIndex?   // 可选，不是必需
+  firstSeenFrame / lastChangedFrame
+}
+```
+
+`decodedCharacter` 来自游戏字符表、CHR 字形表或翻译包配置。字符无法解码时，该 cell 可以作为视觉边界或 unknown glyph，但不应随意加入文本查询。
+
+### 8.8.4 第二阶段：提取单行 TextLine
+
+在同一 tile row 上，按从左到右连接可解码字符。行内可允许少量空格，但不能跨过明确的视觉边界或大段非文字区域。
+
+行内证据包括：
+
+- 字符在同一 baseline；
+- 列坐标连续，或只差可解释的 space；
+- palette 和 background signature 相似；
+- 字形、假名、标点和数字类型可以构成合法文本；
+- 相邻 cell 之间没有对话框线、图标或明显背景中断。
+
+输出不是最终 block，而是保守的单行单元：
+
+```text
+TextLine {
+  lineId
+  orderedCells[]
+  rawText
+  normalizedText
+  bounds
+  visualSignature
+  optionalProvenanceSummary
+}
+```
+
+### 8.8.5 第三阶段：生成多行 TextBlock candidates
+
+多行 block 不直接由窗口边界决定。算法只在屏幕上下相邻、阅读顺序连续的 `TextLine` 之间建立可能的连接。
+
+对 `L1, L2, L3` 只生成连续组合：
+
+```text
+[L1] [L2] [L3]
+[L1,L2] [L2,L3]
+[L1,L2,L3]
+```
+
+不允许跳过 `L2` 直接生成 `[L1,L3]`。第一版可将最大高度限制为 4 行，防止候选数爆炸。
+
+两行之间的初始 `lineLinkScore` 由以下软证据组成：
+
+- 行距是否规则；
+- 水平范围是否重叠，左缩进是否合理；
+- palette/background 是否连续；
+- 上一行结尾与下一行开头是否具有语言连续性；
+- 两行是否在接近时间出现，或表现为同一次逐字写入；
+- 中间是否存在明确框线或不可穿越的图形边界。
+
+明确视觉边界可作为 hard break；没检测到边界不等于已证明两行属于同一 block。
+
+### 8.8.6 第四阶段：逐行查询来源
+
+对每个 `TextLine` 单独查询翻译包，保留 Top-K 候选，不过早选定唯一 record：
+
+```text
+LineMatch {
+  lineId
+  recordId
+  sourceStart / sourceEnd
+  matchType
+  matchedTokenCount
+  editCost
+  boundaryCompatibility
+  occurrenceCount
+  score
+}
+```
+
+例如：
+
+```text
+L1 -> Record A [10..18]  0.96
+L2 -> Record A [20..29]  0.94
+L3 -> Record A [31..39]  0.91
+```
+
+“同一 record”不足以证明它们属于同一 block。还必须检查 source ranges 是否按顺序且距离合理。两个 range 之间只包含 `Enter`、`Space` 或少量可解释的缺失 glyph 时，给予高连续分。
+
+短行可能在大量 records 中出现，因此必须对 `occurrenceCount` 施加歧义惩罚。一个只有两个假名的行可以提供辅助证据，但不应单独决定 block 或译文。
+
+### 8.8.7 第五阶段：连接后的整体复核
+
+如果相邻行的 Top-K 结果中存在共同 record，且 source ranges 按屏幕阅读顺序连续，就生成一个强 block hypothesis。然后将多行文本连接并再次查询：
+
+```text
+normalize(L1) + Enter + normalize(L2) + Enter + normalize(L3)
+```
+
+整体复核时同时允许翻译包中的真实 `Enter`、可忽略空格和受限的少量 gap。它的作用是将多个单行的弱命中变成一个长文本的唯一强命中。
+
+```text
+L1 单独：多义       L2 单独：多义       L3 单独：多义
+       \                 |                 /
+        \---- 共同 Record A + ranges 连续 ----/
+                           |
+                           v
+                    合并后整体查询
+                           |
+                 Record A [10..39] = 0.98
+                           |
+                           v
+                    确认多行 TextBlock
+```
+
+需要单独记录“合并增益”：
+
+```text
+combinedGain = combinedMatchScore
+             - Aggregate(individualLineScores)
+```
+
+如果合并后没有提高唯一性或匹配质量，就不应只因为两行靠得近而强制合并。
+
+### 8.8.8 BlockCandidate 与评分
+
+```text
+BlockCandidate {
+  candidateId
+  lineIds[]
+  cells[]
+  bounds
+  normalizedLines[]
+
+  lineMatches[]
+  recordId?
+  sourceRanges[]
+  translatedText?
+
+  visualScore
+  temporalScore
+  individualMatchScore
+  sourceContinuityScore
+  combinedMatchScore
+  ambiguityPenalty
+  boundaryPenalty
+  totalScore
+}
+```
+
+概念上：
+
+```text
+totalScore =
+    visual continuity
+  + temporal continuity
+  + individual line evidence
+  + same-record agreement
+  + ordered source-range continuity
+  + combined match quality
+  + combined uniqueness gain
+  + optional provenance agreement
+  - source ambiguity
+  - visual boundary crossing
+  - unexplained source/screen gaps
+  - unnecessary merge complexity
+```
+
+`recordId / instanceId` 如果存在，可以作为强加分或冲突检查；如果不存在，算法仍可依靠字符、source range 和空间/时间证据完成决策。
+
+### 8.8.9 第六阶段：全帧选择
+
+不能独立接受每个高分候选，因为 `[L1,L2]` 与 `[L2,L3]` 会争用 `L2`。最终选择必须满足：
+
+1. 一个 `TextLine` 最多属于一个最终 block；
+2. 一个 cell 最多被一个最终 block 占用；
+3. 不跨过 hard visual boundary；
+4. 只选择连续行组合；
+5. 最佳候选与次佳候选差距不足时，保留 unknown 而不猜测。
+
+因为 block 只占用连续的 lines，第一版可使用 weighted interval scheduling / dynamic programming，无需引入通用 ILP。如果同一屏幕中有多个水平区域，先分成不相交的 line columns，再在每个 column 中做 DP。
+
+### 8.8.10 翻译生成和 fallback
+
+对已命中翻译包的 block：
+
+1. 精确 record/range 命中时，使用翻译包的 segment mapping；
+2. 只有长度 mapping 时，按 source range 单调投影到 target range；
+3. 多行 block 的译文优先整体布局，不强制每一个日文行对应一个中文行；
+4. bounds 只由当前可见 cells 计算。
+
+对没有安全命中翻译包的 block，按以下顺序处理：
+
+```text
+足够长且置信度高的可见日文
+        ↓
+查跨帧翻译缓存
+        ↓ 未命中
+可选的本地日→中翻译器
+        ↓
+标记为 MachineFallback，不写回正式翻译包
+```
+
+过短、包含 unknown glyph 或存在多个不同分组解释的文本，不进入机器翻译，以避免频繁抖动和错译。
+
+### 8.8.11 跨帧稳定
+
+为每个最终 block 建立 `TextBlockTrack`：
+
+```text
+TextBlockTrack {
+  trackId
+  previousLineIds / cells / text
+  selectedRecordId?
+  selectedSourceRanges[]
+  firstSeenFrame / lastSeenFrame
+  stableFrameCount
+  confidence
+}
+```
+
+如果字符、位置和候选来源没有实质变化，延续上一帧结果，不重复执行全量模糊查询。逐字对话在文本还在生长时可以暂缓发布，直到：
+
+- 文本稳定若干帧；
+- 出现句末或翻译包强边界；
+- 长文本已经形成高置信度唯一命中。
+
+当 cells 从屏幕消失时，对应译文必须随当前 scene 消失；track 只用于缓存和身份稳定，不能让不可见文本继续显示。
+
+### 8.8.12 每帧伪代码
+
+```text
+ResolveFrame(frame, packageIndex, previousTracks):
+    cells = DecodeVisibleNametable(frame)
+    textLines = ExtractConservativeTextLines(cells)
+
+    lineMatches = {}
+    for line in textLines:
+        lineMatches[line.id] = QueryTopK(line.normalizedText, packageIndex)
+
+    blockCandidates = []
+    for consecutiveLines in EnumerateConsecutiveLineGroups(textLines, maxLines=4):
+        if CrossesHardVisualBoundary(consecutiveLines):
+            continue
+
+        candidate = BuildBlockCandidate(consecutiveLines)
+        candidate.lineMatches = Collect(lineMatches, consecutiveLines)
+        candidate.sourceChains = JoinOrderedCommonSources(candidate.lineMatches)
+        candidate.combinedMatches = QueryCombinedText(consecutiveLines, packageIndex)
+        ScoreBlock(candidate, frame, previousTracks)
+        blockCandidates.append(candidate)
+
+    selectedBlocks = SelectNonOverlappingBlocks(blockCandidates)
+
+    for block in selectedBlocks:
+        if block.hasSafePackageMatch:
+            block.translation = ProjectPackageTranslation(block)
+        else if block.isStableAndSafeForMachineFallback:
+            block.translation = QueryCachedLocalTranslator(block)
+        else:
+            block.translation = None
+
+    scene = LayoutUsingCurrentVisibleBounds(selectedBlocks)
+    tracks = UpdateTextBlockTracks(previousTracks, selectedBlocks)
+    return scene, tracks, diagnostics
+```
+
+### 8.8.13 实现分步
+
+**Phase 1：可见字符与单行基线**
+
+- 只读当前可见 Nametable；
+- 输出 `ScreenCell` 和 `TextLine`；
+- 用 debug overlay 显示解码字符、line bounds 和分割原因；
+- 暂不输出译文。
+
+**Phase 2：翻译包索引与逐行查询**
+
+- 统一 source normalization；
+- 建立 full record、line/segment、substring 和首字符索引；
+- 为每行输出 Top-K `LineMatch`、source range 和歧义数；
+- 先做诊断，不自动 grouping。
+
+**Phase 3：多行 candidates 与整体复核**
+
+- 枚举最多 4 个连续 TextLines；
+- 实现共同 record + ordered ranges 链接；
+- 实现 combined query 和 `combinedGain`；
+- 将候选评分分解显示在调试日志中。
+
+**Phase 4：全帧选择与译文投影**
+
+- 使用 DP 选择不重叠 block；
+- 只对唯一性和 margin 达标的候选发布译文；
+- 接入 segment mapping 和长度 mapping；
+- 对照现有 case 矩阵验证错译、漏译和残留。
+
+**Phase 5：跨帧与本地翻译 fallback**
+
+- `TextBlockTrack` 和增量缓存；
+- 逐字写入的稳定发布策略；
+- 本地日→中翻译与持久缓存；
+- 机器译文明确标记，与翻译包结果分开评估。
+
+### 8.8.14 第一版成功标准
+
+- 在没有任何 record provenance 的普通对话画面中，能稳定提取完整 `TextLine`；
+- 三行对话中，逐行候选能通过共同 record 和连续 source ranges 合并成一个 block；
+- 两个相邻但无关的文本区域不被错误合并；
+- 短词多义时保持 unknown，不用覆盖率强行选择；
+- 有 provenance 与无 provenance 时，对同一稳定画面应产生相同的文本分组和译文；
+- 候选分数、丢弃原因、source ranges 和最佳/次佳 margin 可通过诊断输出解释。
 
 ## 9. 已知 Corner Cases
 
