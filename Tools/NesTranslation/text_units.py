@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from .database import DatabaseError, GameDatabase
 from .segments import parse_record_segments
+from .vocabulary import normalize_vocabulary
 
 
 @dataclass(frozen=True)
@@ -147,8 +148,7 @@ def build_text_units(
                 line_count=len(lines),
                 line_height=box["lineHeight"],
             ))
-    vocabulary_records = list((vocabulary or {}).get("records", []))
-    vocabulary_records.extend((vocabulary or {}).get("ppuLexemes", []))
+    vocabulary_records = normalize_vocabulary(vocabulary).get("records", [])
     for record in vocabulary_records:
         if record.get("category") == "system-template":
             continue

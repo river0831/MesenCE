@@ -1,0 +1,8 @@
+{
+  "formatVersion": 1,
+  "game": "Ninja Ryuuken Den III - Yomi no Hakobune (Japan)",
+  "language": "zh-Hans",
+  "status": "blocked-on-text-codec",
+  "records": [],
+  "notes": "The first-pass tile-index mapping does not produce reliable natural Japanese. No candidate has been translated as if it were confirmed text."
+}

@@ -34,6 +34,7 @@ from Tools.NesTranslation.dialogue_overlay import (
     validate_presentation_characters,
 )
 from Tools.NesTranslation.dialogue_glyph_provenance import (
+    attach_glyph_pattern_signatures,
     FrameSnapshotBuffer,
     build_script as build_glyph_provenance_script,
     group_visible_cells,
@@ -46,6 +47,8 @@ from Tools.NesTranslation.text_units import PpuBounds, VisibilityUpdate, build_t
 from Tools.NesTranslation.text_run_state import (
     NametableTextMatcher,
     NametableTextRunState,
+    ScreenCell,
+    TextLine,
     TextRun,
 )
 from Tools.NesTranslation.events import InputEvent, RomReadEvent
@@ -69,12 +72,15 @@ from Tools.NesTranslation.runtime_catalog_match import (
 )
 from Tools.NesTranslation.snapshot_replay import load_snapshots, replay_snapshots
 from Tools.NesTranslation.snapshot_audit import audit_snapshots, render_markdown
+from Tools.NesTranslation.scenario_regression import replay_scenario
 from Tools.NesTranslation.playtest_report import (
     build_playtest_report,
     render_markdown as render_playtest_markdown,
 )
 from Tools.NesTranslation.text_review import load_character_map, render_bytes
 from Tools.NesTranslation.translation_pack import load_translation_pack
+from Tools.NesTranslation.vocabulary import normalize_vocabulary
+from Tools.NesTranslation.vocabulary_audit import audit_vocabulary
 from Tools.NesTranslation.segments import (
     parse_record_segments,
     select_segment_by_visible_source,
@@ -115,6 +121,183 @@ def read_event(prg_offset: int, frame: int = 1) -> RomReadEvent:
 
 
 class DatabaseTests(unittest.TestCase):
+    def test_structured_rom_vocabulary_is_complete(self) -> None:
+        vocabulary = json.loads(
+            VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8")
+        )
+        self.assertNotIn("ppuLexemes", vocabulary)
+        self.assertTrue(all(
+            isinstance(record.get("encodings"), list)
+            and record["encodings"]
+            for record in vocabulary["records"]
+        ))
+        spells = [
+            record for record in vocabulary["records"]
+            if record.get("category") == "spell"
+        ]
+        self.assertEqual(len(spells), 10)
+        self.assertEqual(
+            [
+                next(
+                    encoding["token"] for encoding in record["encodings"]
+                    if encoding["kind"] == "dictionary-token"
+                )
+                for record in spells
+            ],
+            list(range(0x80, 0x8A)),
+        )
+        self.assertEqual(
+            [record["sourceText"] for record in spells],
+            [
+                "ホイミ", "ギラ", "ラリホー", "レミーラ", "マホトーン",
+                "リレミト", "ルーラ", "トヘロス", "ベホイミ", "ベギラマ",
+            ],
+        )
+
+        monsters = [
+            record for record in vocabulary["records"]
+            if record.get("category") == "monster"
+        ]
+        self.assertEqual(len(monsters), 40)
+        self.assertEqual(
+            [
+                next(
+                    encoding["index"] for encoding in record["encodings"]
+                    if encoding["kind"] == "rom-table"
+                )
+                for record in monsters
+            ],
+            list(range(40)),
+        )
+        self.assertEqual(monsters[0]["sourceText"], "スライム")
+        self.assertEqual(monsters[1]["display"], "红史莱姆")
+        self.assertEqual(monsters[-1]["sourceText"], "りゅうおう")
+
+        # The Japanese release stores 40 fixed 16-byte enemy records in
+        # CHR bank 3: eight stat bytes followed by an eight-byte encoded name.
+        rom = ROM.read_bytes()
+        table_file_offset = rom.find(bytes((5, 3, 3, 0, 15, 1, 1, 2)))
+        self.assertGreaterEqual(table_file_offset, 0)
+        dictionary = read_dictionary(ines_prg(rom), 2136, 2849, 0xFA)
+        for monster_id, record in enumerate(monsters):
+            encoded_name = rom[
+                table_file_offset + monster_id * 16 + 8:
+                table_file_offset + monster_id * 16 + 16
+            ].split(b"\xFA", 1)[0]
+            expanded = bytes(
+                value
+                for token in expand_tokens(
+                    encoded_name,
+                    dictionary,
+                    0x6D,
+                    modifier_values=frozenset((0xF8, 0xF9)),
+                )
+                for value in token.expanded
+            )
+            source_hex = next(
+                encoding["sourceHex"] for encoding in record["encodings"]
+                if encoding["kind"] == "ppu-pattern"
+            )
+            self.assertEqual(expanded.hex(" "), source_hex)
+
+        required_ui = {
+            "battle-fight", "battle-run", "equipment-none",
+            "start-enter-name", "start-enter-password",
+            "start-wrong-password", "start-back", "start-next",
+            "start-finish",
+            "menu-talk", "menu-spell", "menu-strength", "menu-items",
+            "menu-stairs", "menu-search", "menu-door", "menu-take",
+            "status-hp", "status-mp",
+            "direction-north", "direction-west", "direction-east",
+            "direction-south",
+        }
+        self.assertTrue(
+            required_ui.issubset({
+                record["id"] for record in vocabulary["records"]
+            })
+        )
+        self.assertTrue(all(
+            record.get("display") == record.get("translation")
+            for record in vocabulary["records"]
+        ))
+
+    def test_dragon_quest_runtime_presentations_are_simplified_chinese(self) -> None:
+        dialogue = json.loads(
+            DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")
+        )
+        database = json.loads(DATABASE.read_text(encoding="utf-8"))
+        rendered = []
+        for record in dialogue["records"]:
+            rendered.extend(
+                line
+                for group in record.get("pages", []) + record.get("segments", [])
+                for line in group.get("lines", [])
+            )
+            runtime = record.get("runtimeComposition", {})
+            if isinstance(runtime.get("template"), str):
+                rendered.append(runtime["template"])
+        for record in database["records"]:
+            presentation = record.get("presentation", {})
+            rendered.extend(
+                label["text"] for label in presentation.get("labels", [])
+            )
+        forbidden = set("這裡麼離開後邊鎮備齊傷時戰鬥進勢會繼脈從獲龍現將請讓臨奪禮寶間詢問們鑰該門發準來著個沒與經驗樣級斷積漸強復樂達歡記帶蘿處願傳聞國雖給識應見變園務東態樓調査撃談幣購買")
+        remaining = sorted(set("".join(rendered)) & forbidden)
+        self.assertEqual(remaining, [])
+
+    def test_legacy_ppu_lexemes_normalize_into_records(self) -> None:
+        vocabulary = normalize_vocabulary({
+            "records": [{
+                "id": "dictionary-word", "token": 0x80,
+            }],
+            "ppuLexemes": [{
+                "id": "screen-word", "sourceHex": "01 02",
+            }],
+        })
+        self.assertNotIn("ppuLexemes", vocabulary)
+        self.assertEqual(
+            [record["id"] for record in vocabulary["records"]],
+            ["dictionary-word", "screen-word"],
+        )
+        self.assertEqual(
+            vocabulary["records"][0]["encodings"],
+            [{"kind": "dictionary-token", "token": 0x80}],
+        )
+        self.assertEqual(
+            vocabulary["records"][1]["encodings"],
+            [{"kind": "ppu-pattern", "sourceHex": "01 02"}],
+        )
+
+    def test_monster_vocabulary_fills_battle_message_template(self) -> None:
+        package = load_translation_pack(TRANSLATION_PACK)
+        dialogue_catalog = json.loads(
+            package.paths["dialogueCatalog"].read_text(encoding="utf-8")
+        )
+        matcher = NametableTextMatcher(
+            package.vocabulary_translations,
+            package.dictionary_catalog,
+            package.dialogue_translations,
+            dialogue_catalog,
+            package.character_map,
+        )
+        # Visible PPU cells for スライムベスが あらわれた！. The dakuten is
+        # composited by the renderer, so the conservative row contains the
+        # base glyph rather than an inline F8 control byte.
+        matcher.apply({
+            "type": "writes",
+            "runs": [{
+                "row": 20,
+                "startColumn": 4,
+                "hex": "69404a4d26690f5f0a3035331961",
+            }],
+        })
+        matches = [
+            item for item in matcher.visible_screen_texts
+            if item.record_id == "chr-fc-366f"
+        ]
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0].text, "红史莱姆出现了！")
+
     def test_runtime_discoveries_promote_exact_catalog_records(self) -> None:
         catalog = {"records": [{
             "id": "new", "runtime": {"status": "unverified"},
@@ -182,11 +365,42 @@ class DatabaseTests(unittest.TestCase):
             if record["id"] == "chr-fc-35e7"
         )
         self.assertEqual(
-            chest["runtimeComposition"]["template"], "發現了{ITEM}。"
+            chest["runtimeComposition"]["template"], "发现了{ITEM}。"
         )
         self.assertGreater(
             package.dialogue_translations["staticIntegration"]["recordCount"],
             130,
+        )
+        promoted_name_template = next(
+            record for record in package.dialogue_translations["records"]
+            if record["id"] == "chr-fc-23d9"
+        )
+        self.assertEqual(
+            promoted_name_template["integrationMode"], "nametable-template"
+        )
+        self.assertIn(
+            "PLAYER_NAME",
+            promoted_name_template["screenTemplate"]["parameters"],
+        )
+        promoted_dynamic_template = next(
+            record for record in package.dialogue_translations["records"]
+            if record["id"] == "chr-fc-366f"
+        )
+        self.assertEqual(
+            promoted_dynamic_template["screenTemplate"]["template"],
+            "{DYNAMIC_1}出现了！",
+        )
+        split_fixed = next(
+            record for record in package.dialogue_translations["records"]
+            if record["id"] == "chr-fc-3011-u1"
+        )
+        self.assertEqual(split_fixed["segments"][0]["sourceEndExclusive"], 27)
+        split_template = next(
+            record for record in package.dialogue_translations["records"]
+            if record["id"] == "chr-fc-3011-u2"
+        )
+        self.assertEqual(
+            split_template["integrationMode"], "nametable-template-unit"
         )
         split_dialogue = next(
             record for record in package.dialogue_translations["records"]
@@ -220,7 +434,7 @@ class DatabaseTests(unittest.TestCase):
             record for record in dialogue["records"]
             if record["id"] == "chr-fc-35e7"
         )
-        chest["runtimeComposition"]["template"] = "發現了{UNKNOWN}。"
+        chest["runtimeComposition"]["template"] = "发现了{UNKNOWN}。"
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             (root / "database").mkdir()
@@ -341,7 +555,7 @@ class DatabaseTests(unittest.TestCase):
                          if record.id == "dq.menu.direction")
         self.assertEqual(
             [label.text for label in direction.presentation.labels],
-            ["北", "西", "東", "南"],
+            ["北", "西", "东", "南"],
         )
         self.assertEqual(direction.return_to_record_id, "dq.menu.main")
         yes_no = next(record for record in database.records
@@ -421,7 +635,7 @@ class DatabaseTests(unittest.TestCase):
         self.assertNotIn("__NES_TRANSLATION_CONFIG__", script)
         self.assertIn('id = "dq.menu.main"', script)
         self.assertIn('id = "dq.menu.strength"', script)
-        self.assertIn('text = "等級:"', script)
+        self.assertIn('text = "等级:"', script)
         self.assertIn("startAddress = 33881", script)
         self.assertIn("local inputAddress = 71", script)
 
@@ -465,7 +679,7 @@ class DatabaseTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         script = build_provenance_script(database, template)
         self.assertNotIn("__NES_TRANSLATION_PROVENANCE_CONFIG__", script)
-        self.assertIn('text = "等級:"', script)
+        self.assertIn('text = "等级:"', script)
         self.assertIn("clearWidth = 78", script)
         self.assertIn("restoreRatio = 0.80", script)
         self.assertIn("bulkClearThreshold = 8", script)
@@ -493,8 +707,8 @@ class DatabaseTests(unittest.TestCase):
         self.assertNotIn("__NES_TRANSLATION_DIALOGUE_CONFIG__", script)
         self.assertIn('id = "chr-fc-35c8"', script)
         self.assertIn("matchPrefix = { 85, 98, 252 }", script)
-        self.assertIn("這裡什麼也拿不到。", script)
-        self.assertIn("離開城堡後，旁邊有座城鎮。", script)
+        self.assertIn("这里什么也拿不到。", script)
+        self.assertIn("离开城堡后，旁边有座城镇。", script)
         self.assertIn("local visibilityStart = 576", script)
         self.assertIn("and not activeIsVisible", script)
         self.assertIn("frame - lastVisibilityWriteFrame >= stableRegionFrames", script)
@@ -514,20 +728,19 @@ class DatabaseTests(unittest.TestCase):
         with self.assertRaisesRegex(DatabaseError, "not runtime-confirmed"):
             build_dialogue_overlay(catalog, spec, "-- __NES_TRANSLATION_DIALOGUE_CONFIG__")
 
-    def test_dialogue_presentation_uses_only_mesen_hud_glyphs(self) -> None:
+    def test_legacy_mesen_hud_rejects_unsupported_presentation_glyphs(self) -> None:
         spec = load_translation_spec(DIALOGUE_TRANSLATIONS)
         supported = load_mesen_font_characters(
             ROOT / "Core/Shared/Video/DrawStringCommand.cpp"
         )
-        validate_presentation_characters(spec, supported)
         broken = json.loads(json.dumps(spec, ensure_ascii=False))
-        broken["records"][0]["pages"][0]["lines"] = ["这里什么也拿不到。"]
-        with self.assertRaisesRegex(DatabaseError, "么这"):
+        broken["records"][0]["pages"][0]["lines"] = ["龘"]
+        with self.assertRaisesRegex(DatabaseError, "龘"):
             validate_presentation_characters(broken, supported)
 
         segment_broken = json.loads(json.dumps(spec, ensure_ascii=False))
-        segment_broken["records"][0]["segments"] = [{"lines": ["这"]}]
-        with self.assertRaisesRegex(DatabaseError, "这"):
+        segment_broken["records"][0]["segments"] = [{"lines": ["龘"]}]
+        with self.assertRaisesRegex(DatabaseError, "龘"):
             validate_presentation_characters(segment_broken, supported)
 
     def test_opening_speech_has_complete_reviewed_segments(self) -> None:
@@ -647,7 +860,7 @@ class DictionaryCatalogTests(unittest.TestCase):
         }]}
         vocabulary = {"records": [{
             "id": "dict-a1", "token": 0xA1, "category": "item",
-            "sourceText": "かぎ", "translation": "钥匙", "display": "鑰匙",
+            "sourceText": "かぎ", "translation": "钥匙", "display": "钥匙",
             "confidence": "semantic-probable",
         }]}
         validate_vocabulary(catalog, vocabulary)
@@ -657,6 +870,44 @@ class DictionaryCatalogTests(unittest.TestCase):
 
 
 class ReadAnalysisTests(unittest.TestCase):
+    def test_vocabulary_audit_reports_coverage_encoding_and_conflicts(self) -> None:
+        vocabulary = {"records": [
+            {
+                "id": "seen", "sourceText": "甲", "display": "甲",
+                "encodings": [{"kind": "ppu-pattern", "sourceHex": "01"}],
+            },
+            {
+                "id": "conflict", "sourceText": "乙", "display": "乙",
+                "encodings": [{"kind": "ppu-pattern", "sourceHex": "01"}],
+            },
+            {"id": "missing", "sourceText": "丙", "display": "丙"},
+        ]}
+        report = audit_vocabulary(vocabulary, observed_record_ids=["seen"])
+        self.assertEqual(report["summary"]["observedRecordCount"], 1)
+        self.assertEqual(report["missingEncodingRecordIds"], ["missing"])
+        self.assertEqual(report["summary"]["patternConflictCount"], 1)
+
+    def test_captured_scenario_replays_through_production_router(self) -> None:
+        package = load_translation_pack(TRANSLATION_PACK)
+        dialogue_catalog = json.loads(
+            package.paths["dialogueCatalog"].read_text(encoding="utf-8")
+        )
+        report = replay_scenario(
+            "battle-menu",
+            [{
+                "type": "writes", "frame": 1,
+                "runs": [{
+                    "row": 4, "startColumn": 8, "hex": "19190f0c",
+                }],
+            }],
+            package,
+            dialogue_catalog,
+            expected_record_ids=["battle-fight"],
+            expected_texts=["战斗"],
+        )
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["observedRecordIds"], ["battle-fight"])
+
     def test_playtest_report_tracks_instances_parameters_and_candidates(self) -> None:
         snapshots = [{
             "frame": 10,
@@ -695,6 +946,32 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual(report["summary"]["discoveredUntranslatedCount"], 1)
         self.assertEqual(
             report["catalogDiscoveries"][0]["recordId"], "new-dialogue"
+        )
+
+    def test_playtest_report_accepts_rows_composed_of_known_terms(self) -> None:
+        text = "かいたん  しらへる"
+        character_map = {
+            index: {"type": "glyph", "display": character}
+            for index, character in enumerate(text, 1)
+        }
+        report = build_playtest_report(
+            [],
+            [{
+                "type": "writes", "frame": 1,
+                "runs": [{
+                    "row": 1, "startColumn": 1,
+                    "hex": bytes(range(1, len(text) + 1)).hex(),
+                }],
+            }],
+            character_map,
+            {"records": []},
+            {"records": [
+                {"id": "stairs", "sourceText": "かいだん"},
+                {"id": "search", "sourceText": "しらべる"},
+            ]},
+        )
+        self.assertEqual(
+            report["textCandidates"][0]["classification"], "known-source"
         )
 
     def test_playtest_report_treats_devoiced_partial_writes_as_known(self) -> None:
@@ -790,7 +1067,7 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIsNone(matcher.apply(events[0]))
         match = matcher.apply(events[1])
         assert match is not None
-        self.assertEqual(match.text, "獲得了120金幣。")
+        self.assertEqual(match.text, "获得了120金币。")
         self.assertEqual((match.left, match.top, match.right, match.bottom), (
             9, 20, 22, 23,
         ))
@@ -814,7 +1091,7 @@ class ReadAnalysisTests(unittest.TestCase):
             "runs": [{"row": 22, "startColumn": 14, "hex": "19"}],
         })
         assert match is not None
-        self.assertEqual(match.text, "發現了火把。")
+        self.assertEqual(match.text, "发现了火把。")
 
     def test_incremental_matcher_allows_reviewed_voicing_tile_variation(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
@@ -833,7 +1110,7 @@ class ReadAnalysisTests(unittest.TestCase):
             "runs": [{"row": 22, "startColumn": 11, "hex": "291b1219"}],
         })
         assert match is not None
-        self.assertEqual(match.text, "發現了鑰匙。")
+        self.assertEqual(match.text, "发现了钥匙。")
 
     def test_incremental_matcher_rejects_unreviewed_voicing_tile(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
@@ -944,7 +1221,7 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         assert shown is not None
         self.assertEqual([item["text"] for item in shown["items"]], [
-            "火把", "發現了火把。"
+            "火把", "发现了火把。"
         ])
         self.assertEqual(shown["items"][1]["ppuBounds"], {
             "x": 88, "y": 160, "width": 80, "height": 24,
@@ -970,6 +1247,7 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertEqual([glyph.value for glyph in glyphs], [0x24, 0x19])
         self.assertEqual([glyph.index for glyph in glyphs], [0, 1])
         self.assertEqual(glyphs[0].source_offset, 10)
+        self.assertEqual(glyphs[0].modifier, 0xF8)
         self.assertEqual(glyphs[1].expanded_index, 3)
 
     def test_visible_cells_group_into_source_ranges(self) -> None:
@@ -1204,7 +1482,7 @@ class ReadAnalysisTests(unittest.TestCase):
         assert shown is not None
         self.assertTrue(shown["visible"])
         self.assertEqual([item["text"] for item in shown["items"]], [
-            "離開城堡後，旁邊有座城鎮。"
+            "离开城堡后，旁边有座城镇。"
         ])
         both = router.consume(
             'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
@@ -1213,7 +1491,7 @@ class ReadAnalysisTests(unittest.TestCase):
             '"visibleCount":20}]}'
         )
         assert both is not None
-        self.assertIn("先在那裡備齊武器和防具。", [
+        self.assertIn("先在那里备齐武器和防具。", [
             item["text"] for item in both["items"]
         ])
         cleared = router.consume(
@@ -1231,7 +1509,7 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         assert replacement is not None
         self.assertEqual([item["text"] for item in replacement["items"]], [
-            "戰鬥中受傷時，"
+            "战斗中受伤时，"
         ])
         hidden = router.consume(
             'DQGLYPH {"type":"reset","recordId":"chr-fc-38a7"}'
@@ -1256,7 +1534,7 @@ class ReadAnalysisTests(unittest.TestCase):
         self.assertIsNone(menu.source_start)
 
         dialogue = by_id["chr-fc-38a7#glyph-0-22"]
-        self.assertEqual(dialogue.text, "離開城堡後，旁邊有座城鎮。")
+        self.assertEqual(dialogue.text, "离开城堡后，旁边有座城镇。")
         self.assertEqual(dialogue.total_count, 22)
         self.assertEqual(dialogue.kind, "dialogue")
         self.assertEqual(dialogue.source_start, 0)
@@ -1269,9 +1547,13 @@ class ReadAnalysisTests(unittest.TestCase):
             load_database(DATABASE),
         )
         shown = router.apply_visibility(VisibilityUpdate(
-            "label:dq.menu.main", (("dq.menu.main#label-4", 10),)
+            "label:dq.menu.main", (("dq.menu.main#label-4", 10),),
+            (("dq.menu.main#label-4", PpuBounds(80, 96, 32, 8)),),
         ))
         self.assertEqual([item["text"] for item in shown["items"]], ["道具"])
+        self.assertEqual(shown["items"][0]["ppuBounds"], {
+            "x": 80, "y": 96, "width": 32, "height": 8,
+        })
         hidden = router.apply_visibility(VisibilityUpdate(
             "label:dq.menu.main", ()
         ))
@@ -1296,7 +1578,7 @@ class ReadAnalysisTests(unittest.TestCase):
             '"x":168,"y":64,"width":24,"height":8}]}'
         )
         assert shown is not None
-        self.assertEqual(shown["items"][0]["text"], "鑰匙")
+        self.assertEqual(shown["items"][0]["text"], "钥匙")
         self.assertEqual(shown["items"][0]["ppuBounds"], {
             "x": 168, "y": 64, "width": 24, "height": 8,
         })
@@ -1304,12 +1586,12 @@ class ReadAnalysisTests(unittest.TestCase):
             "dialogue:chr-fc-35e7", (("chr-fc-35e7#glyph-0-7", 7),)
         ))
         self.assertEqual([item["text"] for item in dialogue["items"]], [
-            "鑰匙", "發現了物品。"
+            "钥匙", "发现了物品。"
         ])
         restored = router.apply_visibility(VisibilityUpdate(
             "dialogue:chr-fc-35e7", ()
         ))
-        self.assertEqual([item["text"] for item in restored["items"]], ["鑰匙"])
+        self.assertEqual([item["text"] for item in restored["items"]], ["钥匙"])
         hidden = router.consume(
             'DQMENU {"type":"group","frame":10,"recordId":"dict-a1",'
             '"cellCount":0,"labels":[]}'
@@ -1339,7 +1621,7 @@ class ReadAnalysisTests(unittest.TestCase):
         shown = shown or router._scene_state()
         self.assertEqual(
             [item["text"] for item in shown["items"]],
-            ["調査"],
+            ["调查"],
         )
         adjacent = router.consume(
             'DQRUN {"type":"writes","frame":10,"runs":['
@@ -1348,10 +1630,10 @@ class ReadAnalysisTests(unittest.TestCase):
         assert adjacent is not None
         self.assertEqual(
             [item["text"] for item in adjacent["items"]],
-            ["調査", "鑰匙"],
+            ["调查", "钥匙"],
         )
 
-    def test_ppu_lexemes_are_automatically_renderable_from_the_pack(self) -> None:
+    def test_ppu_patterns_are_automatically_renderable_from_the_pack(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
         catalog = json.loads((
             ROOT / "Research/dragon-quest-jp/generated/prg-dictionary-catalog.json"
@@ -1368,7 +1650,7 @@ class ReadAnalysisTests(unittest.TestCase):
         assert scene is not None
         self.assertEqual(
             [item["text"] for item in scene["items"]],
-            ["購買物品", "出售物品"],
+            ["购买物品", "出售物品"],
         )
 
     def test_multiline_screen_text_is_a_generic_content_fallback(self) -> None:
@@ -1392,6 +1674,448 @@ class ReadAnalysisTests(unittest.TestCase):
              for item in matcher.visible_screen_texts],
             [("message", "完整译文", 7, 4, 11, 7)],
         )
+
+    def test_text_lines_split_at_unknown_and_sourced_cells(self) -> None:
+        state = NametableTextRunState()
+        state.apply({
+            "type": "writes",
+            "runs": [
+                {"row": 4, "startColumn": 3, "hex": "010203"},
+                {"row": 4, "startColumn": 8, "hex": "0405"},
+            ],
+        })
+        self.assertEqual(state.text_lines(), (
+            TextLine(
+                "row-4:3-6:010203", 4, 3, (1, 2, 3),
+                (ScreenCell(4, 3, 1), ScreenCell(4, 4, 2),
+                 ScreenCell(4, 5, 3)),
+            ),
+            TextLine(
+                "row-4:8-10:0405", 4, 8, (4, 5),
+                (ScreenCell(4, 8, 4), ScreenCell(4, 9, 5)),
+            ),
+        ))
+        self.assertEqual(
+            [line.values for line in state.text_lines(
+                excluded_cells=frozenset({(4, 4)})
+            )],
+            [(1,), (3,), (4, 5)],
+        )
+
+    def test_character_grouping_bridges_blank_gaps_but_not_border_tiles(self) -> None:
+        state = NametableTextRunState()
+        state.apply({
+            "type": "writes",
+            "runs": [{
+                "row": 4, "startColumn": 2,
+                "hex": "015f025f5f5f5f5f0304700506",
+            }],
+        })
+        lines = state.text_lines(glyph_values=frozenset({1, 2, 3, 4, 5, 6}))
+        self.assertEqual(
+            [(line.start_column, line.values) for line in lines],
+            [
+                (2, (1, 0x5F, 2, 0x5F, 0x5F, 0x5F, 0x5F, 0x5F, 3, 4)),
+                (13, (5, 6)),
+            ],
+        )
+
+    def test_runtime_placeholder_matches_template_line(self) -> None:
+        character_map = {
+            value: {"type": "glyph"}
+            for value in (1, 2, 3, 4, 5, 6, 7)
+        }
+        character_map.update({
+            0xF2: {"type": "control", "display": "{PLAYER_NAME}"},
+            0xFC: {"type": "control", "display": "<END>"},
+        })
+        matcher = NametableTextMatcher(
+            {}, {},
+            {"records": [{
+                "id": "message",
+                "translation": "unused",
+                "segments": [{
+                    "sourceStart": 0,
+                    "sourceEndExclusive": 4,
+                    "lines": ["模板译文"],
+                }],
+            }]},
+            {"records": [{
+                "id": "message", "expandedHex": "0102f20607fc",
+            }]},
+            character_map,
+        )
+        matcher.apply({
+            "type": "writes",
+            "runs": [{
+                "row": 4, "startColumn": 7,
+                "hex": "01025f0304055f5f0607",
+            }],
+        })
+        self.assertEqual(len(matcher.visible_screen_texts), 1)
+        match = matcher.visible_screen_texts[0]
+        self.assertEqual(match.text, "模板译文")
+        self.assertEqual(match.match_type, "NametableTemplate")
+        self.assertEqual(match.bindings, (("PLAYER_NAME", (3, 4, 5)),))
+
+    def test_dragon_quest_player_name_line_matches_real_package_template(self) -> None:
+        matcher = NametableTextMatcher(
+            {}, {},
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            json.loads((
+                ROOT / "Research/dragon-quest-jp/generated/dialogue-catalog.json"
+            ).read_text(encoding="utf-8")),
+            load_character_map(CHARACTER_MAP),
+        )
+        matcher.apply({
+            "type": "writes",
+            "runs": [{
+                "row": 24, "startColumn": 9,
+                # まっておるぞ + blank + runtime name あ + padding + よ！
+                "hex": "28381c0e32185f0a5f5f5f2f61",
+            }],
+        })
+        matches = [
+            item for item in matcher.visible_screen_texts
+            if item.record_id == "chr-fc-3397"
+        ]
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0].text, "我会等着勇者！")
+        self.assertEqual(matches[0].match_type, "NametableTemplate")
+        self.assertEqual(matches[0].bindings, (("PLAYER_NAME", (0x0A,)),))
+
+    def test_dragon_quest_item_slot_is_captured_and_translated_from_screen(self) -> None:
+        matcher = NametableTextMatcher(
+            json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8")),
+            json.loads((
+                ROOT / "Research/dragon-quest-jp/generated/"
+                "prg-dictionary-catalog.json"
+            ).read_text(encoding="utf-8")),
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            json.loads((
+                ROOT / "Research/dragon-quest-jp/generated/dialogue-catalog.json"
+            ).read_text(encoding="utf-8")),
+            load_character_map(CHARACTER_MAP),
+        )
+        matcher.apply({
+            "type": "writes",
+            "runs": [
+                {
+                    "row": 20, "startColumn": 7,
+                    # あ + padding + は + space + たいまつ + を
+                    "hex": "0a5f5f5f235f190b281b36",
+                },
+                {"row": 22, "startColumn": 7, "hex": "291b12194f"},
+            ],
+        })
+        matches = [
+            item for item in matcher.visible_screen_texts
+            if item.record_id == "chr-fc-35e7"
+        ]
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0].text, "发现了火把。")
+        self.assertEqual(matches[0].match_type, "NametableTemplate")
+        self.assertEqual(matches[0].bindings, (
+            ("PLAYER_NAME", (0x0A,)),
+            ("ITEM", (0x19, 0x0B, 0x28, 0x1B)),
+        ))
+
+    def test_multiline_candidates_join_individual_line_matches(self) -> None:
+        matcher = NametableTextMatcher(
+            {}, {},
+            {"records": [{"id": "message", "translation": "完整译文"}]},
+            {"records": [{
+                "id": "message", "expandedHex": "0102fe0304fc",
+            }]},
+        )
+        matcher.apply({
+            "type": "writes",
+            "runs": [
+                {"row": 4, "startColumn": 7, "hex": "0102"},
+                {"row": 7, "startColumn": 12, "hex": "0304"},
+            ],
+        })
+        self.assertEqual(
+            [(item.record_id, item.source_line_index)
+             for item in matcher.line_source_matches],
+            [("message", 0), ("message", 1)],
+        )
+        complete = [
+            item for item in matcher.block_candidates if item.complete_record
+        ]
+        self.assertEqual(len(complete), 1)
+        self.assertEqual(
+            [line.row for line in complete[0].lines], [4, 7]
+        )
+        self.assertEqual(matcher.visible_screen_texts[0].line_count, 2)
+
+    def test_multiline_candidates_require_ordered_source_lines(self) -> None:
+        matcher = NametableTextMatcher(
+            {}, {},
+            {"records": [{"id": "message", "translation": "完整译文"}]},
+            {"records": [{
+                "id": "message", "expandedHex": "0102fe0304fe0506fc",
+            }]},
+        )
+        matcher.apply({
+            "type": "writes",
+            "runs": [
+                {"row": 4, "startColumn": 7, "hex": "0102"},
+                {"row": 6, "startColumn": 7, "hex": "0506"},
+            ],
+        })
+        self.assertFalse(any(
+            item.complete_record for item in matcher.block_candidates
+        ))
+        self.assertEqual(matcher.visible_screen_texts, ())
+
+    def test_package_line_accepts_unwritten_explicit_space_only(self) -> None:
+        matcher = NametableTextMatcher(
+            {}, {},
+            {"records": [{"id": "message", "translation": "有空格"}]},
+            {"records": [{
+                "id": "message", "expandedHex": "015f02fc",
+            }]},
+        )
+        matcher.apply({
+            "type": "writes",
+            "runs": [
+                {"row": 4, "startColumn": 7, "hex": "01"},
+                {"row": 4, "startColumn": 9, "hex": "02"},
+            ],
+        })
+        self.assertEqual(
+            [(item.record_id, item.text) for item in matcher.visible_screen_texts],
+            [("message", "有空格")],
+        )
+
+    def test_segment_can_match_two_lines_when_runtime_prefix_line_differs(self) -> None:
+        character_map = {
+            value: {"type": "glyph"}
+            for value in (1, 2, 3, 4, 5, 6, 7)
+        }
+        character_map.update({
+            0xFE: {"type": "control"},
+            0xFC: {"type": "control"},
+        })
+        matcher = NametableTextMatcher(
+            {}, {},
+            {"records": [{
+                "id": "message",
+                "translation": "unused container translation",
+                "segments": [{
+                    "sourceStart": 0,
+                    "sourceEndExclusive": 7,
+                    "lines": ["分段译文"],
+                }],
+            }]},
+            {"records": [{
+                # 0x99 models a runtime substitution/control inside line 1.
+                "id": "message",
+                "expandedHex": "019902fe0304fe0506fc",
+            }]},
+            character_map,
+        )
+        matcher.apply({
+            "type": "writes",
+            "runs": [
+                # The first visible line differs because 0x99 expanded at
+                # runtime, while the remaining two lines are deterministic.
+                {"row": 4, "startColumn": 7, "hex": "01aabb02"},
+                {"row": 6, "startColumn": 8, "hex": "0304"},
+                {"row": 8, "startColumn": 9, "hex": "0506"},
+            ],
+        })
+        self.assertEqual(
+            [(item.record_id, item.text, item.line_count, item.confidence)
+             for item in matcher.visible_screen_texts],
+            [("message", "分段译文", 2, 0.9)],
+        )
+
+    def test_source_cells_do_not_suppress_nametable_block_matching(self) -> None:
+        matcher = NametableTextMatcher(
+            {}, {},
+            {"records": [{"id": "message", "translation": "译文"}]},
+            {"records": [{"id": "message", "expandedHex": "0102fc"}]},
+        )
+        matcher.apply({
+            "type": "writes",
+            "runs": [{"row": 4, "startColumn": 7, "hex": "0102"}],
+        })
+        matcher.set_sourced_cells({(4, 7), (4, 8)})
+        self.assertEqual(
+            [(item.record_id, item.text) for item in matcher.visible_screen_texts],
+            [("message", "译文")],
+        )
+
+    def test_content_segment_suppresses_same_source_range_without_box_overlap(self) -> None:
+        router = SubtitleEventRouter({"records": []})
+        router._source_block_items = [
+            {
+                "unitId": "source:first", "recordId": "message",
+                "kind": "dialogue", "text": "重复片段",
+                "sourceStart": 0, "sourceEndExclusive": 14,
+                "ppuBounds": {"x": 8, "y": 8, "width": 32, "height": 8},
+            },
+            {
+                "unitId": "source:later", "recordId": "message",
+                "kind": "dialogue", "text": "其他页面",
+                "sourceStart": 36, "sourceEndExclusive": 48,
+                "ppuBounds": {"x": 8, "y": 32, "width": 32, "height": 8},
+            },
+        ]
+        router._content_text_items = [{
+            "unitId": "content:first", "recordId": "message",
+            "kind": "content", "text": "完整分段译文",
+            "sourceStart": 0, "sourceEndExclusive": 36,
+            # Deliberately separate geometry: source identity/range, rather
+            # than translated box overlap, must remove the duplicate.
+            "ppuBounds": {"x": 120, "y": 120, "width": 64, "height": 24},
+        }]
+        scene = router._scene_state()
+        self.assertEqual(
+            [(item["unitId"], item["text"]) for item in scene["items"]],
+            [
+                ("source:later", "其他页面"),
+                ("content:first", "完整分段译文"),
+            ],
+        )
+
+    def test_router_publishes_character_and_line_debug_without_translation(self) -> None:
+        router = SubtitleEventRouter(
+            {"records": []},
+            dialogue_catalog={"records": []},
+            character_map={1: {"type": "glyph", "display": "あ"}},
+        )
+        scene = router.consume(
+            'DQRUN {"type":"writes","frame":1,"runs":['
+            '{"row":4,"startColumn":7,"hex":"01"}]}'
+        )
+        assert scene is not None
+        self.assertFalse(scene["visible"])
+        self.assertEqual(
+            [(item["debugType"], item["label"])
+             for item in scene["debugRegions"]],
+            [
+                ("visual-region", "R visual-region-1 chars=1"),
+                ("character", "あ 01"),
+                ("text-line", "L r4 c7-8"),
+            ],
+        )
+
+    def test_visual_regions_join_blank_continuity_and_stop_at_unknown_cells(self) -> None:
+        matcher = NametableTextMatcher(
+            {}, {}, character_map={
+                1: {"type": "glyph", "display": "あ"},
+                2: {"type": "glyph", "display": "い"},
+                0x5F: {"type": "glyph", "display": " "},
+            },
+        )
+        matcher.apply({
+            "type": "writes",
+            "runs": [
+                {"row": 4, "startColumn": 2, "hex": "015f02"},
+                {"row": 5, "startColumn": 2, "hex": "5f5f5f"},
+                {"row": 4, "startColumn": 10, "hex": "01"},
+            ],
+        })
+        self.assertEqual(
+            [
+                (
+                    region.top, region.left, region.bottom, region.right,
+                    len(region.character_cells),
+                )
+                for region in matcher.visual_regions
+            ],
+            [(3, 1, 6, 6, 2), (3, 9, 6, 12, 1)],
+        )
+
+    def test_visual_region_paths_stop_at_any_non_background_tile(self) -> None:
+        matcher = NametableTextMatcher(
+            {}, {}, character_map={
+                1: {"type": "glyph", "display": "あ"},
+                2: {"type": "glyph", "display": "い"},
+                0x5F: {"type": "glyph", "display": " "},
+                # This can be a white rule, map art, or any other ordinary
+                # game tile. It needs no special "border" classification.
+                0x80: {"type": "graphic"},
+            },
+        )
+        matcher.apply({
+            "type": "writes",
+            "runs": [
+                {"row": 4, "startColumn": 2, "hex": "015f8002"},
+                {"row": 8, "startColumn": 2, "hex": "01"},
+                {"row": 9, "startColumn": 2, "hex": "5f"},
+                {"row": 10, "startColumn": 2, "hex": "02"},
+                {"row": 8, "startColumn": 10, "hex": "01"},
+                {"row": 9, "startColumn": 10, "hex": "80"},
+                {"row": 10, "startColumn": 10, "hex": "02"},
+            ],
+        })
+        groups = [region.character_cells for region in matcher.visual_regions]
+        self.assertNotIn(frozenset({(4, 2), (4, 5)}), groups)
+        self.assertIn(frozenset({(8, 2), (10, 2)}), groups)
+        self.assertNotIn(frozenset({(8, 10), (10, 10)}), groups)
+
+    def test_chr_pattern_mask_rejects_same_tile_id_with_different_pixels(self) -> None:
+        matcher = NametableTextMatcher(
+            {}, {}, character_map={
+                1: {"type": "glyph", "display": "あ"},
+                2: {"type": "glyph", "display": "い"},
+            },
+        )
+        matcher.apply({
+            "type": "writes",
+            "runs": [{
+                "row": 4, "startColumn": 7, "hex": "0102",
+                "glyphMask": "10",
+            }],
+        })
+        self.assertEqual(
+            [(cell.column, cell.value) for cell in matcher.recognized_cells],
+            [(7, 1)],
+        )
+        self.assertEqual(
+            [region.character_cells for region in matcher.visual_regions],
+            [frozenset({(4, 7)})],
+        )
+
+    def test_rom_font_sources_attach_exact_sixteen_byte_signatures(self) -> None:
+        character_map = load_character_map(CHARACTER_MAP)
+        attach_glyph_pattern_signatures(
+            character_map, CHARACTER_MAP, ROM,
+        )
+        signatures = character_map[0x0A]["patternSignatures"]
+        self.assertEqual(len(signatures), 2)
+        self.assertTrue(all(len(signature) == 32 for signature in signatures))
+
+    def test_debug_ignores_blank_glyph_but_keeps_internal_space(self) -> None:
+        router = SubtitleEventRouter(
+            {"records": []},
+            dialogue_catalog={"records": []},
+            character_map={
+                1: {"type": "glyph", "display": "あ"},
+                2: {"type": "glyph", "display": "い"},
+                0x5F: {"type": "glyph", "display": " "},
+            },
+        )
+        scene = router.consume(
+            'DQRUN {"type":"writes","frame":1,"runs":['
+            '{"row":0,"startColumn":0,"hex":"5f5f5f5f"},'
+            '{"row":4,"startColumn":7,"hex":"015f02"}]}'
+        )
+        assert scene is not None
+        characters = [
+            item for item in scene["debugRegions"]
+            if item["debugType"] == "character"
+        ]
+        lines = [
+            item for item in scene["debugRegions"]
+            if item["debugType"] == "text-line"
+        ]
+        self.assertEqual([item["label"] for item in characters], ["あ 01", "い 02"])
+        self.assertEqual([item["label"] for item in lines], ["L r4 c7-10"])
 
     def test_vocabulary_visibility_rejects_single_cell_fragments(self) -> None:
         vocabulary = json.loads(VOCABULARY_TRANSLATIONS.read_text(encoding="utf-8"))
@@ -1421,25 +2145,27 @@ class ReadAnalysisTests(unittest.TestCase):
             load_database(DATABASE),
         )
         shown = router.consume(
-            'DQMENU {"type":"group","recordId":"dq.menu.main","cellCount":113}'
+            'DQMENU {"type":"group","recordId":"dq.menu.main",'
+            '"cellCount":10,"labels":[{"index":4,"cellCount":10,'
+            '"x":80,"y":96,"width":32,"height":8}]}'
         )
         assert shown is not None
         self.assertEqual(shown["mode"], "visible-translation-snapshot")
-        self.assertEqual(len(shown["items"]), 8)
-        self.assertEqual(shown["items"][3]["text"], "道具")
+        self.assertEqual(len(shown["items"]), 1)
+        self.assertEqual(shown["items"][0]["text"], "道具")
         self.assertEqual(
-            shown["items"][3]["ppuBounds"],
-            {"x": 174, "y": 48, "width": 40, "height": 12},
+            shown["items"][0]["ppuBounds"],
+            {"x": 80, "y": 96, "width": 32, "height": 8},
         )
-        self.assertEqual(shown["items"][3]["unitId"], "dq.menu.main#label-4")
-        self.assertEqual(shown["items"][3]["visibleRatio"], 1.0)
+        self.assertEqual(shown["items"][0]["unitId"], "dq.menu.main#label-4")
+        self.assertEqual(shown["items"][0]["visibleRatio"], 1.0)
         hidden = router.consume(
             'DQMENU {"type":"group","recordId":"dq.menu.main","cellCount":0}'
         )
         assert hidden is not None
         self.assertFalse(hidden["visible"])
 
-    def test_partial_menu_cells_do_not_shrink_reviewed_label_bounds(self) -> None:
+    def test_menu_labels_use_detected_bounds_instead_of_reviewed_bounds(self) -> None:
         router = SubtitleEventRouter(
             json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
             load_database(DATABASE),
@@ -1452,7 +2178,23 @@ class ReadAnalysisTests(unittest.TestCase):
         assert shown is not None
         self.assertEqual(shown["items"][0]["text"], "拿取")
         self.assertEqual(shown["items"][0]["ppuBounds"], {
-            "x": 174, "y": 80, "width": 40, "height": 12,
+            "x": 176, "y": 80, "width": 16, "height": 8,
+        })
+
+    def test_direction_labels_follow_detected_screen_positions(self) -> None:
+        router = SubtitleEventRouter(
+            json.loads(DIALOGUE_TRANSLATIONS.read_text(encoding="utf-8")),
+            load_database(DATABASE),
+        )
+        shown = router.consume(
+            'DQMENU {"type":"group","recordId":"dq.menu.direction",'
+            '"cellCount":2,"labels":[{"index":1,"cellCount":2,'
+            '"x":72,"y":32,"width":16,"height":8}]}'
+        )
+        assert shown is not None
+        self.assertEqual(shown["items"][0]["text"], "北")
+        self.assertEqual(shown["items"][0]["ppuBounds"], {
+            "x": 72, "y": 32, "width": 16, "height": 8,
         })
 
     def test_subtitle_router_filters_individual_visible_menu_labels(self) -> None:
@@ -1462,12 +2204,14 @@ class ReadAnalysisTests(unittest.TestCase):
         )
         scene = router.consume(
             'DQMENU {"type":"group","recordId":"dq.menu.main",'
-            '"cellCount":12,"labels":[{"index":1,"cellCount":6},'
-            '{"index":2,"cellCount":6}]}'
+            '"cellCount":12,"labels":[{"index":1,"cellCount":6,'
+            '"x":40,"y":40,"width":24,"height":8},'
+            '{"index":2,"cellCount":6,'
+            '"x":40,"y":56,"width":24,"height":8}]}'
         )
         assert scene is not None
         self.assertEqual(
-            [item["text"] for item in scene["items"]], ["交談", "咒文"]
+            [item["text"] for item in scene["items"]], ["交谈", "咒文"]
         )
         self.assertEqual(scene["delta"], {
             "appeared": ["dq.menu.main#label-1", "dq.menu.main#label-2"],
@@ -1476,8 +2220,10 @@ class ReadAnalysisTests(unittest.TestCase):
         })
         changed = router.consume(
             'DQMENU {"type":"group","recordId":"dq.menu.main",'
-            '"cellCount":11,"labels":[{"index":1,"cellCount":5},'
-            '{"index":2,"cellCount":6}]}'
+            '"cellCount":11,"labels":[{"index":1,"cellCount":5,'
+            '"x":40,"y":40,"width":24,"height":8},'
+            '{"index":2,"cellCount":6,'
+            '"x":40,"y":56,"width":24,"height":8}]}'
         )
         assert changed is not None
         self.assertEqual(changed["delta"], {
@@ -1487,7 +2233,8 @@ class ReadAnalysisTests(unittest.TestCase):
         })
         removed = router.consume(
             'DQMENU {"type":"group","recordId":"dq.menu.main",'
-            '"cellCount":6,"labels":[{"index":2,"cellCount":6}]}'
+            '"cellCount":6,"labels":[{"index":2,"cellCount":6,'
+            '"x":40,"y":56,"width":24,"height":8}]}'
         )
         assert removed is not None
         self.assertEqual(removed["delta"], {
@@ -1502,7 +2249,9 @@ class ReadAnalysisTests(unittest.TestCase):
             load_database(DATABASE),
         )
         router.consume(
-            'DQMENU {"type":"group","recordId":"dq.menu.main","cellCount":113}'
+            'DQMENU {"type":"group","recordId":"dq.menu.main",'
+            '"cellCount":10,"labels":[{"index":4,"cellCount":10,'
+            '"x":80,"y":96,"width":32,"height":8}]}'
         )
         scene = router.consume(
             'DQGLYPH {"type":"coverage","recordId":"chr-fc-38a7",'
@@ -1511,8 +2260,8 @@ class ReadAnalysisTests(unittest.TestCase):
             '"visibleCount":0}]}'
         )
         assert scene is not None
-        self.assertEqual(len(scene["items"]), 9)
-        self.assertEqual(scene["items"][-1]["text"], "離開城堡後，旁邊有座城鎮。")
+        self.assertEqual(len(scene["items"]), 2)
+        self.assertEqual(scene["items"][-1]["text"], "离开城堡后，旁边有座城镇。")
         self.assertEqual(
             scene["items"][-1]["ppuBounds"],
             {"x": 52, "y": 175, "width": 152, "height": 15},
@@ -1526,13 +2275,13 @@ class ReadAnalysisTests(unittest.TestCase):
             '"visibleCount":6}]}'
         )
         assert scene is not None
-        self.assertEqual(scene["items"][-1]["text"], "先在那裡備齊武器和防具。")
+        self.assertEqual(scene["items"][-1]["text"], "先在那里备齐武器和防具。")
         reset = router.consume(
             'DQGLYPH {"type":"reset","recordId":"chr-fc-38a7"}'
         )
         assert reset is not None
         self.assertTrue(reset["visible"])
-        self.assertEqual(len(reset["items"]), 8)
+        self.assertEqual(len(reset["items"]), 1)
         self.assertTrue(all("#label-" in item["unitId"] for item in reset["items"]))
 
     def test_visible_nametable_resolves_variable_chest_message(self) -> None:
@@ -1553,20 +2302,20 @@ class ReadAnalysisTests(unittest.TestCase):
             '{"row":20,"startColumn":17,"hex":"0f9936"}]}'
         )
         assert partial is not None
-        self.assertEqual(partial["items"][0]["text"], "鑰匙")
+        self.assertEqual(partial["items"][0]["text"], "钥匙")
         shown = router.consume(
             'DQRUN {"type":"writes","frame":12,"runs":['
             '{"row":22,"startColumn":11,"hex":"291b1219"}]}'
         )
         assert shown is not None
         self.assertEqual([item["text"] for item in shown["items"]], [
-            "鑰匙", "發現了鑰匙。"
+            "钥匙", "发现了钥匙。"
         ])
         item = shown["items"][1]
         self.assertEqual(item["parameters"]["ITEM"], {
             "recordId": "dict-a1",
             "sourceText": "かぎ",
-            "text": "鑰匙",
+            "text": "钥匙",
             "category": "item",
         })
         hidden = router.consume(
@@ -1660,7 +2409,7 @@ class ReadAnalysisTests(unittest.TestCase):
         assert key_scene is not None
         self.assertEqual(
             [item["text"] for item in key_scene["items"]],
-            ["鑰匙", "發現了鑰匙。"],
+            ["钥匙", "发现了钥匙。"],
         )
         self.assertEqual(key_scene["items"][1]["instanceId"], "msg-1")
         router.consume('DQRUN {"type":"writes","frame":5,"runs":['
@@ -1677,7 +2426,7 @@ class ReadAnalysisTests(unittest.TestCase):
         assert torch_scene is not None
         self.assertEqual(
             [item["text"] for item in torch_scene["items"]],
-            ["火把", "發現了火把。"],
+            ["火把", "发现了火把。"],
         )
         self.assertEqual(torch_scene["items"][1]["instanceId"], "msg-2")
         self.assertEqual(
@@ -1755,7 +2504,7 @@ class ReadAnalysisTests(unittest.TestCase):
                 "frame": 100,
                 "visible": True,
                 "mode": "visible-translation-snapshot",
-                "items": [{"unitId": "one", "text": "交談"}],
+                "items": [{"unitId": "one", "text": "交谈"}],
                 "delta": {"appeared": ["one"], "updated": [],
                           "disappeared": []},
             },
@@ -1795,7 +2544,7 @@ class ReadAnalysisTests(unittest.TestCase):
 
     def test_snapshot_audit_accepts_balanced_non_overlapping_trace(self) -> None:
         unit = {
-            "unitId": "menu#label-1", "recordId": "menu", "text": "交談",
+            "unitId": "menu#label-1", "recordId": "menu", "text": "交谈",
             "ppuBounds": {"x": 8, "y": 8, "width": 32, "height": 12},
             "visibleCount": 4, "totalCount": 4, "visibleRatio": 1.0,
             "fontSize": 7.5,

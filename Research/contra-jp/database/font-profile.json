@@ -1,0 +1,10 @@
+{
+  "game": "Contra (Japan)",
+  "minimumLength": 3,
+  "ranges": [
+    { "start": 1, "text": "0123456789" },
+    { "start": 11, "text": "ABCDEFGHIJKLMNOPQRSTUVWXYZ" }
+  ],
+  "symbols": { "00": " ", "25": ".", "26": ",", "28": "!", "29": "?" },
+  "joiners": {}
+}

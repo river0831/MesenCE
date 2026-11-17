@@ -26,9 +26,46 @@ from .text_units import PpuBounds, TextUnit, VisibilityUpdate, build_text_units
 from .text_run_state import NametableTextMatcher
 from .translation_pack import load_translation_pack
 from .segments import parse_record_segments, select_segment_by_visible_source
+from .vocabulary import normalize_vocabulary
 
 
 CONFIG_MARKER = "-- __NES_TRANSLATION_GLYPH_PROVENANCE_CONFIG__"
+
+
+def attach_glyph_pattern_signatures(
+    character_map: dict[int, dict[str, Any]],
+    character_map_path: Path,
+    rom_path: Path,
+) -> None:
+    """Attach reviewed CHR-bank tile signatures to character-map entries."""
+    raw_map = json.loads(character_map_path.read_text(encoding="utf-8"))
+    sources = raw_map.get("glyphPatternSources", [])
+    if not isinstance(sources, list) or not sources:
+        return
+    rom = rom_path.read_bytes()
+    if len(rom) < 16 or rom[:4] != b"NES\x1a":
+        raise DatabaseError("glyph signatures require an iNES ROM")
+    prg_size = rom[4] * 16_384
+    chr_size = rom[5] * 8_192
+    trainer_size = 512 if rom[6] & 0x04 else 0
+    chr_start = 16 + trainer_size + prg_size
+    chr_data = rom[chr_start:chr_start + chr_size]
+    for value, entry in character_map.items():
+        if entry.get("type") != "glyph":
+            continue
+        signatures = set()
+        for source in sources:
+            if not isinstance(source, dict):
+                continue
+            bank, table = source.get("chrBank"), source.get("patternTable")
+            if not isinstance(bank, int) or not isinstance(table, int):
+                continue
+            offset = bank * 8_192 + table * 4_096 + value * 16
+            pattern = chr_data[offset:offset + 16]
+            if len(pattern) == 16:
+                signatures.add(pattern.hex())
+        if signatures:
+            entry["patternSignatures"] = sorted(signatures)
 
 
 @dataclass(frozen=True)
@@ -38,6 +75,7 @@ class LogicalGlyph:
     display: str
     expanded_index: int
     source_offset: int
+    modifier: int | None = None
 
 
 class FrameSnapshotBuffer:
@@ -100,6 +138,17 @@ def logical_glyphs(
                     expanded_index=expanded_index,
                     source_offset=int(token["source_offset"]),
                 ))
+            elif (entry is not None and entry.get("type") == "modifier"
+                    and result):
+                previous = result[-1]
+                result[-1] = LogicalGlyph(
+                    index=previous.index,
+                    value=previous.value,
+                    display=previous.display,
+                    expanded_index=previous.expanded_index,
+                    source_offset=previous.source_offset,
+                    modifier=value,
+                )
             expanded_index += 1
     return tuple(result)
 
@@ -170,10 +219,12 @@ class SubtitleEventRouter:
         vocabulary: dict[str, Any] | None = None,
         dictionary_catalog: dict[str, Any] | None = None,
         dialogue_catalog: dict[str, Any] | None = None,
+        character_map: dict[int, dict[str, Any]] | None = None,
         activation_coverage: float = 0.25,
     ):
         if not 0 < activation_coverage <= 1:
             raise ValueError("activation coverage must be in (0, 1]")
+        vocabulary = normalize_vocabulary(vocabulary)
         self._activation_coverage = activation_coverage
         self._records = {
             record["id"]: record for record in translations.get("records", [])
@@ -194,11 +245,12 @@ class SubtitleEventRouter:
         }
         self._text_matcher = NametableTextMatcher(
             vocabulary or {}, dictionary_catalog or {},
-            translations, dialogue_catalog or {},
+            translations, dialogue_catalog or {}, character_map,
         )
         self._dynamic_item: dict[str, Any] | None = None
         self._content_text_items: list[dict[str, Any]] = []
         self._screen_text_matches: tuple[tuple[Any, ...], ...] = ()
+        self._screen_debug_signature: tuple[tuple[Any, ...], ...] = ()
         self._screen_vocabulary_matches: dict[str, tuple[tuple[int, int, int], ...]] = {}
         self._source_cells_by_scope: dict[str, frozenset[tuple[int, int]]] = {}
         self._source_fallback_records: set[str] = set()
@@ -210,8 +262,9 @@ class SubtitleEventRouter:
         self._source_range_records: set[str] = set()
         self._source_block_items: list[dict[str, Any]] = []
         self._runtime_parameters: dict[str, dict[str, dict[str, Any]]] = {}
+        vocabulary_records = (vocabulary or {}).get("records", [])
         self._vocabulary_records = {
-            record["id"]: record for record in (vocabulary or {}).get("records", [])
+            record["id"]: record for record in vocabulary_records
         }
         self._dialogue_units = {
             (unit.record_id, unit.segment_id): unit
@@ -294,8 +347,15 @@ class SubtitleEventRouter:
             key=lambda unit: (0 if unit.kind == "label" else 1, unit.id),
         )
         for unit in layout_units:
+            # Menu and vocabulary overlays must follow the cells that were
+            # actually projected onto the current screen.  The reviewed
+            # database rectangle is metadata for identifying legacy layouts,
+            # not a presentation fallback: a fixed rectangle can be wrong
+            # after scrolling, offscreen construction, or a relocated menu.
+            if unit.id not in self._visible_bounds:
+                continue
             items.append(unit.snapshot_item(
-                self._visible_units[unit.id], self._visible_bounds.get(unit.id)
+                self._visible_units[unit.id], self._visible_bounds[unit.id]
             ))
 
         dialogue_by_record: dict[str, list[TextUnit]] = {}
@@ -345,6 +405,42 @@ class SubtitleEventRouter:
         # cells that carry stable source provenance. Geometry is deliberately
         # not involved: source-less text beside or inside the same window must
         # remain eligible for the generic fallback.
+        if self._content_text_items:
+            content_regions = [
+                (item, PpuBounds(
+                    item["ppuBounds"]["x"], item["ppuBounds"]["y"],
+                    item["ppuBounds"]["width"], item["ppuBounds"]["height"],
+                ))
+                for item in self._content_text_items
+            ]
+            # A complete screen-template result has more evidence than the
+            # older vocabulary/source-fragment composition paths. Keep menu
+            # labels, but suppress lower-level text occupying the same box so
+            # the user sees one coherent translation instead of stacked
+            # partial renderings.
+            items = [
+                item for item in items
+                if item.get("kind") == "label"
+                or not any(
+                    (
+                        item.get("kind") == "dialogue"
+                        and item.get("recordId") == content.get("recordId")
+                        and isinstance(item.get("sourceStart"), int)
+                        and isinstance(item.get("sourceEndExclusive"), int)
+                        and isinstance(content.get("sourceStart"), int)
+                        and isinstance(content.get("sourceEndExclusive"), int)
+                        and item["sourceStart"] < content["sourceEndExclusive"]
+                        and content["sourceStart"] < item["sourceEndExclusive"]
+                    )
+                    or self._bounds_overlap(
+                        PpuBounds(
+                            item["ppuBounds"]["x"], item["ppuBounds"]["y"],
+                            item["ppuBounds"]["width"], item["ppuBounds"]["height"],
+                        ), bounds,
+                    )
+                    for content, bounds in content_regions
+                )
+            ]
         items.extend(self._content_text_items)
         current_items = {item["unitId"]: item for item in items}
         appeared = sorted(current_items.keys() - self._last_snapshot_items.keys())
@@ -360,12 +456,76 @@ class SubtitleEventRouter:
             "visible": bool(items),
             "mode": "visible-translation-snapshot",
             "items": items,
+            "debugRegions": self._nametable_debug_regions(),
             "delta": {
                 "appeared": appeared,
                 "updated": updated,
                 "disappeared": disappeared,
             },
         }
+
+    def _nametable_debug_regions(self) -> list[dict[str, Any]]:
+        regions: list[dict[str, Any]] = []
+        for region in self._text_matcher.visual_regions:
+            regions.append({
+                "debugType": "visual-region",
+                "label": (
+                    f"R {region.region_id} "
+                    f"chars={len(region.character_cells)}"
+                ),
+                "ppuBounds": {
+                    "x": region.left * 8, "y": region.top * 8,
+                    "width": (region.right - region.left) * 8,
+                    "height": (region.bottom - region.top) * 8,
+                },
+            })
+        for cell in self._text_matcher.recognized_cells:
+            display = self._text_matcher.display_for_value(cell.value)
+            regions.append({
+                "debugType": "character",
+                "label": f"{display or '?'} {cell.value:02X}",
+                "ppuBounds": {
+                    "x": cell.column * 8, "y": cell.row * 8,
+                    "width": 8, "height": 8,
+                },
+            })
+        for line in self._text_matcher.observed_text_lines:
+            regions.append({
+                "debugType": "text-line",
+                "label": f"L r{line.row} c{line.start_column}-{line.end_column}",
+                "ppuBounds": {
+                    "x": line.start_column * 8, "y": line.row * 8,
+                    "width": len(line.values) * 8, "height": 8,
+                },
+            })
+        seen_blocks = set()
+        for block in self._text_matcher.block_candidates:
+            if not block.cells:
+                continue
+            key = (
+                block.source_unit_id, block.source_line_start,
+                block.source_line_end_exclusive, block.cells,
+            )
+            if key in seen_blocks:
+                continue
+            seen_blocks.add(key)
+            left = min(column for _, column in block.cells)
+            top = min(row for row, _ in block.cells)
+            right = max(column for _, column in block.cells) + 1
+            bottom = max(row for row, _ in block.cells) + 1
+            regions.append({
+                "debugType": "block-candidate",
+                "label": (
+                    f"B {block.source_unit_id} "
+                    f"[{block.source_line_start}:{block.source_line_end_exclusive}]"
+                ),
+                "ppuBounds": {
+                    "x": left * 8, "y": top * 8,
+                    "width": (right - left) * 8,
+                    "height": (bottom - top) * 8,
+                },
+            })
+        return regions
 
     def _set_source_cell_scope(self, scope: str, addresses: Any) -> None:
         cells = frozenset(
@@ -636,14 +796,28 @@ class SubtitleEventRouter:
                 ))
         self._screen_vocabulary_matches = signatures
         screen_text_signatures = tuple(
-            (item.record_id, item.left, item.top, item.right, item.bottom)
+            (
+                item.source_unit_id, item.record_id,
+                item.left, item.top, item.right, item.bottom,
+                item.match_type, item.bindings,
+            )
             for item in self._text_matcher.visible_screen_texts
         )
         content_changed = screen_text_signatures != self._screen_text_matches
         self._screen_text_matches = screen_text_signatures
+        debug_regions = self._nametable_debug_regions()
+        debug_signature = tuple(
+            (
+                item["debugType"], item["label"],
+                tuple(item["ppuBounds"].values()),
+            )
+            for item in debug_regions
+        )
+        debug_changed = debug_signature != self._screen_debug_signature
+        self._screen_debug_signature = debug_signature
         self._content_text_items = [
             {
-                "unitId": f"screen-text:{item.record_id}",
+                "unitId": f"screen-text:{item.source_unit_id}",
                 "recordId": item.record_id,
                 "kind": "content",
                 "text": item.text,
@@ -656,11 +830,23 @@ class SubtitleEventRouter:
                 "totalCount": len(item.cells),
                 "visibleRatio": 1.0,
                 "fontSize": 8.5,
+                "identityStatus": "InferredRecord",
+                "matchType": item.match_type,
+                "confidence": item.confidence,
+                "lineCount": item.line_count,
+                "templateBindings": {
+                    name: bytes(values).hex()
+                    for name, values in item.bindings
+                },
+                "sourceLineStart": item.source_line_start,
+                "sourceLineEndExclusive": item.source_line_end_exclusive,
+                "sourceStart": item.source_start,
+                "sourceEndExclusive": item.source_end_exclusive,
             }
             for item in self._text_matcher.visible_screen_texts
         ]
         if (dynamic_item == self._dynamic_item and not vocabulary_changed
-                and not content_changed):
+                and not content_changed and not debug_changed):
             return None
         self._dynamic_item = dynamic_item
         return self._scene_state()
@@ -769,15 +955,13 @@ class SubtitleEventRouter:
                         candidate for candidate in (label_counts or [])
                         if isinstance(candidate, dict) and candidate.get("index") == index
                     ), None)
-                    # Declarative menu labels have stable reviewed bounds.
-                    # During window construction or occlusion, the runtime
-                    # cells may cover only part of a label; using their tight
-                    # bounding box clips translated text.  Vocabulary terms
-                    # have no fixed position, so only they use live bounds.
-                    if unit.kind == "vocabulary" and item is not None and all(
+                    # Every overlay is anchored to the cells detected on the
+                    # current screen. Never substitute the database's old
+                    # absolute label rectangle for a missing live position.
+                    if item is not None and all(
                         isinstance(item.get(key), int)
                         for key in ("x", "y", "width", "height")
-                    ):
+                    ) and item["width"] > 0 and item["height"] > 0:
                         unit_bounds.append((unit.id, PpuBounds(
                             item["x"], item["y"], item["width"], item["height"]
                         )))
@@ -1028,8 +1212,24 @@ def build_config(
         f"local scratchFirstAddress = {runtime['scratchFirstAddress']}",
         f"local visibilityStart = {runtime['visibilityStart']}",
         f"local visibilityEndExclusive = {runtime['visibilityEndExclusive']}",
-        "local layoutRecords = {",
+        "local glyphPatterns = {",
     ]
+    for value, entry in sorted(character_map.items()):
+        signatures = entry.get("patternSignatures", [])
+        if isinstance(signatures, list) and signatures:
+            lines.append(
+                "  [%d] = { %s }," % (
+                    value,
+                    ", ".join(
+                        "[%s] = true" % _lua_string(signature)
+                        for signature in signatures
+                    ),
+                )
+            )
+    lines.extend([
+        "}",
+        "local layoutRecords = {",
+    ])
     if database is not None:
         for record in database.records:
             if record.presentation is None:
@@ -1068,23 +1268,30 @@ def build_config(
         if dictionary_catalog is not None and vocabulary is not None:
             validate_vocabulary(dictionary_catalog, vocabulary)
             entries = {
-                entry["id"]: entry for entry in dictionary_catalog.get("entries", [])
+                entry["token"]: entry
+                for entry in dictionary_catalog.get("entries", [])
             }
             for word in vocabulary.get("records", []):
                 if word.get("category") == "system-template":
                     continue
-                entry = entries[word["id"]]
-                if entry["prgEndExclusive"] <= entry["prgStart"]:
-                    continue
-                lines.append(
-                    "  { id = %s, startAddress = %d, endAddress = %d, "
-                    "dynamic = true, labels = {} },"
-                    % (
-                        _lua_string(word["id"]),
-                        database.cpu_address_base + entry["prgStart"],
-                        database.cpu_address_base + entry["prgEndExclusive"] - 1,
+                for encoding in word.get("encodings", []):
+                    if encoding.get("kind") != "dictionary-token":
+                        continue
+                    entry = entries.get(encoding.get("token"))
+                    if (
+                        entry is None
+                        or entry["prgEndExclusive"] <= entry["prgStart"]
+                    ):
+                        continue
+                    lines.append(
+                        "  { id = %s, startAddress = %d, endAddress = %d, "
+                        "dynamic = true, labels = {} },"
+                        % (
+                            _lua_string(word["id"]),
+                            database.cpu_address_base + entry["prgStart"],
+                            database.cpu_address_base + entry["prgEndExclusive"] - 1,
+                        )
                     )
-                )
     lines.extend([
         "}",
         "local discoveryNodes = {",
@@ -1103,6 +1310,12 @@ def build_config(
         "local records = {",
     ])
     for translation in translations.get("records", []):
+        # Nametable-only records are matched from the completed screen text.
+        # They deliberately do not participate in the legacy ROM provenance
+        # hook, so they need neither a runtime-confirmed entry point nor a
+        # unique raw-byte prefix here.
+        if str(translation.get("integrationMode", "")).startswith("nametable-"):
+            continue
         record_id = translation.get("id")
         catalog_record_id = translation.get("catalogRecordId", record_id)
         record = records_by_id.get(catalog_record_id)
@@ -1158,8 +1371,9 @@ def build_config(
         for glyph in glyphs:
             lines.append(
                 "      { index = %d, value = %d, sourceOffset = %d, "
-                "expandedIndex = %d },"
-                % (glyph.index, glyph.value, glyph.source_offset, glyph.expanded_index)
+                "expandedIndex = %d, modifier = %s },"
+                % (glyph.index, glyph.value, glyph.source_offset, glyph.expanded_index,
+                   "nil" if glyph.modifier is None else str(glyph.modifier))
             )
         lines.extend(["    },", "  },"])
     lines.append("}")
@@ -1212,6 +1426,7 @@ def run(
     dictionary_catalog_path: Path | None = None,
     vocabulary_path: Path | None = None,
     translations_override: dict[str, Any] | None = None,
+    voicing_capture_dir: Path | None = None,
 ) -> int:
     if display_segments and external_subtitles:
         raise ValueError("choose either in-game or external segment display")
@@ -1244,10 +1459,14 @@ def run(
         validate_presentation_characters(
             translations, load_mesen_font_characters(font_source_path)
         )
+    character_map = load_character_map(character_map_path)
+    attach_glyph_pattern_signatures(
+        character_map, character_map_path, rom_path
+    )
     script = build_script(
         catalog,
         translations,
-        load_character_map(character_map_path),
+        character_map,
         template_path.read_text(encoding="utf-8"),
         display_segments=display_segments,
         database=database,
@@ -1273,6 +1492,7 @@ def run(
             translations, database, vocabulary,
             dictionary_catalog=dictionary_catalog,
             dialogue_catalog=catalog,
+            character_map=character_map,
         )
         frame_buffer = FrameSnapshotBuffer()
         if snapshot_trace_path is not None:
@@ -1281,6 +1501,14 @@ def run(
             text_run_trace_path.parent.mkdir(parents=True, exist_ok=True)
         if discovery_trace_path is not None:
             discovery_trace_path.parent.mkdir(parents=True, exist_ok=True)
+        if voicing_capture_dir is not None:
+            voicing_capture_dir.mkdir(parents=True, exist_ok=True)
+        confirmed_voicing_samples: list[dict[str, Any]] = []
+        chr_patterns = None
+        if voicing_capture_dir is not None:
+            from .nametable_pattern_dump import chr_index, ines_chr, save_confirmed_samples
+            chr_patterns = chr_index(ines_chr(rom_path.read_bytes()))
+            save_confirmed_samples([], voicing_capture_dir)
         with ExitStack() as stack:
             companion = None
             if external_subtitles:
@@ -1317,7 +1545,7 @@ def run(
             for line in process.stdout:
                 structured_event = line.startswith((
                     "DQRUN ", "DQDISCOVERY ", "DQFRAME ", "DQGLYPH ",
-                    "DQMENU ", "DQTERM ",
+                    "DQMENU ", "DQTERM ", "DQVOICE ",
                 ))
                 if line.startswith("DQRUN "):
                     if text_run_file is not None:
@@ -1327,6 +1555,18 @@ def run(
                     if discovery_file is not None:
                         discovery_file.write(line[len("DQDISCOVERY "):])
                         discovery_file.flush()
+                elif line.startswith("DQVOICE ") and voicing_capture_dir is not None:
+                    from .nametable_pattern_dump import confirmed_voice_sample, save_confirmed_samples
+                    assert chr_patterns is not None
+                    sample = confirmed_voice_sample(json.loads(line[len("DQVOICE "):]), chr_patterns)
+                    confirmed_voicing_samples.append(sample)
+                    save_confirmed_samples(confirmed_voicing_samples, voicing_capture_dir)
+                    print(
+                        "Confirmed modifier glyph: %s tile=$%02X cell=%d:%d,%d" % (
+                            sample["logicalCharacter"] or "unknown", sample["tileId"],
+                            sample["page"], sample["row"], sample["column"],
+                        ), flush=True,
+                    )
                 if not structured_event:
                     sys.stdout.write(line)
                     sys.stdout.flush()
@@ -1389,6 +1629,10 @@ def main() -> None:
         "--discovery-trace", type=Path,
         help="write statically cataloged runtime text discoveries as JSONL",
     )
+    parser.add_argument(
+        "--voicing-capture-dir", type=Path,
+        help="write source-confirmed modified-glyph 3x3 captures",
+    )
     args = parser.parse_args()
     translations_override = None
     if args.translation_pack is not None:
@@ -1422,6 +1666,7 @@ def main() -> None:
         args.snapshot_trace, args.text_run_trace, args.discovery_trace,
         args.dictionary_catalog, args.vocabulary,
         translations_override,
+        args.voicing_capture_dir,
     ))
 
 

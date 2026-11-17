@@ -1,0 +1,10 @@
+{
+  "game": "Portopia Renzoku Satsujin Jiken (Japan)",
+  "minimumLength": 3,
+  "ranges": [
+    { "start": 0, "text": "0123456789" },
+    { "start": 10, "text": "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわんっゃゅょ" }
+  ],
+  "symbols": { "55": "＊", "61": "！", "62": "「" },
+  "joiners": { "FF": " ", "FE": "\n" }
+}

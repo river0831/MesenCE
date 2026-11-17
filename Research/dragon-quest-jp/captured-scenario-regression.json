@@ -1,0 +1,32 @@
+{
+  "formatVersion": 1,
+  "translationPack": "translation-pack.json",
+  "scenarios": [
+    {
+      "id": "key-message-incremental",
+      "textRuns": "generated/key-text-runs.jsonl",
+      "expectedRecordIds": ["currency-gold", "dict-ba"],
+      "expectedTexts": ["获得了120金币。"]
+    },
+    {
+      "id": "key-message-final",
+      "textRuns": "generated/key-final-text-runs.jsonl"
+    },
+    {
+      "id": "incremental-dialogue",
+      "textRuns": "generated/incremental-text-runs.jsonl",
+      "expectedRecordIds": ["currency-gold", "dict-ba"],
+      "expectedTexts": ["获得了120金币。"]
+    },
+    {
+      "id": "general-playtest",
+      "textRuns": "generated/playtest-text-runs.jsonl",
+      "expectedRecordIds": ["chr-fc-3397"],
+      "expectedTexts": ["准备好旅行后，", "再来见我。"]
+    },
+    {
+      "id": "voicing-and-menu",
+      "textRuns": "generated/voicing-text-runs.jsonl"
+    }
+  ]
+}

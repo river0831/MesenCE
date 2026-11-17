@@ -9,6 +9,8 @@ from pathlib import Path
 import unicodedata
 from typing import Any
 
+from .vocabulary import normalize_vocabulary
+
 from .dictionary_codec import ines_prg
 from .text_review import load_character_map, render_bytes
 
@@ -139,28 +141,62 @@ def render_markdown(catalog: dict[str, Any]) -> str:
 
 
 def validate_vocabulary(catalog: dict[str, Any], vocabulary: dict[str, Any]) -> None:
-    by_id = {item["id"]: item for item in catalog.get("entries", [])}
+    vocabulary = normalize_vocabulary(vocabulary)
+    by_token = {item["token"]: item for item in catalog.get("entries", [])}
     seen_ids: set[str] = set()
     seen_tokens: set[int] = set()
     for index, record in enumerate(vocabulary.get("records", [])):
         if not isinstance(record, dict):
             raise VocabularyError(f"vocabulary record {index} must be an object")
         record_id = record.get("id")
-        token = record.get("token")
         if not isinstance(record_id, str) or record_id in seen_ids:
             raise VocabularyError(f"invalid or duplicate vocabulary id: {record_id}")
-        if not isinstance(token, int) or token in seen_tokens:
-            raise VocabularyError(f"invalid or duplicate vocabulary token: {token}")
-        source = by_id.get(record_id)
-        if source is None or source["token"] != token:
-            raise VocabularyError(f"vocabulary source mismatch: {record_id}")
         for key in ("category", "sourceText", "translation", "display", "confidence"):
             if not isinstance(record.get(key), str) or not record[key]:
                 raise VocabularyError(f"vocabulary {record_id}.{key} must be non-empty")
-        if not source["unknownBytes"] and record["sourceText"] != source["normalized"]:
-            raise VocabularyError(f"resolved source text mismatch: {record_id}")
+        encodings = record.get("encodings", [])
+        if not encodings:
+            raise VocabularyError(f"vocabulary {record_id} has no encodings")
+        for encoding in encodings:
+            kind = encoding.get("kind")
+            if kind == "dictionary-token":
+                token = encoding.get("token")
+                if not isinstance(token, int) or token in seen_tokens:
+                    raise VocabularyError(
+                        f"invalid or duplicate vocabulary token: {token}"
+                    )
+                source = by_token.get(token)
+                if source is None:
+                    raise VocabularyError(
+                        f"vocabulary source mismatch: {record_id}"
+                    )
+                if not source["unknownBytes"] and record["sourceText"] != source["normalized"]:
+                    raise VocabularyError(
+                        f"resolved source text mismatch: {record_id}"
+                    )
+                seen_tokens.add(token)
+            elif kind == "ppu-pattern":
+                try:
+                    pattern = bytes.fromhex(encoding.get("sourceHex", ""))
+                except (TypeError, ValueError) as error:
+                    raise VocabularyError(
+                        f"invalid PPU pattern: {record_id}"
+                    ) from error
+                if not pattern:
+                    raise VocabularyError(f"empty PPU pattern: {record_id}")
+            elif kind == "rom-table":
+                if (
+                    not isinstance(encoding.get("table"), str)
+                    or not isinstance(encoding.get("index"), int)
+                ):
+                    raise VocabularyError(
+                        f"invalid ROM table encoding: {record_id}"
+                    )
+            else:
+                raise VocabularyError(
+                    f"unsupported vocabulary encoding {kind}: {record_id}"
+                )
         seen_ids.add(record_id)
-        seen_tokens.add(token)
 
 
 def main() -> None:

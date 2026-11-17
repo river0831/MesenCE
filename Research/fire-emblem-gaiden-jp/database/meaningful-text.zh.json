@@ -1,0 +1,29 @@
+{
+  "formatVersion": 1,
+  "game": "Fire Emblem Gaiden (Japan)",
+  "language": "zh-Hans",
+  "status": "first-pass-static-review",
+  "notes": "Voiced marks and some control codes are not decoded yet; fragment translations intentionally preserve incompleteness.",
+  "records": [
+    { "id": "prg-02aeae", "sourceText": "あなたはこのたたかいに", "translation": "你在这场战斗中……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-00fa61", "sourceText": "まよいのもりにあるという", "translation": "据说它在迷失森林里。", "kind": "complete-or-near-complete", "confidence": "high" },
+    { "id": "prg-033ad1", "sourceText": "しあわせにくらしている", "translation": "幸福地生活着。", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-02b14b", "sourceText": "きみのちからになろう", "translation": "我来助你一臂之力。", "kind": "complete-or-near-complete", "confidence": "high" },
+    { "id": "prg-00e3db", "sourceText": "なにもいうことはない", "translation": "没什么可说的。", "kind": "complete-or-near-complete", "confidence": "high" },
+    { "id": "prg-02a9bc", "sourceText": "あなたのために", "translation": "为了你……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-02adea", "sourceText": "このたたかいには", "translation": "在这场战斗中……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-02aef4", "sourceText": "たおしたのは", "translation": "打倒……的是……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-029486", "sourceText": "はいりました", "translation": "进去了。", "kind": "fragment", "confidence": "medium" },
+    { "id": "prg-0291ae", "sourceText": "このなかには", "translation": "在这里面……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-02b212", "sourceText": "これからは", "translation": "从今以后……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-02b6c2", "sourceText": "はなしたように", "translation": "正如我说过的……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-00f8d3", "sourceText": "わたしたちには", "translation": "对我们来说……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-00e47d", "sourceText": "にいきますから", "translation": "因为我要去……", "kind": "fragment", "confidence": "medium" },
+    { "id": "prg-00e636", "sourceText": "あのしまには", "translation": "在那座岛上……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-00fd90", "sourceText": "よくわからないの", "translation": "我不太清楚。", "kind": "complete-or-near-complete", "confidence": "medium" },
+    { "id": "prg-0136df", "sourceText": "こたえるものはいない", "translation": "没有人回答。", "kind": "complete-or-near-complete", "confidence": "high" },
+    { "id": "prg-0138a0", "sourceText": "かれんみたものはいない", "translation": "没有人见过他。", "kind": "complete-or-near-complete", "confidence": "medium", "notes": "One decoded glyph is probably a control/voicing error." },
+    { "id": "prg-00f253", "sourceText": "よそのくにからきた", "translation": "从别的国家来的。", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-02b299", "sourceText": "にしのもりにある", "translation": "在西边的森林里。", "kind": "fragment", "confidence": "high" }
+  ]
+}

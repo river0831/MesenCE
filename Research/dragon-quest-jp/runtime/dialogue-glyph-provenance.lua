@@ -35,8 +35,10 @@ local layoutPending = {}
 local layoutCells = {}
 local layoutDirty = {}
 local textRunWrites = {}
+local textRunGlyphs = {}
 local textCells = {}
 local previousProjectedText = {}
+local previousProjectedGlyphs = {}
 local textCellsDirty = false
 local previousProjectionKey = nil
 local previousSourceProjectionKey = nil
@@ -44,6 +46,8 @@ local previousLayoutProjectionKey = nil
 local discoveryNode = 1
 local recordsByFirstByte = {}
 local layoutRecordsById = {}
+local readPpuState = emu.getState
+local pendingModifiedCaptures = {}
 
 for _, record in ipairs(records) do
   maxPrefixLength = math.max(maxPrefixLength, #record.matchPrefix)
@@ -86,6 +90,25 @@ end
 
 local function jsonString(value) return string.format("%q", value) end
 
+local function tilePatternSignature(tileIndex, patternBase)
+  local bytes = {}
+  local address = patternBase + tileIndex * 16
+  for offset = 0, 15 do
+    table.insert(bytes, string.format("%02x",
+      emu.read(address + offset, emu.memType.nesPpuMemory)))
+  end
+  return table.concat(bytes)
+end
+
+local function isKnownGlyphPattern(tileIndex, patternBase, cache)
+  if cache[tileIndex] ~= nil then return cache[tileIndex] end
+  local expected = glyphPatterns[tileIndex]
+  local matches = expected ~= nil and
+    expected[tilePatternSignature(tileIndex, patternBase)] == true
+  cache[tileIndex] = matches
+  return matches
+end
+
 local function prefixMatches(prefix)
   if #stream < #prefix then return false end
   for index = 1, #prefix do
@@ -121,6 +144,45 @@ local function assignCell(address, tag)
     end
   end
   cells[address] = tag
+  if tag.modifier then
+    pendingModifiedCaptures[address] = tag
+  end
+end
+
+local function emitModifiedCaptures()
+  local state = readPpuState()
+  local patternBase = state["ppu.control.backgroundPatternAddr"] or 0
+  for address, tag in pairs(pendingModifiedCaptures) do
+    local pageBase = math.floor(address / 0x400) * 0x400
+    local within = address % 0x400
+    local row = math.floor(within / 32)
+    local column = within % 32
+    local actualTile = emu.read(address, emu.memType.nesNametableRam)
+    local parts = {}
+    for dy = -1, 1 do
+      for dx = -1, 1 do
+        local targetRow = row + dy
+        local targetColumn = column + dx
+        if targetRow >= 0 and targetRow < 30 and targetColumn >= 0 and targetColumn < 32 then
+          local target = pageBase + targetRow * 32 + targetColumn
+          local tile = emu.read(target, emu.memType.nesNametableRam)
+          parts[#parts + 1] = string.format(
+            "{\"dx\":%d,\"dy\":%d,\"ciramAddress\":%d," ..
+            "\"tileId\":%d,\"patternHex\":\"%s\"}",
+            dx, dy, target, tile, tilePatternSignature(tile, patternBase))
+        end
+      end
+    end
+    print(string.format(
+      "DQVOICE {\"frame\":%d,\"sourceBase\":%d,\"modifier\":%d," ..
+      "\"ppuAddress\":%d,\"ciramAddress\":%d,\"tileId\":%d," ..
+      "\"patternBase\":%d,\"patternHex\":\"%s\"," ..
+      "\"basePatternHex\":\"%s\",\"neighborhood\":[%s]}",
+      frame, tag.sourceValue, tag.modifier, 0x2000 + address, address,
+      actualTile, patternBase, tilePatternSignature(actualTile, patternBase),
+      tilePatternSignature(tag.sourceValue, patternBase), table.concat(parts, ",")))
+  end
+  pendingModifiedCaptures = {}
 end
 
 local function physicalNametableAddress(ppuAddress)
@@ -134,8 +196,9 @@ end
 local function alignCandidate(candidate, alreadyUploaded)
   if not activeRecord then return end
   local glyph = activeRecord.glyphs[nextGlyph]
-  if not glyph or candidate.value ~= glyph.value then return end
+  if not glyph or (not glyph.modifier and candidate.value ~= glyph.value) then return end
   local address = physicalNametableAddress(candidate.ppuAddress)
+  if address % 0x400 >= 0x3C0 then return end
   local tag = {
     recordId = activeRecord.id,
     instanceId = activeInstanceId,
@@ -144,6 +207,8 @@ local function alignCandidate(candidate, alreadyUploaded)
     sourceOffset = glyph.sourceOffset,
     expandedIndex = glyph.expandedIndex,
     value = candidate.value,
+    sourceValue = glyph.value,
+    modifier = glyph.modifier,
   }
   if alreadyUploaded then
     assignCell(address, tag)
@@ -214,6 +279,7 @@ local function currentProjection()
   local state = emu.getState()
   local temporary = state["ppu.tmpVideoRamAddr"] or 0
   local fineX = state["ppu.xScroll"] or 0
+  local patternBase = state["ppu.control.backgroundPatternAddr"] or 0
   local scrollX = (temporary & 0x1F) * 8 + fineX
   if (temporary & 0x400) ~= 0 then scrollX = scrollX + 256 end
   local scrollY = ((temporary & 0x3E0) >> 2) +
@@ -222,7 +288,9 @@ local function currentProjection()
   return {
     scrollX = scrollX,
     scrollY = scrollY,
-    key = tostring(scrollX) .. ":" .. tostring(scrollY),
+    patternBase = patternBase,
+    key = tostring(scrollX) .. ":" .. tostring(scrollY) ..
+      ":" .. tostring(patternBase),
   }
 end
 
@@ -370,12 +438,12 @@ local function projectVisibleCells(projection)
 end
 
 local function projectVisibleText(projection)
-  if not textCellsDirty and projection.key == previousProjectionKey then
-    return false
-  end
   textCellsDirty = false
   previousProjectionKey = projection.key
   local projected = {}
+  local projectedGlyphs = {}
+  local patternBase = projection.patternBase or 0
+  local glyphCache = {}
   for address, value in pairs(textCells) do
     local physicalPage = math.floor(address / 0x400)
     local within = address % 0x400
@@ -394,14 +462,19 @@ local function projectVisibleText(projection)
         -- applying it here silently drops menus and shop lists in the upper
         -- part of the screen.
         projected[screenAddress] = value
+        projectedGlyphs[screenAddress] = isKnownGlyphPattern(
+          value, patternBase, glyphCache)
       end
     end
   end
   textRunWrites = {}
+  textRunGlyphs = {}
   local changedProjection = false
   for address, value in pairs(projected) do
-    if previousProjectedText[address] ~= value then
+    if previousProjectedText[address] ~= value
+        or previousProjectedGlyphs[address] ~= projectedGlyphs[address] then
       textRunWrites[address] = value
+      textRunGlyphs[address] = projectedGlyphs[address]
       changedProjection = true
     end
   end
@@ -410,10 +483,13 @@ local function projectVisibleText(projection)
   for address, _ in pairs(previousProjectedText) do
     if projected[address] == nil then
       textRunWrites[address] = 0x5F
+      textRunGlyphs[address] = isKnownGlyphPattern(
+        0x5F, patternBase, glyphCache)
       changedProjection = true
     end
   end
   previousProjectedText = projected
+  previousProjectedGlyphs = projectedGlyphs
   return changedProjection
 end
 
@@ -429,20 +505,26 @@ local function emitTextRuns()
     local column = address % 32
     if not current or current.row ~= row
         or column ~= current.startColumn + #current.values then
-      current = { row = row, startColumn = column, values = {} }
+      current = { row = row, startColumn = column, values = {}, glyphs = {} }
       table.insert(runs, current)
     end
     table.insert(current.values, textRunWrites[address])
+    table.insert(current.glyphs, textRunGlyphs[address] == true)
   end
   local parts = {}
   for _, run in ipairs(runs) do
     local bytes = {}
+    local glyphMask = {}
     for _, value in ipairs(run.values) do
       table.insert(bytes, string.format("%02x", value))
     end
+    for _, isGlyph in ipairs(run.glyphs) do
+      table.insert(glyphMask, isGlyph and "1" or "0")
+    end
     table.insert(parts, string.format(
-      "{\"row\":%d,\"startColumn\":%d,\"hex\":%s}",
-      run.row, run.startColumn, jsonString(table.concat(bytes))
+      "{\"row\":%d,\"startColumn\":%d,\"hex\":%s," ..
+      "\"glyphMask\":%s}", run.row, run.startColumn,
+      jsonString(table.concat(bytes)), jsonString(table.concat(glyphMask))
     ))
   end
   print(string.format(
@@ -739,6 +821,7 @@ end
 
 local function onEndFrame()
   propagateCopiedCells()
+  emitModifiedCaptures()
   local projection = currentProjection()
   local sourceProjectionChanged = projectVisibleCells(projection)
   local textProjectionChanged = projectVisibleText(projection)

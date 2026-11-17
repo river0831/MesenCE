@@ -76,6 +76,7 @@ def integrate_static_texts(
         *, record_id: str, catalog_record_id: str, source_text: str,
         translation: str, translation_status: Any, runtime: dict[str, Any],
         integration_mode: str, match_raw_hex: str | None = None,
+        screen_template: dict[str, Any] | None = None,
     ) -> None:
         glyph_count = sum(
             1 for token in runtime.get("tokens", [])
@@ -105,6 +106,8 @@ def integrate_static_texts(
         }
         if match_raw_hex is not None:
             item["matchRawHex"] = match_raw_hex
+        if screen_template is not None:
+            item["screenTemplate"] = screen_template
         records.append(item)
         existing.add(record_id)
         promoted.append(record_id)
@@ -133,6 +136,31 @@ def integrate_static_texts(
                 translation=translation,
                 translation_status=candidate.get("translationStatus"),
                 runtime=runtime, integration_mode="static-exact",
+            )
+        source_text = str(candidate.get("sourceText", ""))
+        if (
+            record_id not in existing
+            and candidate.get("messageUnitCount") == 1
+            and isinstance(translation, str) and translation.strip()
+            and "<F3>" not in source_text
+            and ("{PLAYER_NAME}" in source_text or "<FD>" in source_text)
+        ):
+            parameters: dict[str, Any] = {}
+            template = translation
+            if "{PLAYER_NAME}" in source_text:
+                parameters["PLAYER_NAME"] = {"source": "screen-capture"}
+            if "<FD>" in source_text:
+                parameters["DYNAMIC_1"] = {"source": "screen-capture"}
+                template = template.replace("<FD>", "{DYNAMIC_1}")
+            promote(
+                record_id=record_id, catalog_record_id=record_id,
+                source_text=source_text, translation=translation,
+                translation_status=candidate.get("translationStatus"),
+                runtime=runtime, integration_mode="nametable-template",
+                screen_template={
+                    "template": template,
+                    "parameters": parameters,
+                },
             )
         if candidate.get("messageUnitCount", 1) <= 1:
             continue
@@ -167,7 +195,7 @@ def integrate_static_texts(
                 ),
             )
     result["staticIntegration"] = {
-        "policy": "exact-fixed-message-units",
+        "policy": "exact-fixed-and-declared-nametable-templates",
         "recordCount": len(promoted),
         "recordIds": promoted,
     }

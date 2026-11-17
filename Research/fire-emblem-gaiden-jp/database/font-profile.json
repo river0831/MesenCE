@@ -1,0 +1,11 @@
+{
+  "game": "Fire Emblem Gaiden (Japan)",
+  "minimumLength": 3,
+  "ranges": [
+    { "start": 0, "text": "あいうえおかきくけこさしすせそ" },
+    { "start": 16, "text": "たちつてとなにぬねのはひふへほ" },
+    { "start": 32, "text": "まみむめもやゆよらりるれろわん" }
+  ],
+  "symbols": { "2F": " ", "3F": "。" },
+  "joiners": {}
+}

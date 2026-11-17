@@ -1,0 +1,8 @@
+{
+  "formatVersion": 1,
+  "game": "Final Fantasy (Japan)",
+  "language": "zh-Hans",
+  "status": "blocked-on-runtime-chr-ram-font-capture",
+  "records": [],
+  "notes": "This ROM has no CHR-ROM section. Runtime font capture and the game's text codec are required before trustworthy translation."
+}

@@ -290,6 +290,7 @@ python3 -m Tools.NesTranslation.dictionary_catalog \
   --dictionary-terminator fa \
   --token-base 6d \
   --vocabulary Research/dragon-quest-jp/database/vocabulary-translations.json \
+  --dictionary-catalog Research/dragon-quest-jp/generated/prg-dictionary-catalog.json \
   --json-output Research/dragon-quest-jp/generated/prg-dictionary-catalog.json \
   --markdown-output Research/dragon-quest-jp/generated/prg-dictionary-review.md
 ```
@@ -427,6 +428,26 @@ python3 -m Tools.NesTranslation.playtest_report \
 The candidate list is deliberately conservative: it reports readable tile
 sequences not already covered by a reviewed source string. It is a review
 queue, not an assertion that every sequence is dialogue.
+
+The report also audits the unified vocabulary database. It lists records that
+were never observed, records without usable encodings, encodings that cannot
+produce a screen pattern, and byte patterns mapped to conflicting
+translations.
+
+Replay all curated real-capture scenarios through the same router used during
+play, and compare them with their expected records and translations:
+
+```sh
+python3 -m Tools.NesTranslation.scenario_regression \
+  --manifest Research/dragon-quest-jp/captured-scenario-regression.json \
+  --json-output Research/dragon-quest-jp/generated/scenario-regression.json \
+  --markdown-output Research/dragon-quest-jp/output/scenario-regression.md
+```
+
+The command exits unsuccessfully when an expected record or translation is
+missing, a forbidden translation appears, or one snapshot contains duplicate
+translation units. New captures can be added to the manifest without adding
+game-specific code to the runner.
 
 Exact full-record discoveries can be promoted into the generated validated
 catalog before adding reviewed translations. Re-running this command is safe;

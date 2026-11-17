@@ -1,0 +1,16 @@
+{
+  "game": "Ninja Ryuuken Den III - Yomi no Hakobune (Japan)",
+  "minimumLength": 3,
+  "ranges": [
+    { "start": 64, "text": "あいうえおかきくけこさしすせそ" },
+    { "start": 80, "text": "たちつてとなにぬねのはひふへほ" },
+    { "start": 96, "text": "まみむめも" },
+    { "start": 101, "text": "や" },
+    { "start": 103, "text": "ゆ" },
+    { "start": 105, "text": "よらりるれろ" },
+    { "start": 112, "text": "わ" },
+    { "start": 117, "text": "ん" }
+  ],
+  "symbols": { "3F": " " },
+  "joiners": {}
+}

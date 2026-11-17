@@ -1,0 +1,17 @@
+{
+  "formatVersion": 1,
+  "game": "Contra (Japan)",
+  "language": "zh-Hans",
+  "status": "first-pass-static-review",
+  "records": [
+    { "id": "prg-011e0d", "sourceText": "PUSH START BUTTON", "translation": "按下开始键", "kind": "complete", "confidence": "high" },
+    { "id": "prg-011ccb", "sourceText": "STAGE SELECT MODE", "translation": "关卡选择模式", "kind": "complete", "confidence": "high" },
+    { "id": "prg-01f6bd", "sourceText": "ENERGY ZONE", "translation": "能源区", "kind": "label", "confidence": "high" },
+    { "id": "prg-011dcc", "sourceText": "ENERGY ZONE", "translation": "能源区", "kind": "label", "confidence": "high" },
+    { "id": "prg-01f6b0", "sourceText": "SNOW FIELD", "translation": "雪原", "kind": "label", "confidence": "high" },
+    { "id": "prg-011db3", "sourceText": "SNOW FIELD", "translation": "雪原", "kind": "label", "confidence": "high" },
+    { "id": "prg-01f69c", "sourceText": "WATERFALL", "translation": "瀑布", "kind": "label", "confidence": "high" },
+    { "id": "prg-01f5eb", "sourceText": "GAME OVER", "translation": "游戏结束", "kind": "complete", "confidence": "high" },
+    { "id": "prg-01069e", "sourceText": "PROGRAMMERS / GRAPHIC DESIGNERS", "translation": "程序设计 / 图形设计", "kind": "credits", "confidence": "high", "notes": "The same record also contains staff names; names remain untranslated." }
+  ]
+}

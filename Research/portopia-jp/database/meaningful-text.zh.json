@@ -1,0 +1,29 @@
+{
+  "formatVersion": 1,
+  "game": "Portopia Renzoku Satsujin Jiken (Japan)",
+  "language": "zh-Hans",
+  "status": "first-pass-static-review",
+  "notes": "Several voiced kana currently decode as their unvoiced base or as small kana; translations use the evident sentence meaning only where it is sufficiently clear.",
+  "records": [
+    { "id": "prg-0014ad", "sourceText": "ほかに はなすこと ないの", "translation": "没有别的要说了吗？", "kind": "complete-or-near-complete", "confidence": "high" },
+    { "id": "prg-003849", "sourceText": "たしかに うちとこに きました", "translation": "他的确来过我这里。", "kind": "complete-or-near-complete", "confidence": "medium" },
+    { "id": "prg-002030", "sourceText": "やしきのしたに こっな めいろ", "translation": "宅邸下面有这样的迷宫……", "kind": "fragment", "confidence": "medium" },
+    { "id": "prg-002ac8", "sourceText": "あのなかには はいれませっ", "translation": "无法进入那里。", "kind": "complete-or-near-complete", "confidence": "medium" },
+    { "id": "prg-002e0b", "sourceText": "むこうにみえるのは", "translation": "在对面能看到的是……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-001108", "sourceText": "に いましたか", "translation": "在……那里吗？", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-001246", "sourceText": "わたし ほっとうに なっにも しらないっ", "translation": "我真的什么都不知道。", "kind": "complete-or-near-complete", "confidence": "medium" },
+    { "id": "prg-0013ff", "sourceText": "と おかねんかして もらえないかなあ", "translation": "能借我一点钱吗？", "kind": "complete-or-near-complete", "confidence": "medium" },
+    { "id": "prg-00229b", "sourceText": "たしかに 17にちのよる", "translation": "确实是在17日晚上……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-002a07", "sourceText": "つくえの うえに めも", "translation": "桌子上有一张便条。", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-002689", "sourceText": "ものは おちていませっ", "translation": "没有东西掉在这里。", "kind": "complete-or-near-complete", "confidence": "medium" },
+    { "id": "prg-003972", "sourceText": "ほっとうに やめるの", "translation": "真的要放弃吗？", "kind": "complete-or-near-complete", "confidence": "medium" },
+    { "id": "prg-002f86", "sourceText": "ん たいほ しました", "translation": "已经逮捕了……", "kind": "fragment", "confidence": "medium" },
+    { "id": "prg-001d30", "sourceText": "みなとの ちかくに", "translation": "在港口附近……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-001a42", "sourceText": "ていると おもいますよ", "translation": "我想应该正在……", "kind": "fragment", "confidence": "medium" },
+    { "id": "prg-002bcb", "sourceText": "たいようん みては いけない", "translation": "不能直视太阳。", "kind": "complete-or-near-complete", "confidence": "medium" },
+    { "id": "prg-0034d8", "sourceText": "かれには ころす りゆう", "translation": "他有杀人的理由……", "kind": "fragment", "confidence": "high" },
+    { "id": "prg-002476", "sourceText": "には いないよう", "translation": "似乎不在……", "kind": "fragment", "confidence": "medium" },
+    { "id": "prg-003800", "sourceText": "おみせは しっかいちの まっなか", "translation": "商店位于市区正中央。", "kind": "complete-or-near-complete", "confidence": "medium" },
+    { "id": "prg-0019ac", "sourceText": "しっせきに ひきとられましてね", "translation": "后来被亲戚接走了。", "kind": "complete-or-near-complete", "confidence": "medium" }
+  ]
+}

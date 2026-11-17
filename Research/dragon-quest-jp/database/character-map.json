@@ -1,5 +1,9 @@
 {
   "mapVersion": 1,
+  "glyphPatternSources": [
+    { "chrBank": 0, "patternTable": 0 },
+    { "chrBank": 2, "patternTable": 0 }
+  ],
   "entries": {
     "0A": { "display": "あ", "type": "glyph", "confidence": "semantic-probable", "evidence": "ordered hiragana table; dialogue context" },
     "0B": { "display": "い", "type": "glyph", "confidence": "cross-validated", "evidence": "menu and dialogue context" },

@@ -1,55 +1,1822 @@
 {
   "formatVersion": 1,
   "language": "zh-Hans",
-  "source": "prg-dictionary",
+  "source": "unified-text-database",
   "records": [
-    { "id": "dict-8b", "token": 139, "category": "weapon", "sourceText": "たけざお", "translation": "竹竿", "display": "竹竿", "confidence": "semantic-probable" },
-    { "id": "dict-8c", "token": 140, "category": "weapon", "sourceText": "こんぼう", "translation": "木棒", "display": "木棒", "confidence": "semantic-probable" },
-    { "id": "dict-8d", "token": 141, "category": "weapon", "sourceText": "どうのつるぎ", "translation": "铜剑", "display": "銅劍", "confidence": "semantic-probable" },
-    { "id": "dict-8e", "token": 142, "category": "weapon", "sourceText": "てつのおの", "translation": "铁斧", "display": "鐵斧", "confidence": "semantic-probable" },
-    { "id": "dict-8f", "token": 143, "category": "weapon", "sourceText": "はがねのつるぎ", "translation": "钢剑", "display": "鋼劍", "confidence": "semantic-probable" },
-    { "id": "dict-90", "token": 144, "category": "weapon", "sourceText": "ほのおのつるぎ", "translation": "火焰剑", "display": "火焰劍", "confidence": "semantic-probable" },
-    { "id": "dict-91", "token": 145, "category": "weapon", "sourceText": "ロトのつるぎ", "translation": "洛特之剑", "display": "洛特之劍", "confidence": "semantic-probable" },
-
-    { "id": "dict-92", "token": 146, "category": "armor", "sourceText": "ぬののふく", "translation": "布衣", "display": "布衣", "confidence": "semantic-probable" },
-    { "id": "dict-93", "token": 147, "category": "armor", "sourceText": "かわのふく", "translation": "皮衣", "display": "皮衣", "confidence": "semantic-probable" },
-    { "id": "dict-94", "token": 148, "category": "armor", "sourceText": "くさりかたびら", "translation": "锁子甲", "display": "鎖子甲", "confidence": "semantic-probable" },
-    { "id": "dict-95", "token": 149, "category": "armor", "sourceText": "てつのよろい", "translation": "铁甲", "display": "鐵甲", "confidence": "semantic-probable" },
-    { "id": "dict-96", "token": 150, "category": "armor", "sourceText": "はがねのよろい", "translation": "钢甲", "display": "鋼甲", "confidence": "semantic-probable" },
-    { "id": "dict-97", "token": 151, "category": "armor", "sourceText": "まほうのよろい", "translation": "魔法铠甲", "display": "魔法鎧甲", "confidence": "semantic-probable" },
-    { "id": "dict-98", "token": 152, "category": "armor", "sourceText": "ロトのよろい", "translation": "洛特铠甲", "display": "洛特鎧甲", "confidence": "semantic-probable" },
-
-    { "id": "dict-99", "token": 153, "category": "shield", "sourceText": "かわのたて", "translation": "皮盾", "display": "皮盾", "confidence": "semantic-probable" },
-    { "id": "dict-9a", "token": 154, "category": "shield", "sourceText": "てつのたて", "translation": "铁盾", "display": "鐵盾", "confidence": "semantic-probable" },
-    { "id": "dict-9b", "token": 155, "category": "shield", "sourceText": "みかがみのたて", "translation": "水镜盾", "display": "水鏡盾", "confidence": "semantic-probable" },
-
-    { "id": "dict-a0", "token": 160, "category": "item", "sourceText": "やくそう", "translation": "药草", "display": "藥草", "confidence": "semantic-probable" },
-    { "id": "dict-a1", "token": 161, "category": "item", "sourceText": "かぎ", "translation": "钥匙", "display": "鑰匙", "confidence": "semantic-probable", "tileAlternatives": { "1": [153] } },
-    { "id": "dict-a2", "token": 162, "category": "item", "sourceText": "たいまつ", "translation": "火把", "display": "火把", "confidence": "semantic-probable" },
-    { "id": "dict-a3", "token": 163, "category": "item", "sourceText": "せいすい", "translation": "圣水", "display": "聖水", "confidence": "semantic-probable" },
-    { "id": "dict-a4", "token": 164, "category": "item", "sourceText": "キメラのつばさ", "translation": "奇美拉之翼", "display": "奇美拉之翼", "confidence": "semantic-probable" },
-    { "id": "dict-a5", "token": 165, "category": "item", "sourceText": "りゅうのうろこ", "translation": "龙鳞", "display": "龍鱗", "confidence": "semantic-probable" },
-    { "id": "dict-a6", "token": 166, "category": "item", "sourceText": "ようせいのふえ", "translation": "妖精之笛", "display": "妖精之笛", "confidence": "semantic-probable" },
-    { "id": "dict-a7", "token": 167, "category": "item", "sourceText": "せんしのゆびわ", "translation": "战士戒指", "display": "戰士戒指", "confidence": "semantic-probable" },
-    { "id": "dict-a8", "token": 168, "category": "item", "sourceText": "ロトのしるし", "translation": "洛特印记", "display": "洛特印記", "confidence": "semantic-probable" },
-    { "id": "dict-a9", "token": 169, "category": "item", "sourceText": "おうじょのあい", "translation": "公主之爱", "display": "公主之愛", "confidence": "semantic-probable" },
-    { "id": "dict-aa", "token": 170, "category": "item", "sourceText": "のろいのベルト", "translation": "诅咒腰带", "display": "詛咒腰帶", "confidence": "semantic-probable" },
-    { "id": "dict-ab", "token": 171, "category": "item", "sourceText": "ぎんのたてごと", "translation": "银竖琴", "display": "銀豎琴", "confidence": "semantic-probable" },
-    { "id": "dict-ac", "token": 172, "category": "item", "sourceText": "しのくびかざり", "translation": "死亡项链", "display": "死亡項鏈", "confidence": "semantic-probable" },
-    { "id": "dict-ad", "token": 173, "category": "item", "sourceText": "たいようのいし", "translation": "太阳石", "display": "太陽石", "confidence": "semantic-probable" },
-    { "id": "dict-ae", "token": 174, "category": "item", "sourceText": "あまぐものつえ", "translation": "雨云杖", "display": "雨雲杖", "confidence": "semantic-probable" },
-    { "id": "dict-af", "token": 175, "category": "item", "sourceText": "にじのしずく", "translation": "彩虹水滴", "display": "彩虹水滴", "confidence": "semantic-probable" },
-
-    { "id": "dict-b5", "token": 181, "category": "system-template", "sourceText": "もてませんが", "translation": "已经拿不下了", "display": "已經拿不下了", "confidence": "semantic-probable" },
-    { "id": "dict-b6", "token": 182, "category": "system-template", "sourceText": "おかねが たりませんが", "translation": "金钱不够", "display": "金錢不夠", "confidence": "semantic-probable" },
-    { "id": "dict-b8", "token": 184, "category": "system-template", "sourceText": "どれを", "translation": "选择哪一个", "display": "選擇哪一個", "confidence": "semantic-probable" },
-    { "id": "dict-b9", "token": 185, "category": "system-template", "sourceText": "なにを", "translation": "要选择什么", "display": "要選擇什麼", "confidence": "semantic-probable" },
-    { "id": "dict-ba", "token": 186, "category": "system-template", "sourceText": "てにいれた", "translation": "获得了", "display": "獲得了", "confidence": "semantic-probable", "composition": { "objectCategories": ["currency"], "captureAmount": true, "maxRowDistance": 3, "format": "獲得了{amount}{object}。" } },
-    { "id": "dict-bb", "token": 187, "category": "system-template", "sourceText": "みつけた", "translation": "发现了", "display": "發現了", "confidence": "semantic-probable", "composition": { "objectCategories": ["item", "weapon", "armor", "shield"], "maxRowDistance": 3, "format": "發現了{object}。" } }
-  ],
-  "ppuLexemes": [
-    { "id": "currency-gold", "category": "currency", "sourceHex": "45 f8 4e 43 42", "display": "金幣", "confidence": "runtime-confirmed" },
-    { "id": "shop-buy", "category": "menu-choice", "sourceHex": "2c 22 36 0f 0b 1f 10 19", "display": "購買物品", "confidence": "runtime-confirmed" },
-    { "id": "shop-sell", "category": "menu-choice", "sourceHex": "2c 22 36 0c 31 1f 10 19", "display": "出售物品", "confidence": "runtime-confirmed" }
+    {
+      "id": "dict-80",
+      "category": "spell",
+      "sourceText": "ホイミ",
+      "translation": "荷伊米",
+      "display": "荷伊米",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 128
+        }
+      ]
+    },
+    {
+      "id": "dict-81",
+      "category": "spell",
+      "sourceText": "ギラ",
+      "translation": "基拉",
+      "display": "基拉",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 129
+        }
+      ]
+    },
+    {
+      "id": "dict-82",
+      "category": "spell",
+      "sourceText": "ラリホー",
+      "translation": "拉里霍",
+      "display": "拉里霍",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 130
+        }
+      ]
+    },
+    {
+      "id": "dict-83",
+      "category": "spell",
+      "sourceText": "レミーラ",
+      "translation": "雷米拉",
+      "display": "雷米拉",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 131
+        }
+      ]
+    },
+    {
+      "id": "dict-84",
+      "category": "spell",
+      "sourceText": "マホトーン",
+      "translation": "玛霍托恩",
+      "display": "玛霍托恩",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 132
+        }
+      ]
+    },
+    {
+      "id": "dict-85",
+      "category": "spell",
+      "sourceText": "リレミト",
+      "translation": "里雷米特",
+      "display": "里雷米特",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 133
+        }
+      ]
+    },
+    {
+      "id": "dict-86",
+      "category": "spell",
+      "sourceText": "ルーラ",
+      "translation": "鲁拉",
+      "display": "鲁拉",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 134
+        }
+      ]
+    },
+    {
+      "id": "dict-87",
+      "category": "spell",
+      "sourceText": "トヘロス",
+      "translation": "托赫洛斯",
+      "display": "托赫洛斯",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 135
+        }
+      ]
+    },
+    {
+      "id": "dict-88",
+      "category": "spell",
+      "sourceText": "ベホイミ",
+      "translation": "贝荷伊米",
+      "display": "贝荷伊米",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 136
+        }
+      ]
+    },
+    {
+      "id": "dict-89",
+      "category": "spell",
+      "sourceText": "ベギラマ",
+      "translation": "贝基拉玛",
+      "display": "贝基拉玛",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 137
+        }
+      ]
+    },
+    {
+      "id": "dict-8b",
+      "category": "weapon",
+      "sourceText": "たけざお",
+      "translation": "竹竿",
+      "display": "竹竿",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 139
+        }
+      ]
+    },
+    {
+      "id": "dict-8c",
+      "category": "weapon",
+      "sourceText": "こんぼう",
+      "translation": "木棒",
+      "display": "木棒",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 140
+        }
+      ]
+    },
+    {
+      "id": "dict-8d",
+      "category": "weapon",
+      "sourceText": "どうのつるぎ",
+      "translation": "铜剑",
+      "display": "铜剑",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 141
+        }
+      ]
+    },
+    {
+      "id": "dict-8e",
+      "category": "weapon",
+      "sourceText": "てつのおの",
+      "translation": "铁斧",
+      "display": "铁斧",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 142
+        }
+      ]
+    },
+    {
+      "id": "dict-8f",
+      "category": "weapon",
+      "sourceText": "はがねのつるぎ",
+      "translation": "钢剑",
+      "display": "钢剑",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 143
+        }
+      ]
+    },
+    {
+      "id": "dict-90",
+      "category": "weapon",
+      "sourceText": "ほのおのつるぎ",
+      "translation": "火焰剑",
+      "display": "火焰剑",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 144
+        }
+      ]
+    },
+    {
+      "id": "dict-91",
+      "category": "weapon",
+      "sourceText": "ロトのつるぎ",
+      "translation": "洛特之剑",
+      "display": "洛特之剑",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 145
+        }
+      ]
+    },
+    {
+      "id": "dict-92",
+      "category": "armor",
+      "sourceText": "ぬののふく",
+      "translation": "布衣",
+      "display": "布衣",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 146
+        }
+      ]
+    },
+    {
+      "id": "dict-93",
+      "category": "armor",
+      "sourceText": "かわのふく",
+      "translation": "皮衣",
+      "display": "皮衣",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 147
+        }
+      ]
+    },
+    {
+      "id": "dict-94",
+      "category": "armor",
+      "sourceText": "くさりかたびら",
+      "translation": "锁子甲",
+      "display": "锁子甲",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 148
+        }
+      ]
+    },
+    {
+      "id": "dict-95",
+      "category": "armor",
+      "sourceText": "てつのよろい",
+      "translation": "铁甲",
+      "display": "铁甲",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 149
+        }
+      ]
+    },
+    {
+      "id": "dict-96",
+      "category": "armor",
+      "sourceText": "はがねのよろい",
+      "translation": "钢甲",
+      "display": "钢甲",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 150
+        }
+      ]
+    },
+    {
+      "id": "dict-97",
+      "category": "armor",
+      "sourceText": "まほうのよろい",
+      "translation": "魔法铠甲",
+      "display": "魔法铠甲",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 151
+        }
+      ]
+    },
+    {
+      "id": "dict-98",
+      "category": "armor",
+      "sourceText": "ロトのよろい",
+      "translation": "洛特铠甲",
+      "display": "洛特铠甲",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 152
+        }
+      ]
+    },
+    {
+      "id": "dict-99",
+      "category": "shield",
+      "sourceText": "かわのたて",
+      "translation": "皮盾",
+      "display": "皮盾",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 153
+        }
+      ]
+    },
+    {
+      "id": "dict-9a",
+      "category": "shield",
+      "sourceText": "てつのたて",
+      "translation": "铁盾",
+      "display": "铁盾",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 154
+        }
+      ]
+    },
+    {
+      "id": "dict-9b",
+      "category": "shield",
+      "sourceText": "みかがみのたて",
+      "translation": "水镜盾",
+      "display": "水镜盾",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 155
+        }
+      ]
+    },
+    {
+      "id": "dict-a0",
+      "category": "item",
+      "sourceText": "やくそう",
+      "translation": "药草",
+      "display": "药草",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 160
+        }
+      ]
+    },
+    {
+      "id": "dict-a1",
+      "category": "item",
+      "sourceText": "かぎ",
+      "translation": "钥匙",
+      "display": "钥匙",
+      "confidence": "semantic-probable",
+      "tileAlternatives": {
+        "1": [
+          153
+        ]
+      },
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 161
+        }
+      ]
+    },
+    {
+      "id": "dict-a2",
+      "category": "item",
+      "sourceText": "たいまつ",
+      "translation": "火把",
+      "display": "火把",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 162
+        }
+      ]
+    },
+    {
+      "id": "dict-a3",
+      "category": "item",
+      "sourceText": "せいすい",
+      "translation": "圣水",
+      "display": "圣水",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 163
+        }
+      ]
+    },
+    {
+      "id": "dict-a4",
+      "category": "item",
+      "sourceText": "キメラのつばさ",
+      "translation": "奇美拉之翼",
+      "display": "奇美拉之翼",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 164
+        }
+      ]
+    },
+    {
+      "id": "dict-a5",
+      "category": "item",
+      "sourceText": "りゅうのうろこ",
+      "translation": "龙鳞",
+      "display": "龙鳞",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 165
+        }
+      ]
+    },
+    {
+      "id": "dict-a6",
+      "category": "item",
+      "sourceText": "ようせいのふえ",
+      "translation": "妖精之笛",
+      "display": "妖精之笛",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 166
+        }
+      ]
+    },
+    {
+      "id": "dict-a7",
+      "category": "item",
+      "sourceText": "せんしのゆびわ",
+      "translation": "战士戒指",
+      "display": "战士戒指",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 167
+        }
+      ]
+    },
+    {
+      "id": "dict-a8",
+      "category": "item",
+      "sourceText": "ロトのしるし",
+      "translation": "洛特印记",
+      "display": "洛特印记",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 168
+        }
+      ]
+    },
+    {
+      "id": "dict-a9",
+      "category": "item",
+      "sourceText": "おうじょのあい",
+      "translation": "公主之爱",
+      "display": "公主之爱",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 169
+        }
+      ]
+    },
+    {
+      "id": "dict-aa",
+      "category": "item",
+      "sourceText": "のろいのベルト",
+      "translation": "诅咒腰带",
+      "display": "诅咒腰带",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 170
+        }
+      ]
+    },
+    {
+      "id": "dict-ab",
+      "category": "item",
+      "sourceText": "ぎんのたてごと",
+      "translation": "银竖琴",
+      "display": "银竖琴",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 171
+        }
+      ]
+    },
+    {
+      "id": "dict-ac",
+      "category": "item",
+      "sourceText": "しのくびかざり",
+      "translation": "死亡项链",
+      "display": "死亡项链",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 172
+        }
+      ]
+    },
+    {
+      "id": "dict-ad",
+      "category": "item",
+      "sourceText": "たいようのいし",
+      "translation": "太阳石",
+      "display": "太阳石",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 173
+        }
+      ]
+    },
+    {
+      "id": "dict-ae",
+      "category": "item",
+      "sourceText": "あまぐものつえ",
+      "translation": "雨云杖",
+      "display": "雨云杖",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 174
+        }
+      ]
+    },
+    {
+      "id": "dict-af",
+      "category": "item",
+      "sourceText": "にじのしずく",
+      "translation": "彩虹水滴",
+      "display": "彩虹水滴",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 175
+        }
+      ]
+    },
+    {
+      "id": "dict-b5",
+      "category": "system-template",
+      "sourceText": "もてませんが",
+      "translation": "已经拿不下了",
+      "display": "已经拿不下了",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 181
+        }
+      ]
+    },
+    {
+      "id": "dict-b6",
+      "category": "system-template",
+      "sourceText": "おかねが たりませんが",
+      "translation": "金钱不够",
+      "display": "金钱不够",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 182
+        }
+      ]
+    },
+    {
+      "id": "dict-b8",
+      "category": "system-template",
+      "sourceText": "どれを",
+      "translation": "选择哪一个",
+      "display": "选择哪一个",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 184
+        }
+      ]
+    },
+    {
+      "id": "dict-b9",
+      "category": "system-template",
+      "sourceText": "なにを",
+      "translation": "要选择什么",
+      "display": "要选择什么",
+      "confidence": "semantic-probable",
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 185
+        }
+      ]
+    },
+    {
+      "id": "dict-ba",
+      "category": "system-template",
+      "sourceText": "てにいれた",
+      "translation": "获得了",
+      "display": "获得了",
+      "confidence": "semantic-probable",
+      "composition": {
+        "objectCategories": [
+          "currency"
+        ],
+        "captureAmount": true,
+        "maxRowDistance": 3,
+        "format": "获得了{amount}{object}。"
+      },
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 186
+        }
+      ]
+    },
+    {
+      "id": "dict-bb",
+      "category": "system-template",
+      "sourceText": "みつけた",
+      "translation": "发现了",
+      "display": "发现了",
+      "confidence": "semantic-probable",
+      "composition": {
+        "objectCategories": [
+          "item",
+          "weapon",
+          "armor",
+          "shield"
+        ],
+        "maxRowDistance": 3,
+        "format": "发现了{object}。"
+      },
+      "encodings": [
+        {
+          "kind": "dictionary-token",
+          "token": 187
+        }
+      ]
+    },
+    {
+      "id": "currency-gold",
+      "category": "currency",
+      "display": "金币",
+      "confidence": "runtime-confirmed",
+      "sourceText": "ゴールド",
+      "translation": "金币",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "45 f8 4e 43 42"
+        }
+      ]
+    },
+    {
+      "id": "shop-buy",
+      "category": "menu-choice",
+      "display": "购买物品",
+      "confidence": "runtime-confirmed",
+      "sourceText": "どれを かいます",
+      "translation": "购买物品",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "2c 22 36 0f 0b 1f 10 19"
+        }
+      ]
+    },
+    {
+      "id": "shop-sell",
+      "category": "menu-choice",
+      "display": "出售物品",
+      "confidence": "runtime-confirmed",
+      "sourceText": "どれを うります",
+      "translation": "出售物品",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "2c 22 36 0c 31 1f 10 19"
+        }
+      ]
+    },
+    {
+      "id": "battle-fight",
+      "category": "menu-choice",
+      "sourceText": "たたかう",
+      "display": "战斗",
+      "confidence": "rom-table-confirmed",
+      "translation": "战斗",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "19 19 0f 0c"
+        }
+      ]
+    },
+    {
+      "id": "battle-run",
+      "category": "menu-choice",
+      "sourceText": "にげる",
+      "display": "逃跑",
+      "confidence": "rom-table-confirmed",
+      "translation": "逃跑",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "1f 12 f8 32"
+        }
+      ]
+    },
+    {
+      "id": "equipment-none",
+      "category": "status-value",
+      "sourceText": "なし",
+      "display": "无",
+      "confidence": "rom-table-confirmed",
+      "translation": "无",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "1e 15"
+        }
+      ]
+    },
+    {
+      "id": "start-enter-name",
+      "category": "system-ui",
+      "sourceText": "なまえを いれてください",
+      "display": "请输入名字",
+      "confidence": "rom-table-confirmed",
+      "translation": "请输入名字",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "1e 28 0d 36 5f 0b 33 1c 11 19 f8 14 0b"
+        }
+      ]
+    },
+    {
+      "id": "start-enter-password",
+      "category": "system-ui",
+      "sourceText": "ふっかつのじゅもんを いれてください",
+      "display": "请输入复活咒文",
+      "confidence": "rom-table-confirmed",
+      "translation": "请输入复活咒文",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "25 38 0f 1b 22 15 f8 3a 2c 37 36 5f 0b 33 1c 11 19 f8 14 0b"
+        }
+      ]
+    },
+    {
+      "id": "start-wrong-password",
+      "category": "system-ui",
+      "sourceText": "じゅもんが ちがいます",
+      "display": "咒文不正确",
+      "confidence": "rom-table-confirmed",
+      "translation": "咒文不正确",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "15 f8 3a 2c 37 0f f8 5f 1a 0f f8 0b 28 16"
+        }
+      ]
+    },
+    {
+      "id": "start-back",
+      "category": "menu-choice",
+      "sourceText": "もどる",
+      "display": "返回",
+      "confidence": "rom-table-confirmed",
+      "translation": "返回",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "2c 1d f8 32"
+        }
+      ]
+    },
+    {
+      "id": "start-next",
+      "category": "menu-choice",
+      "sourceText": "すすむ",
+      "display": "继续",
+      "confidence": "rom-table-confirmed",
+      "translation": "继续",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "16 16 2a"
+        }
+      ]
+    },
+    {
+      "id": "start-finish",
+      "category": "menu-choice",
+      "sourceText": "おわり",
+      "display": "结束",
+      "confidence": "rom-table-confirmed",
+      "translation": "结束",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "0e 35 31"
+        }
+      ]
+    },
+    {
+      "id": "menu-talk",
+      "category": "menu-choice",
+      "sourceText": "はなす",
+      "translation": "交谈",
+      "display": "交谈",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "23 1e 16"
+        }
+      ]
+    },
+    {
+      "id": "menu-spell",
+      "category": "menu-choice",
+      "sourceText": "じゅもん",
+      "translation": "咒文",
+      "display": "咒文",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "15 f8 3a 2c 37"
+        }
+      ]
+    },
+    {
+      "id": "menu-strength",
+      "category": "menu-choice",
+      "sourceText": "つよさ",
+      "translation": "状态",
+      "display": "状态",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "1b 2f 14"
+        }
+      ]
+    },
+    {
+      "id": "menu-items",
+      "category": "menu-choice",
+      "sourceText": "どうぐ",
+      "translation": "道具",
+      "display": "道具",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "1d f8 0c 11 f8"
+        }
+      ]
+    },
+    {
+      "id": "menu-stairs",
+      "category": "menu-choice",
+      "sourceText": "かいだん",
+      "translation": "楼梯",
+      "display": "楼梯",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "0f 0b 19 f8 37"
+        }
+      ]
+    },
+    {
+      "id": "menu-search",
+      "category": "menu-choice",
+      "sourceText": "しらべる",
+      "translation": "调查",
+      "display": "调查",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "15 30 26 f8 32"
+        }
+      ]
+    },
+    {
+      "id": "menu-door",
+      "category": "menu-choice",
+      "sourceText": "とびら",
+      "translation": "开门",
+      "display": "开门",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "1d 24 f8 30"
+        }
+      ]
+    },
+    {
+      "id": "menu-take",
+      "category": "menu-choice",
+      "sourceText": "とる",
+      "translation": "拿取",
+      "display": "拿取",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "1d 32"
+        }
+      ]
+    },
+    {
+      "id": "status-hp",
+      "category": "status-label",
+      "sourceText": "HP",
+      "translation": "HP",
+      "display": "HP",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "63 65"
+        }
+      ]
+    },
+    {
+      "id": "status-mp",
+      "category": "status-label",
+      "sourceText": "MP",
+      "translation": "MP",
+      "display": "MP",
+      "confidence": "rom-table-confirmed",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "64 65"
+        }
+      ]
+    },
+    {
+      "id": "direction-north",
+      "category": "menu-choice",
+      "sourceText": "きた",
+      "translation": "北",
+      "display": "北",
+      "confidence": "rom-table-confirmed",
+      "encodings": [{ "kind": "ppu-pattern", "sourceHex": "10 19" }]
+    },
+    {
+      "id": "direction-west",
+      "category": "menu-choice",
+      "sourceText": "にし",
+      "translation": "西",
+      "display": "西",
+      "confidence": "rom-table-confirmed",
+      "encodings": [{ "kind": "ppu-pattern", "sourceHex": "1f 15" }]
+    },
+    {
+      "id": "direction-east",
+      "category": "menu-choice",
+      "sourceText": "ひがし",
+      "translation": "东",
+      "display": "东",
+      "confidence": "rom-table-confirmed",
+      "encodings": [{ "kind": "ppu-pattern", "sourceHex": "24 f8 15" }]
+    },
+    {
+      "id": "direction-south",
+      "category": "menu-choice",
+      "sourceText": "みなみ",
+      "translation": "南",
+      "display": "南",
+      "confidence": "rom-table-confirmed",
+      "encodings": [{ "kind": "ppu-pattern", "sourceHex": "29 1e 29" }]
+    },
+    {
+      "id": "monster-00",
+      "category": "monster",
+      "sourceText": "スライム",
+      "display": "史莱姆",
+      "confidence": "rom-table-confirmed",
+      "translation": "史莱姆",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "69 40 4a 4d"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 0
+        }
+      ]
+    },
+    {
+      "id": "monster-01",
+      "category": "monster",
+      "sourceText": "スライムベス",
+      "display": "红史莱姆",
+      "confidence": "rom-table-confirmed",
+      "translation": "红史莱姆",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "69 40 4a 4d 26 f8 69"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "id": "monster-02",
+      "category": "monster",
+      "sourceText": "ドラキー",
+      "display": "德拉奇",
+      "confidence": "rom-table-confirmed",
+      "translation": "德拉奇",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "42 40 6a 4e"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 2
+        }
+      ]
+    },
+    {
+      "id": "monster-03",
+      "category": "monster",
+      "sourceText": "ゴースト",
+      "display": "幽灵",
+      "confidence": "rom-table-confirmed",
+      "translation": "幽灵",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "45 f8 4e 69 6b"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 3
+        }
+      ]
+    },
+    {
+      "id": "monster-04",
+      "category": "monster",
+      "sourceText": "まほうつかい",
+      "display": "魔法师",
+      "confidence": "rom-table-confirmed",
+      "translation": "魔法师",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "28 27 0c 1b 0f 0b"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 4
+        }
+      ]
+    },
+    {
+      "id": "monster-05",
+      "category": "monster",
+      "sourceText": "メイジドラキー",
+      "display": "魔法德拉奇",
+      "confidence": "rom-table-confirmed",
+      "translation": "魔法德拉奇",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "3f 4a 48 f8 42 40 6a 4e"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 5
+        }
+      ]
+    },
+    {
+      "id": "monster-06",
+      "category": "monster",
+      "sourceText": "おおさそり",
+      "display": "大蝎子",
+      "confidence": "rom-table-confirmed",
+      "translation": "大蝎子",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "0e 0e 14 18 31"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 6
+        }
+      ]
+    },
+    {
+      "id": "monster-07",
+      "category": "monster",
+      "sourceText": "メーダ",
+      "display": "梅达",
+      "confidence": "rom-table-confirmed",
+      "translation": "梅达",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "3f 4e 47 f8"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 7
+        }
+      ]
+    },
+    {
+      "id": "monster-08",
+      "category": "monster",
+      "sourceText": "メトロゴースト",
+      "display": "梅特罗幽灵",
+      "confidence": "rom-table-confirmed",
+      "translation": "梅特罗幽灵",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "3f 6b 41 45 f8 4e 69 6b"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 8
+        }
+      ]
+    },
+    {
+      "id": "monster-09",
+      "category": "monster",
+      "sourceText": "ドロル",
+      "display": "多罗尔",
+      "confidence": "rom-table-confirmed",
+      "translation": "多罗尔",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "42 41 43"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 9
+        }
+      ]
+    },
+    {
+      "id": "monster-10",
+      "category": "monster",
+      "sourceText": "ドラキーマ",
+      "display": "德拉奇玛",
+      "confidence": "rom-table-confirmed",
+      "translation": "德拉奇玛",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "42 40 6a 4e 4b"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 10
+        }
+      ]
+    },
+    {
+      "id": "monster-11",
+      "category": "monster",
+      "sourceText": "がいこつ",
+      "display": "骷髅",
+      "confidence": "rom-table-confirmed",
+      "translation": "骷髅",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "0f f8 0b 13 1b"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 11
+        }
+      ]
+    },
+    {
+      "id": "monster-12",
+      "category": "monster",
+      "sourceText": "まどうし",
+      "display": "魔道士",
+      "confidence": "rom-table-confirmed",
+      "translation": "魔道士",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "28 1d f8 0c 15"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 12
+        }
+      ]
+    },
+    {
+      "id": "monster-13",
+      "category": "monster",
+      "sourceText": "てつのさそり",
+      "display": "铁蝎子",
+      "confidence": "rom-table-confirmed",
+      "translation": "铁蝎子",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "1c 1b 22 14 18 31"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 13
+        }
+      ]
+    },
+    {
+      "id": "monster-14",
+      "category": "monster",
+      "sourceText": "リカント",
+      "display": "利坎特",
+      "confidence": "rom-table-confirmed",
+      "translation": "利坎特",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "31 4c 46 6b"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 14
+        }
+      ]
+    },
+    {
+      "id": "monster-15",
+      "category": "monster",
+      "sourceText": "しりょう",
+      "display": "死灵",
+      "confidence": "rom-table-confirmed",
+      "translation": "死灵",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "15 31 3b 0c"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 15
+        }
+      ]
+    },
+    {
+      "id": "monster-16",
+      "category": "monster",
+      "sourceText": "メタルスライム",
+      "display": "金属史莱姆",
+      "confidence": "rom-table-confirmed",
+      "translation": "金属史莱姆",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "3f 47 43 69 40 4a 4d"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 16
+        }
+      ]
+    },
+    {
+      "id": "monster-17",
+      "category": "monster",
+      "sourceText": "ヘルゴースト",
+      "display": "地狱幽灵",
+      "confidence": "rom-table-confirmed",
+      "translation": "地狱幽灵",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "26 43 45 f8 4e 69 6b"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 17
+        }
+      ]
+    },
+    {
+      "id": "monster-18",
+      "category": "monster",
+      "sourceText": "リカントマムル",
+      "display": "利坎特玛姆尔",
+      "confidence": "rom-table-confirmed",
+      "translation": "利坎特玛姆尔",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "31 4c 46 6b 4b 4d 43"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 18
+        }
+      ]
+    },
+    {
+      "id": "monster-19",
+      "category": "monster",
+      "sourceText": "メーダロード",
+      "display": "梅达领主",
+      "confidence": "rom-table-confirmed",
+      "translation": "梅达领主",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "3f 4e 47 f8 41 4e 42"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 19
+        }
+      ]
+    },
+    {
+      "id": "monster-20",
+      "category": "monster",
+      "sourceText": "ドロルメイジ",
+      "display": "多罗尔法师",
+      "confidence": "rom-table-confirmed",
+      "translation": "多罗尔法师",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "42 41 43 3f 4a 48 f8"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 20
+        }
+      ]
+    },
+    {
+      "id": "monster-21",
+      "category": "monster",
+      "sourceText": "キメラ",
+      "display": "奇美拉",
+      "confidence": "rom-table-confirmed",
+      "translation": "奇美拉",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "6a 3f 40"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 21
+        }
+      ]
+    },
+    {
+      "id": "monster-22",
+      "category": "monster",
+      "sourceText": "しのさそり",
+      "display": "死亡蝎子",
+      "confidence": "rom-table-confirmed",
+      "translation": "死亡蝎子",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "15 22 14 18 31"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 22
+        }
+      ]
+    },
+    {
+      "id": "monster-23",
+      "category": "monster",
+      "sourceText": "しりょうのきし",
+      "display": "死灵骑士",
+      "confidence": "rom-table-confirmed",
+      "translation": "死灵骑士",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "15 31 3b 0c 22 10 15"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 23
+        }
+      ]
+    },
+    {
+      "id": "monster-24",
+      "category": "monster",
+      "sourceText": "ゴーレム",
+      "display": "魔像",
+      "confidence": "rom-table-confirmed",
+      "translation": "魔像",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "45 f8 4e 44 4d"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 24
+        }
+      ]
+    },
+    {
+      "id": "monster-25",
+      "category": "monster",
+      "sourceText": "ゴールドマン",
+      "display": "黄金人",
+      "confidence": "rom-table-confirmed",
+      "translation": "黄金人",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "45 f8 4e 43 42 4b 46"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 25
+        }
+      ]
+    },
+    {
+      "id": "monster-26",
+      "category": "monster",
+      "sourceText": "よろいのきし",
+      "display": "铠甲骑士",
+      "confidence": "rom-table-confirmed",
+      "translation": "铠甲骑士",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "2f 34 0b 22 10 15"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 26
+        }
+      ]
+    },
+    {
+      "id": "monster-27",
+      "category": "monster",
+      "sourceText": "メイジキメラ",
+      "display": "魔法奇美拉",
+      "confidence": "rom-table-confirmed",
+      "translation": "魔法奇美拉",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "3f 4a 48 f8 6a 3f 40"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 27
+        }
+      ]
+    },
+    {
+      "id": "monster-28",
+      "category": "monster",
+      "sourceText": "かげのきし",
+      "display": "暗影骑士",
+      "confidence": "rom-table-confirmed",
+      "translation": "暗影骑士",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "0f 12 f8 22 10 15"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 28
+        }
+      ]
+    },
+    {
+      "id": "monster-29",
+      "category": "monster",
+      "sourceText": "キラーリカント",
+      "display": "杀手利坎特",
+      "confidence": "rom-table-confirmed",
+      "translation": "杀手利坎特",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "6a 40 4e 31 4c 46 6b"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 29
+        }
+      ]
+    },
+    {
+      "id": "monster-30",
+      "category": "monster",
+      "sourceText": "ドラゴン",
+      "display": "龙",
+      "confidence": "rom-table-confirmed",
+      "translation": "龙",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "42 40 45 f8 46"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 30
+        }
+      ]
+    },
+    {
+      "id": "monster-31",
+      "category": "monster",
+      "sourceText": "スターキメラ",
+      "display": "星之奇美拉",
+      "confidence": "rom-table-confirmed",
+      "translation": "星之奇美拉",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "69 47 4e 6a 3f 40"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 31
+        }
+      ]
+    },
+    {
+      "id": "monster-32",
+      "category": "monster",
+      "sourceText": "だいまどう",
+      "display": "大魔道士",
+      "confidence": "rom-table-confirmed",
+      "translation": "大魔道士",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "19 f8 0b 28 1d f8 0c"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 32
+        }
+      ]
+    },
+    {
+      "id": "monster-33",
+      "category": "monster",
+      "sourceText": "あくまのきし",
+      "display": "恶魔骑士",
+      "confidence": "rom-table-confirmed",
+      "translation": "恶魔骑士",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "0a 11 28 22 10 15"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 33
+        }
+      ]
+    },
+    {
+      "id": "monster-34",
+      "category": "monster",
+      "sourceText": "キースドラゴン",
+      "display": "基斯龙",
+      "confidence": "rom-table-confirmed",
+      "translation": "基斯龙",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "6a 4e 69 42 40 45 f8 46"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 34
+        }
+      ]
+    },
+    {
+      "id": "monster-35",
+      "category": "monster",
+      "sourceText": "ストーンマン",
+      "display": "石头人",
+      "confidence": "rom-table-confirmed",
+      "translation": "石头人",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "69 6b 4e 46 4b 46"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 35
+        }
+      ]
+    },
+    {
+      "id": "monster-36",
+      "category": "monster",
+      "sourceText": "しにがみのきし",
+      "display": "死神骑士",
+      "confidence": "rom-table-confirmed",
+      "translation": "死神骑士",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "15 1f 0f f8 29 22 10 15"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 36
+        }
+      ]
+    },
+    {
+      "id": "monster-37",
+      "category": "monster",
+      "sourceText": "ダースドラゴ",
+      "display": "达斯龙",
+      "confidence": "rom-table-confirmed",
+      "translation": "达斯龙",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "47 f8 4e 69 42 40 45 f8"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 37
+        }
+      ]
+    },
+    {
+      "id": "monster-38",
+      "category": "monster",
+      "sourceText": "りゅうおう",
+      "display": "龙王",
+      "confidence": "rom-table-confirmed",
+      "form": "first",
+      "translation": "龙王",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "31 3a 0c 0e 0c"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 38
+        }
+      ]
+    },
+    {
+      "id": "monster-39",
+      "category": "monster",
+      "sourceText": "りゅうおう",
+      "display": "龙王",
+      "confidence": "rom-table-confirmed",
+      "form": "dragon",
+      "translation": "龙王",
+      "encodings": [
+        {
+          "kind": "ppu-pattern",
+          "sourceHex": "31 3a 0c 0e 0c"
+        },
+        {
+          "kind": "rom-table",
+          "table": "monsters",
+          "index": 39
+        }
+      ]
+    }
   ]
 }

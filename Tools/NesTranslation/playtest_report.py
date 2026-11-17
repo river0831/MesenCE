@@ -12,6 +12,8 @@ import unicodedata
 
 from .snapshot_replay import load_snapshots
 from .text_review import load_character_map
+from .vocabulary import normalize_vocabulary
+from .vocabulary_audit import audit_vocabulary
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -96,7 +98,9 @@ def build_playtest_report(
     vocabulary: dict[str, Any],
     dialogue_catalog: dict[str, Any] | None = None,
     discovery_events: Iterable[dict[str, Any]] = (),
+    dictionary_catalog: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    vocabulary = normalize_vocabulary(vocabulary)
     snapshots = list(snapshots)
     discovery_events = list(discovery_events)
     translated_dialogue = {
@@ -170,7 +174,24 @@ def build_playtest_report(
 
     def is_known(text: str) -> bool:
         compact = _normalized_text(text)
-        return any(compact and compact in source for source in normalized_sources)
+        if any(compact and compact in source for source in normalized_sources):
+            return True
+        # One screen row commonly contains several independently translated
+        # menu words. Treat it as known when reviewed source terms can cover
+        # the complete normalized row in order; do not require a synthetic
+        # combined database record for every layout.
+        reachable = {0}
+        while reachable:
+            start = min(reachable)
+            reachable.remove(start)
+            if start == len(compact):
+                return True
+            reachable.update(
+                start + len(source)
+                for source in normalized_sources
+                if source and compact.startswith(source, start)
+            )
+        return False
 
     candidates = [
         {
@@ -199,6 +220,9 @@ def build_playtest_report(
             discovery_counts.items(), key=lambda item: (-item[1], item[0])
         )
     ]
+    vocabulary_audit = audit_vocabulary(
+        vocabulary, dictionary_catalog, observed_records
+    )
     return {
         "summary": {
             "snapshotCount": len(snapshots),
@@ -235,6 +259,7 @@ def build_playtest_report(
         },
         "catalogDiscoveries": discoveries,
         "textCandidates": candidates,
+        "vocabularyAudit": vocabulary_audit,
     }
 
 
@@ -251,6 +276,10 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Candidates needing review: {summary['reviewCandidateCount']}",
         f"- Catalog records discovered: {summary['discoveredCatalogRecordCount']}",
         f"- Discovered without translation: {summary['discoveredUntranslatedCount']}",
+        f"- Vocabulary records never observed: "
+        f"{report['vocabularyAudit']['summary']['unobservedRecordCount']}",
+        f"- Vocabulary pattern conflicts: "
+        f"{report['vocabularyAudit']['summary']['patternConflictCount']}",
         "",
         "## Observed records",
         "",
@@ -302,6 +331,38 @@ def render_markdown(report: dict[str, Any]) -> str:
                 f"| {escaped} | {item['occurrences']} | frame {example['frame']}, "
                 f"row {example['row']}, column {example['startColumn']} |"
             )
+    audit = report["vocabularyAudit"]
+    lines.extend(["", "## Vocabulary coverage audit", ""])
+    lines.append(
+        "- Never observed: " + (
+            ", ".join(f"`{value}`" for value in audit["unobservedRecordIds"])
+            or "None"
+        )
+    )
+    lines.append(
+        "- Missing encodings: " + (
+            ", ".join(
+                f"`{value}`" for value in audit["missingEncodingRecordIds"]
+            ) or "None"
+        )
+    )
+    lines.append(
+        "- Unresolved screen patterns: " + (
+            ", ".join(
+                f"`{value}`" for value in audit["unresolvedPatternRecordIds"]
+            ) or "None"
+        )
+    )
+    lines.extend(["", "### Conflicting patterns", ""])
+    if not audit["patternConflicts"]:
+        lines.append("No screen pattern maps to conflicting translations.")
+    else:
+        for conflict in audit["patternConflicts"]:
+            labels = ", ".join(
+                f"`{item['recordId']}` → {item['display']}"
+                for item in conflict["records"]
+            )
+            lines.append(f"- `{conflict['sourceHex']}`: {labels}")
     return "\n".join(lines) + "\n"
 
 
@@ -313,6 +374,7 @@ def main() -> None:
     parser.add_argument("--translations", required=True, type=Path)
     parser.add_argument("--vocabulary", required=True, type=Path)
     parser.add_argument("--dialogue-catalog", type=Path)
+    parser.add_argument("--dictionary-catalog", type=Path)
     parser.add_argument("--discoveries", type=Path)
     parser.add_argument("--json-output", required=True, type=Path)
     parser.add_argument("--markdown-output", required=True, type=Path)
@@ -323,6 +385,7 @@ def main() -> None:
         _load_json(args.vocabulary),
         _load_json(args.dialogue_catalog) if args.dialogue_catalog else None,
         load_discovery_events(args.discoveries) if args.discoveries else (),
+        _load_json(args.dictionary_catalog) if args.dictionary_catalog else None,
     )
     args.json_output.parent.mkdir(parents=True, exist_ok=True)
     args.markdown_output.parent.mkdir(parents=True, exist_ok=True)
